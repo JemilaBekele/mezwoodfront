@@ -154,6 +154,13 @@ shortcut: ['ps', 'ps'],
         shortcut: ['y', 'y'],
         permission: 'VIEW_ALL_TRANSFERS'
       },
+        {
+        title: 'Proforma',
+        url: '/dashboard/proforma',
+        icon: 'receipt',
+        shortcut: ['p', 'p'],
+        // permission: 'VIEW_ALL_PROFORMAS'
+      },
       {
         title: 'Stock Correction',
         url: '/dashboard/StockCorrection',
