@@ -906,7 +906,7 @@ const ShopBatchModal = ({
         </div>
 
         {/* Order Summary */}
-        <div className='rounded-md border border-gray-200 bg-gray-50 p-3'>
+        <div className='rounded-md borderp-3'>
           <h4 className='mb-3 text-sm font-semibold'>Order Summary</h4>
 
           <div className='space-y-2'>
@@ -937,7 +937,7 @@ const ShopBatchModal = ({
                   </div>
                 )}
 
-                <div className='mt-2 border-t border-gray-200 pt-2'>
+                <div className='mt-2 border-t pt-2'>
                   <div className='flex items-center justify-between text-sm font-bold'>
                     <span>Total:</span>
                     <span className='text-blue-600'>
@@ -1792,6 +1792,128 @@ export const ProductSearch = ({
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Dark mode detection
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkDark = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+
+    checkDark();
+    const observer = new MutationObserver(checkDark);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Dark mode styles for react-select
+  const darkStyles = {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      color: '#f9fafb',
+      '&:hover': {
+        borderColor: '#4b5563'
+      }
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: '#1f2937',
+      color: '#f9fafb'
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isFocused ? '#374151' : '#1f2937',
+      color: '#f9fafb',
+      '&:active': {
+        backgroundColor: '#4b5563'
+      }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: '#f9fafb'
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: '#f9fafb'
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: '#9ca3af'
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: '#9ca3af',
+      '&:hover': {
+        color: '#f9fafb'
+      }
+    }),
+    clearIndicator: (base: any) => ({
+      ...base,
+      color: '#9ca3af',
+      '&:hover': {
+        color: '#f87171'
+      }
+    }),
+    indicatorSeparator: (base: any) => ({
+      ...base,
+      backgroundColor: '#374151'
+    }),
+    noOptionsMessage: (base: any) => ({
+      ...base,
+      color: '#9ca3af'
+    }),
+    loadingMessage: (base: any) => ({
+      ...base,
+      color: '#9ca3af'
+    })
+  };
+
+  // Light mode styles for react-select
+  const lightStyles = {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: '#ffffff',
+      borderColor: '#d1d5db',
+      color: '#111827',
+      '&:hover': {
+        borderColor: '#9ca3af'
+      }
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: '#ffffff',
+      color: '#111827'
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isFocused ? '#f3f4f6' : '#ffffff',
+      color: '#111827',
+      '&:active': {
+        backgroundColor: '#e5e7eb'
+      }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: '#111827'
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: '#111827'
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: '#9ca3af'
+    })
+  };
+
+  const selectStyles = isDark ? darkStyles : lightStyles;
+
   // Convert options for react-select format
   const categorySelectOptions = [
     { value: 'all', label: 'All Categories' },
@@ -1817,8 +1939,6 @@ export const ProductSearch = ({
     { value: 'all', label: 'All Additive Types' },
     ...additiveTypeOptions
   ];
-
-
 
   // Initialize state with props directly
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
@@ -2093,7 +2213,6 @@ export const ProductSearch = ({
     return additiveTypeSelectOptions.find(option => option.value === searchFilters.additiveType);
   };
 
-
   return (
     <div className='flex flex-col space-y-6 lg:flex-row lg:space-y-0 lg:space-x-6'>
       <div className='flex-1 space-y-4 sm:space-y-6'>
@@ -2117,6 +2236,7 @@ export const ProductSearch = ({
                 placeholder="Search category..."
                 className="text-xs sm:text-sm"
                 classNamePrefix="react-select"
+                styles={selectStyles}
               />
             </div>
 
@@ -2133,6 +2253,7 @@ export const ProductSearch = ({
                 placeholder="Search brand..."
                 className="text-xs sm:text-sm"
                 classNamePrefix="react-select"
+                styles={selectStyles}
               />
             </div>
 
@@ -2149,6 +2270,7 @@ export const ProductSearch = ({
                 placeholder="Search viscosity..."
                 className="text-xs sm:text-sm"
                 classNamePrefix="react-select"
+                styles={selectStyles}
               />
             </div>
 
@@ -2165,6 +2287,7 @@ export const ProductSearch = ({
                 placeholder="Search oil type..."
                 className="text-xs sm:text-sm"
                 classNamePrefix="react-select"
+                styles={selectStyles}
               />
             </div>
 
@@ -2181,10 +2304,9 @@ export const ProductSearch = ({
                 placeholder="Search additive type..."
                 className="text-xs sm:text-sm"
                 classNamePrefix="react-select"
+                styles={selectStyles}
               />
             </div>
-
-       
 
             {/* Product Name Search */}
             <div>
@@ -2214,7 +2336,7 @@ export const ProductSearch = ({
 
         {/* Results Count */}
         <div className='w-full rounded-lg p-3 shadow-md sm:p-4'>
-          <p className='text-xs text-gray-600 sm:text-sm'>
+          <p className='text-xs text-gray-600 sm:text-sm dark:text-gray-400'>
             Showing {indexOfFirstProduct + 1}-
             {Math.min(indexOfLastProduct, filteredProducts.length)} of{' '}
             {filteredProducts.length} products
@@ -2233,7 +2355,7 @@ export const ProductSearch = ({
             ))
           ) : (
             <div className='col-span-full py-8 text-center sm:py-12'>
-              <p className='text-base text-gray-500 sm:text-lg'>
+              <p className='text-base text-gray-500 sm:text-lg dark:text-gray-400'>
                 No products found matching your criteria.
               </p>
               <Button

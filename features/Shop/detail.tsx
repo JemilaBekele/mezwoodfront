@@ -69,6 +69,7 @@ import {
 } from '@/components/ui/dialog';
 import { normalizeImagePath } from '@/lib/norm';
 import Image from 'next/image';
+import { getProductByShops } from '@/service/Product';
 
 type SaleViewProps = {
   id?: string;
@@ -83,12 +84,14 @@ interface PriceAnalysis {
   productId: string;
   productName: string;
   sellPrice: number;
+  isBox: boolean; // Add this
   additionalPrices: Array<{
     label: string;
     price: number;
     shopId: string | null;
     isMatch: boolean;
     difference: number;
+    isBox: boolean; // Add this
   }>;
   hasMatchingPrice: boolean;
 }
@@ -115,59 +118,129 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
     
     const hasAttachedFiles = !!(normalizedImageUrl || normalizedDocumentUrl);
 
-  const analyzePrices = async () => {
-    if (!sale || !sale.items) return;
+// Function to analyze prices with isBox/Type information
+const analyzePrices = async () => {
+  if (!sale || !sale.items) return;
 
-    setLoadingPriceAnalysis(true);
-    try {
-      const analysis: PriceAnalysis[] = [];
+  setLoadingPriceAnalysis(true);
+  try {
+    const analysis: PriceAnalysis[] = [];
 
-      for (const item of sale.items) {
-        if (!item.product?.id || !item.shop?.id) continue;
+    for (const item of sale.items) {
+      if (!item.product?.id || !item.shop || !item.shop.id) continue;
 
-        try {
-          const additionalPrices = item.product.AdditionalPrice || [];
+  
 
-          const priceComparisons = additionalPrices.map((ap) => {
-            const isMatch = Math.abs(ap.price - item.unitPrice) < 0.01;
-            const difference = item.unitPrice - ap.price;
+      try {
+        // Fetch product availability with shops and additional prices (same as ShopBatchModal)
+        const response = await getProductByShops(item.product.id);
+   
 
-            return {
-              label: ap.label ?? 'N/A',
-              price: ap.price,
-              shopId: ap.shopId ?? null,
-              isMatch,
-              difference
-            };
-          });
+        // Find the specific shop's data (same logic as ShopBatchModal)
+        const shopData = response.shops?.find(
+          (shop: any) => shop.shopId === item.shop?.id
+        );
 
+        if (!shopData) {
           analysis.push({
             productId: item.product.id,
             productName: item.product.name,
             sellPrice: item.unitPrice,
-            additionalPrices: priceComparisons,
-            hasMatchingPrice: priceComparisons.some((ap) => ap.isMatch)
-          });
-        } catch {
-          analysis.push({
-            productId: item.product.id,
-            productName: item.product.name,
-            sellPrice: item.unitPrice,
+            isBox: item.isBox,
             additionalPrices: [],
             hasMatchingPrice: false
           });
+          continue;
         }
+
+        // Get additional prices from the shop data (same as ShopBatchModal)
+        const additionalPrices = shopData.additionalPrices || [];
+        
+   
+    
+
+        // Filter additional prices that match the item's isBox type (same as ShopBatchModal)
+        const matchingTypePrices = additionalPrices.filter(
+          (ap: { isBox: boolean }) => ap.isBox === item.isBox
+        );
+
+        console.log(`✅ Matching type prices (same isBox = ${item.isBox ? 'BOX' : 'PIECE'}): ${matchingTypePrices.length}`);
+        
+        const shopId = item.shop?.id ?? '';
+
+        // Compare sell price with additional prices of the same type
+        const priceComparisons = matchingTypePrices.map(
+          (ap: { price: number; label: string; id: string; isBox: boolean }) => {
+            const isMatch = Math.abs(ap.price - item.unitPrice) < 0.01;
+            const difference = item.unitPrice - ap.price;
+
+            console.log(`   Price comparison: ${ap.price} vs ${item.unitPrice} = ${isMatch ? '✓ MATCH' : '✗ NO MATCH'} (difference: ${difference.toFixed(4)})`);
+
+            return {
+              label: ap.label || (ap.isBox ? 'Box Price' : 'Piece Price'),
+              price: ap.price,
+              shopId,
+              isMatch,
+              difference,
+              isBox: ap.isBox
+            };
+          }
+        );
+
+        // Also show other type prices for reference (different isBox)
+        const otherTypePrices = additionalPrices.filter(
+          (ap: { isBox: boolean }) => ap.isBox !== item.isBox
+        );
+
+        console.log(`⚠️ Other type prices (different isBox): ${otherTypePrices.length}`);
+
+        const otherTypeComparisons = otherTypePrices.map(
+          (ap: { price: number; label: string; id: string; isBox: boolean }) => ({
+            label: ap.label || (ap.isBox ? 'Box Price' : 'Piece Price'),
+            price: ap.price,
+            shopId,
+            isMatch: false,
+            difference: item.unitPrice - ap.price,
+            isBox: ap.isBox
+          })
+        );
+
+        // Combine both
+        const allComparisons = [...priceComparisons, ...otherTypeComparisons];
+        const hasMatchingPrice = priceComparisons.some((ap: { isMatch: any; }) => ap.isMatch);
+
+
+        analysis.push({
+          productId: item.product.id,
+          productName: item.product.name,
+          sellPrice: item.unitPrice,
+          isBox: item.isBox,
+          additionalPrices: allComparisons,
+          hasMatchingPrice: hasMatchingPrice
+        });
+      } catch (error) {
+        console.error(`❌ Error fetching data for product ${item.product.name}:`, error);
+        analysis.push({
+          productId: item.product.id,
+          productName: item.product.name,
+          sellPrice: item.unitPrice,
+          isBox: item.isBox,
+          additionalPrices: [],
+          hasMatchingPrice: false
+        });
       }
-
-      setPriceAnalysis(analysis);
-      setPriceAnalysisModalOpen(true);
-    } catch {
-      toast.error('Failed to analyze prices');
-    } finally {
-      setLoadingPriceAnalysis(false);
     }
-  };
 
+
+    setPriceAnalysis(analysis);
+    setPriceAnalysisModalOpen(true);
+  } catch (error) {
+    console.error('❌ Price analysis failed:', error);
+    toast.error('Failed to analyze prices');
+  } finally {
+    setLoadingPriceAnalysis(false);
+  }
+};
   useEffect(() => {
     const fetchSale = async () => {
       if (!id) return;
@@ -1012,137 +1085,187 @@ return (
         </Button>
       </div>
 
-      <Dialog
-        open={priceAnalysisModalOpen}
-        onOpenChange={setPriceAnalysisModalOpen}
-      >
-        <DialogContent className='max-h-[80vh] max-w-4xl overflow-y-auto'>
-          <DialogHeader>
-            <DialogTitle className='flex items-center gap-2'>
-              <Scale className='h-5 w-5' />
-              Price Analysis
-            </DialogTitle>
-            <DialogDescription>
-              Comparison between sell prices and additional prices for each
-              product in this sale.
-            </DialogDescription>
-          </DialogHeader>
+  <Dialog
+  open={priceAnalysisModalOpen}
+  onOpenChange={setPriceAnalysisModalOpen}
+>
+  <DialogContent className='max-h-[80vh] max-w-4xl overflow-y-auto'>
+    <DialogHeader>
+      <DialogTitle className='flex items-center gap-2'>
+        <Scale className='h-5 w-5' />
+        Price Analysis
+      </DialogTitle>
+      <DialogDescription>
+        Comparison between sell prices and additional prices for each
+        product in this sale. Shows matching prices based on Box/Piece type.
+      </DialogDescription>
+    </DialogHeader>
 
-          <div className='space-y-4'>
-            {priceAnalysis.map((analysis) => (
-              <Card
-                key={analysis.productId}
-                className='border-l-4 border-l-blue-500'
+    <div className='space-y-4'>
+      {priceAnalysis.map((analysis) => (
+        <Card
+          key={analysis.productId}
+          className='border-l-4 border-l-blue-500'
+        >
+          <CardContent className='pt-4'>
+            <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
+              <div>
+                <div className='flex items-center gap-2'>
+                  <h4 className='text-lg font-semibold'>
+                    {analysis.productName}
+                  </h4>
+                  <Badge variant={analysis.isBox ? 'default' : 'secondary'} className='text-xs'>
+                    {analysis.isBox ? (
+                      <>
+                        <Box className='mr-1 h-3 w-3' />
+                        Box
+                      </>
+                    ) : (
+                      <>
+                        <PackageOpen className='mr-1 h-3 w-3' />
+                        Piece
+                      </>
+                    )}
+                  </Badge>
+                </div>
+                <p className='text-muted-foreground'>
+                  Sell Price:{' '}
+                  <span className='text-primary font-bold'>
+                    {analysis.sellPrice.toFixed(2)} ETB
+                  </span>
+                  {' '}per {analysis.isBox ? 'box' : 'piece'}
+                </p>
+              </div>
+              <Badge
+                variant={
+                  analysis.hasMatchingPrice ? 'default' : 'secondary'
+                }
+                className={`w-fit ${
+                  analysis.hasMatchingPrice
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    : ''
+                }`}
               >
-                <CardContent className='pt-4'>
-                  <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
-                    <div>
-                      <h4 className='text-lg font-semibold'>
-                        {analysis.productName}
-                      </h4>
-                      <p className='text-muted-foreground'>
-                        Sell Price:{' '}
-                        <span className='text-primary font-bold'>
-                          ${analysis.sellPrice.toFixed(2)}
-                        </span>
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        analysis.hasMatchingPrice ? 'default' : 'secondary'
-                      }
-                      className={`w-fit ${
-                        analysis.hasMatchingPrice
-                          ? 'bg-green-100 text-green-800'
-                          : ''
+                {analysis.hasMatchingPrice ? (
+                  <Check className='mr-1 h-3 w-3' />
+                ) : (
+                  <X className='mr-1 h-3 w-3' />
+                )}
+                {analysis.hasMatchingPrice
+                  ? 'Price Match Found'
+                  : 'No Match'}
+              </Badge>
+            </div>
+
+            {analysis.additionalPrices.length > 0 ? (
+              <div className='space-y-2'>
+                <h5 className='text-muted-foreground text-sm font-medium'>
+                  Additional Prices:
+                </h5>
+                <div className='grid gap-2'>
+                  {analysis.additionalPrices.map((ap, index) => (
+                    <div
+                      key={index}
+                      className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${
+                        ap.isMatch && ap.isBox === analysis.isBox
+                          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                          : ap.isBox === analysis.isBox
+                          ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20'
+                          : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
                       }`}
                     >
-                      {analysis.hasMatchingPrice ? (
-                        <Check className='mr-1 h-3 w-3' />
-                      ) : (
-                        <X className='mr-1 h-3 w-3' />
-                      )}
-                      {analysis.hasMatchingPrice
-                        ? 'Price Match Found'
-                        : 'No Match'}
-                    </Badge>
-                  </div>
-
-                  {analysis.additionalPrices.length > 0 ? (
-                    <div className='space-y-2'>
-                      <h5 className='text-muted-foreground text-sm font-medium'>
-                        Additional Prices:
-                      </h5>
-                      <div className='grid gap-2'>
-                        {analysis.additionalPrices.map((ap, index) => (
-                          <div
-                            key={index}
-                            className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${
-                              ap.isMatch
-                                ? 'border-green-200 bg-green-50'
-                                : 'border-gray-200 bg-gray-50'
+                      <div className='flex items-center gap-3'>
+                        <div
+                          className={`rounded p-1 ${
+                            ap.isMatch && ap.isBox === analysis.isBox
+                              ? 'bg-green-100 dark:bg-green-800'
+                              : ap.isBox === analysis.isBox
+                              ? 'bg-yellow-100 dark:bg-yellow-800'
+                              : 'bg-gray-100 dark:bg-gray-700'
+                          }`}
+                        >
+                          {ap.isBox ? (
+                            <Box
+                              className={`h-4 w-4 ${
+                                ap.isMatch && ap.isBox === analysis.isBox
+                                  ? 'text-green-600 dark:text-green-300'
+                                  : ap.isBox === analysis.isBox
+                                  ? 'text-yellow-600 dark:text-yellow-300'
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`}
+                            />
+                          ) : (
+                            <PackageOpen
+                              className={`h-4 w-4 ${
+                                ap.isMatch && ap.isBox === analysis.isBox
+                                  ? 'text-green-600 dark:text-green-300'
+                                  : ap.isBox === analysis.isBox
+                                  ? 'text-yellow-600 dark:text-yellow-300'
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`}
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <p className='font-medium'>
+                            {ap.label || (ap.isBox ? 'Box Price' : 'Piece Price')}
+                          </p>
+                          <p className='text-muted-foreground text-xs'>
+                            {ap.shopId ? 'Shop-specific' : 'Global'} • {ap.isBox ? 'Box' : 'Piece'} price
+                          </p>
+                        </div>
+                      </div>
+                      <div className='text-left sm:text-right'>
+                        <p
+                          className={`font-bold ${
+                            ap.isMatch && ap.isBox === analysis.isBox
+                              ? 'text-green-600 dark:text-green-300'
+                              : ap.isBox === analysis.isBox
+                              ? 'text-yellow-600 dark:text-yellow-300'
+                              : 'text-gray-600 dark:text-gray-400'
+                          }`}
+                        >
+                          {ap.price.toFixed(2)} ETB
+                          {ap.isBox === analysis.isBox && (
+                            <span className='ml-1 text-xs font-normal text-muted-foreground'>
+                              per {ap.isBox ? 'box' : 'piece'}
+                            </span>
+                          )}
+                        </p>
+                        {!ap.isMatch && ap.isBox === analysis.isBox && (
+                          <p
+                            className={`text-xs ${
+                              ap.difference > 0
+                                ? 'text-red-500'
+                                : 'text-blue-500'
                             }`}
                           >
-                            <div className='flex items-center gap-3'>
-                              <div
-                                className={`rounded p-1 ${
-                                  ap.isMatch ? 'bg-green-100' : 'bg-gray-100'
-                                }`}
-                              >
-                                <Tag
-                                  className={`h-4 w-4 ${
-                                    ap.isMatch
-                                      ? 'text-green-600'
-                                      : 'text-gray-600'
-                                  }`}
-                                />
-                              </div>
-                              <div>
-                                <p className='font-medium'>{ap.label}</p>
-                                <p className='text-muted-foreground text-xs'>
-                                  {ap.shopId ? 'Shop-specific' : 'Global'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className='text-left sm:text-right'>
-                              <p
-                                className={`font-bold ${
-                                  ap.isMatch
-                                    ? 'text-green-600'
-                                    : 'text-gray-600'
-                                }`}
-                              >
-                                {ap.price.toFixed(2)}
-                              </p>
-                              {!ap.isMatch && (
-                                <p
-                                  className={`text-xs ${
-                                    ap.difference > 0
-                                      ? 'text-red-500'
-                                      : 'text-blue-500'
-                                  }`}
-                                >
-                                  {ap.difference > 0 ? '+' : ''}
-                                  {ap.difference.toFixed(2)}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                            {ap.difference > 0 ? '+' : ''}
+                            {ap.difference.toFixed(2)} ETB difference
+                          </p>
+                        )}
+                        {ap.isBox !== analysis.isBox && (
+                          <p className='text-xs text-muted-foreground'>
+                            Different type ({ap.isBox ? 'Box' : 'Piece'})
+                          </p>
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <div className='text-muted-foreground py-4 text-center'>
-                      <DollarSign className='mx-auto mb-2 h-8 w-8 opacity-50' />
-                      <p>No additional prices found for this product</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className='text-muted-foreground py-4 text-center'>
+                <Tag className='mx-auto mb-2 h-8 w-8 opacity-50' />
+                <p>No additional prices found for this product</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  </DialogContent>
+</Dialog>
 
       <AlertModal
         isOpen={open}

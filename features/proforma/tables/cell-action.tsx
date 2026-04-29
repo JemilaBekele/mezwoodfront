@@ -251,10 +251,10 @@ export const ProformaCellAction: React.FC<ProformaCellActionProps> = ({ data }) 
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-          {/* Upload */}
+          {/* Upload
           <DropdownMenuItem onClick={() => setOpenUploadDialog(true)}>
             <IconUpload className="mr-2 h-4 w-4" /> Upload Files
-          </DropdownMenuItem>
+          </DropdownMenuItem> */}
 
           {/* Update */}
           {data.status !== 'APPROVED' && (
@@ -268,19 +268,7 @@ export const ProformaCellAction: React.FC<ProformaCellActionProps> = ({ data }) 
             <Edit className="mr-2 h-4 w-4" /> View
           </DropdownMenuItem>
 
-          {/* Approve */}
-          {data.status === 'PENDING' && (
-            <DropdownMenuItem onClick={handleApprove}>
-              <IconCheck className="mr-2 h-4 w-4" /> Approve
-            </DropdownMenuItem>
-          )}
-
-          {/* Reject */}
-          {data.status === 'PENDING' && (
-            <DropdownMenuItem onClick={handleReject}>
-              <IconReject className="mr-2 h-4 w-4" /> Reject
-            </DropdownMenuItem>
-          )}
+       
 
           {/* Convert */}
           {data.status === 'APPROVED' && (
