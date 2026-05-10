@@ -139,12 +139,8 @@ export default function SignInViewPage() {
       {/* ── Hero Panel ─────────────────────────── */}
       <div className="login-hero">
         <div className="login-hero__bg">
-<img
-  src="/construction-hero.png"
-  alt="Construction Management"
-  className="login-hero__img"
-  loading="eager"
-/>          <div className="login-hero__overlay" />
+          <img src="/login-hero.png" alt="" className="login-hero__img" loading="eager" />
+          <div className="login-hero__overlay" />
           <div className="login-hero__vignette" />
         </div>
 
@@ -156,57 +152,26 @@ export default function SignInViewPage() {
             transition: "all 0.9s cubic-bezier(0.22,1,0.36,1) 0.3s",
           }}
         >
-         <div className="login-brand">
-  <div className="login-brand__icon">
-    <svg
-      viewBox="0 0 64 64"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M8 56H56"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M16 56V28L32 14L48 28V56"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24 56V40H40V56"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M28 24H36"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
-  </div>
+          <div className="login-brand">
+            <div className="login-brand__icon">
+              <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="2" width="36" height="36" rx="8" stroke="currentColor" strokeWidth="2" />
+                <path d="M12 14h16M12 20h16M12 26h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="login-brand__name">Car Stock</h2>
+              <p className="login-brand__tagline">Inventory Management System</p>
+            </div>
+          </div>
 
-  <div>
-    <h2 className="login-brand__name">BuildTrack</h2>
-    <p className="login-brand__tagline">
-      Construction Management System
-    </p>
-  </div>
-</div>
+          <div className="login-hero__quote">
+            <blockquote>
+               &ldquo;Manage your inventory and track your stock easily.&rdquo;
 
-{/* Quote */}
-<div className="login-hero__quote">
-  <blockquote>
-    &ldquo;Manage projects, teams, materials, and construction progress
-    efficiently in one platform.&rdquo;
-  </blockquote>
-</div>
+            </blockquote>
+          </div>
 
-    
           <div className="login-hero__stats">
             {/* <AnimatedStat value="12K" label="Vehicles Tracked" suffix="+" /> */}
             <div className="login-hero__stats-divider" />
