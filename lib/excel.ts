@@ -40,7 +40,6 @@ export const formatProductDataForExcel = (products: IProduct[]) => {
   return products.map((product) => ({
     'Product Code': product.productCode,
     'Product Name': product.name,
-    'Generic Name': product.generic || 'N/A',
     'Description': product.description || 'N/A',
     'Category': product.category?.name || 'N/A',
     'Status': product.isActive ? 'Active' : 'Inactive',
