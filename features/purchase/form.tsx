@@ -23,38 +23,40 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { IPurchase } from '@/models/purchase';
 import { IProduct } from '@/models/Product';
 import { getStores } from '@/service/store';
-import { getProducts } from '@/service/Product';
+import {
+  getProducts,
+  getUnitOfMeasuresByProductId
+} from '@/service/Product';
 import { createPurchase, updatePurchase } from '@/service/purchase';
 import { ISupplier } from '@/models/supplier';
 import { getSupplier } from '@/service/supplier';
-import { getShops } from '@/service/shop';
-import { IShop } from '@/models/shop';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { IconTrash, IconPlus } from '@tabler/icons-react';
 import { Modal } from '@/components/ui/modal';
 import CreateSupplierModal from './suppliyer';
+import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
 import { format } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 // TypeScript interfaces for form values
 interface FormItemValues {
   productId: string;
-  isBox: boolean;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
+  unitOfMeasureId: string;
+  quantity?: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  height?: number;
+  width?: number;
 }
 
 interface FormValues {
   invoiceNo: string;
   supplierId: string;
   storeId: string;
-  shopId: string;
-  locationType: 'store' | 'shop'; // New field to track selection
   purchaseDate: string;
   paymentStatus: string;
   notes?: string;
@@ -73,26 +75,21 @@ export default function PurchaseForm({
   const [isLoading, setIsLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
   const [stores, setStores] = useState<any[]>([]);
-  const [shops, setShops] = useState<IShop[]>([]);
   const [products, setProducts] = useState<IProduct[]>([]);
+  const [unitsOfMeasure, setUnitsOfMeasure] = useState<{
+    [key: string]: IUnitOfMeasure[];
+  }>({});
   const [isMounted, setIsMounted] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [loadingUOM, setLoadingUOM] = useState<{ [key: string]: boolean }>({});
+  const [itemTypes, setItemTypes] = useState<{ [key: number]: 'quantity' | 'dimension' }>({});
   const router = useRouter();
-
-  // Determine initial location type
-  const getInitialLocationType = (): 'store' | 'shop' => {
-    if (initialData?.storeId) return 'store';
-    if (initialData?.shopId) return 'shop';
-    return 'store'; // Default to store
-  };
 
   const form = useForm<FormValues>({
     defaultValues: {
       invoiceNo: initialData?.invoiceNo || '',
       supplierId: initialData?.supplierId?.toString() || '',
       storeId: initialData?.storeId?.toString() || '',
-      shopId: initialData?.shopId?.toString() || '',
-      locationType: getInitialLocationType(),
       purchaseDate: initialData?.purchaseDate
         ? new Date(initialData.purchaseDate).toISOString().split('T')[0]
         : format(new Date(), 'yyyy-MM-dd'),
@@ -100,22 +97,37 @@ export default function PurchaseForm({
       notes: initialData?.notes || '',
       items:
         initialData?.items?.map((item) => ({
+          ...item,
           productId: item.productId.toString(),
-          isBox: item.isBox || false,
+          unitOfMeasureId: item.unitOfMeasureId.toString(),
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice),
-          totalPrice: Number(item.totalPrice)
+          totalPrice: Number(item.totalPrice),
+          height: item.height ? Number(item.height) : undefined,
+          width: item.width ? Number(item.width) : undefined
         })) || []
     }
   });
 
-  // Watch location type to conditionally render selects
-  const locationType = form.watch('locationType');
+  // Initialize item types from initial data
+  useEffect(() => {
+    if (initialData?.items) {
+      const types: { [key: number]: 'quantity' | 'dimension' } = {};
+      initialData.items.forEach((item, index) => {
+        if (item.height && item.width) {
+          types[index] = 'dimension';
+        } else {
+          types[index] = 'quantity';
+        }
+      });
+      setItemTypes(types);
+    }
+  }, [initialData]);
 
   // Calculate totals
   const items = form.watch('items');
   const grandTotal = items.reduce(
-    (total, item) => total + item.quantity * item.unitPrice,
+    (total, item) => total + ((item.quantity || 0) * (item.unitPrice || 0)),
     0
   );
   const totalProducts = items.filter((item) => item.productId).length;
@@ -124,26 +136,99 @@ export default function PurchaseForm({
     setIsMounted(true);
   }, []);
 
-  // Fetch suppliers, stores, shops, products
+  // Fetch suppliers, stores, products
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [suppliersData, storesData, shopsData, productsData] = await Promise.all([
+        const [suppliersData, storesData, productsData] = await Promise.all([
           getSupplier(),
           getStores(),
-          getShops(),
           getProducts()
         ]);
         setSuppliers(suppliersData);
         setStores(storesData);
-        setShops(shopsData);
         setProducts(productsData);
       } catch {
-        toast.error('Failed to load suppliers, stores, shops, or products');
+        toast.error('Failed to load suppliers, stores, or products');
       }
     };
     fetchData();
   }, []);
+
+  const fetchUnitsOfMeasure = useCallback(
+    async (productId: string) => {
+      if (!productId) return;
+
+      if (!unitsOfMeasure[productId] && !loadingUOM[productId]) {
+        setLoadingUOM((prev) => ({ ...prev, [productId]: true }));
+        try {
+          const uomData = await getUnitOfMeasuresByProductId(productId);
+
+          let uomArray: IUnitOfMeasure[] = [];
+
+          if (Array.isArray(uomData)) {
+            uomArray = uomData;
+          } else if (uomData && typeof uomData === 'object') {
+            uomArray = [uomData as IUnitOfMeasure];
+          }
+
+          setUnitsOfMeasure((prev) => ({ ...prev, [productId]: uomArray }));
+
+          if (uomArray.length === 1) {
+            const currentItems = form.getValues('items');
+            const updatedItems = currentItems.map((item) => {
+              if (item.productId === productId && !item.unitOfMeasureId) {
+                return {
+                  ...item,
+                  unitOfMeasureId: uomArray[0]?.id?.toString() || ''
+                };
+              }
+              return item;
+            });
+            form.setValue('items', updatedItems);
+          }
+        } catch {
+          toast.error('Failed to load units of measure');
+          setUnitsOfMeasure((prev) => ({ ...prev, [productId]: [] }));
+        } finally {
+          setLoadingUOM((prev) => ({ ...prev, [productId]: false }));
+        }
+      }
+    },
+    [unitsOfMeasure, loadingUOM, form]
+  );
+
+  useEffect(() => {
+    items.forEach((item) => {
+      if (
+        item.productId &&
+        !unitsOfMeasure[item.productId] &&
+        !loadingUOM[item.productId]
+      ) {
+        fetchUnitsOfMeasure(item.productId);
+      }
+    });
+  }, [
+    items,
+    unitsOfMeasure,
+    loadingUOM,
+    fetchUnitsOfMeasure
+  ]);
+
+  // Check if a product is already selected
+  const isProductSelected = (productId: string, currentIndex: number): boolean => {
+    return items.some((item, idx) => idx !== currentIndex && item.productId === productId);
+  };
+
+  // Get available products (excluding already selected ones)
+  const getAvailableProducts = (currentIndex: number) => {
+    const selectedProductIds = items
+      .filter((_, idx) => idx !== currentIndex)
+      .map(item => item.productId)
+      .filter(id => id);
+    
+    return products.filter(product => !selectedProductIds.includes(product.id.toString()));
+  };
 
   const handleSupplierCreated = () => {
     setShowSupplierModal(false);
@@ -157,7 +242,7 @@ export default function PurchaseForm({
   const updateItemTotal = (index: number) => {
     const items = form.getValues('items');
     const item = items[index];
-    const totalPrice = item.quantity * item.unitPrice;
+    const totalPrice = (item.quantity || 0) * (item.unitPrice || 0);
 
     const updatedItems = [...items];
     updatedItems[index] = { ...item, totalPrice };
@@ -183,35 +268,12 @@ export default function PurchaseForm({
       isValid = false;
     }
 
-    // Validate based on location type
-    if (data.locationType === 'store') {
-      if (!data.storeId || data.storeId.trim() === '') {
-        form.setError('storeId', {
-          type: 'manual',
-          message: 'Store is required'
-        });
-        isValid = false;
-      } else {
-        form.clearErrors('storeId');
-      }
-      // Clear shop value if store is selected
-      if (data.shopId) {
-        form.setValue('shopId', '');
-      }
-    } else if (data.locationType === 'shop') {
-      if (!data.shopId || data.shopId.trim() === '') {
-        form.setError('shopId', {
-          type: 'manual',
-          message: 'Shop is required'
-        });
-        isValid = false;
-      } else {
-        form.clearErrors('shopId');
-      }
-      // Clear store value if shop is selected
-      if (data.storeId) {
-        form.setValue('storeId', '');
-      }
+    if (!data.storeId || data.storeId.trim() === '') {
+      form.setError('storeId', {
+        type: 'manual',
+        message: 'Store is required'
+      });
+      isValid = false;
     }
 
     if (!data.purchaseDate || data.purchaseDate.trim() === '') {
@@ -239,6 +301,8 @@ export default function PurchaseForm({
     }
 
     data.items.forEach((item, index) => {
+      const itemType = itemTypes[index] || 'quantity';
+
       if (!item.productId || item.productId.trim() === '') {
         form.setError(`items.${index}.productId` as any, {
           type: 'manual',
@@ -247,26 +311,45 @@ export default function PurchaseForm({
         isValid = false;
       }
 
-      if (item.quantity <= 0 || isNaN(item.quantity)) {
+      if (!item.unitOfMeasureId || item.unitOfMeasureId.trim() === '') {
+        form.setError(`items.${index}.unitOfMeasureId` as any, {
+          type: 'manual',
+          message: 'Unit of measure is required'
+        });
+        isValid = false;
+      }
+
+      // Quantity validation - only if quantity is provided
+      if (item.quantity !== undefined && (item.quantity < 0 || isNaN(item.quantity))) {
         form.setError(`items.${index}.quantity` as any, {
           type: 'manual',
-          message: 'Quantity must be greater than 0'
+          message: 'Quantity must be 0 or greater'
         });
         isValid = false;
       }
 
-      if (item.unitPrice < 0 || isNaN(item.unitPrice)) {
+      if (itemType === 'dimension') {
+        if (!item.height || item.height <= 0 || isNaN(item.height)) {
+          form.setError(`items.${index}.height` as any, {
+            type: 'manual',
+            message: 'Height must be greater than 0'
+          });
+          isValid = false;
+        }
+        if (!item.width || item.width <= 0 || isNaN(item.width)) {
+          form.setError(`items.${index}.width` as any, {
+            type: 'manual',
+            message: 'Width must be greater than 0'
+          });
+          isValid = false;
+        }
+      }
+
+      // Unit price validation - only if unit price is provided
+      if (item.unitPrice !== undefined && (item.unitPrice < 0 || isNaN(item.unitPrice))) {
         form.setError(`items.${index}.unitPrice` as any, {
           type: 'manual',
-          message: 'Unit price must be positive'
-        });
-        isValid = false;
-      }
-
-      if (item.totalPrice < 0 || isNaN(item.totalPrice)) {
-        form.setError(`items.${index}.totalPrice` as any, {
-          type: 'manual',
-          message: 'Total price must be positive'
+          message: 'Unit price must be 0 or greater'
         });
         isValid = false;
       }
@@ -282,50 +365,42 @@ export default function PurchaseForm({
       return;
     }
 
-    // Debug: Log the form data before sending
-    
-    data.items.forEach((item, index) => {
-      console.log(`Item ${index + 1}:`, {
-        productId: item.productId,
-        isBox: item.isBox,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice
-      });
-    });
-
     setIsLoading(true);
     try {
       const payload = {
-        invoiceNo: data.invoiceNo,
-        supplierId: data.supplierId,
-        storeId: data.locationType === 'store' ? data.storeId : null,
-        shopId: data.locationType === 'shop' ? data.shopId : null,
-        purchaseDate: data.purchaseDate,
-        paymentStatus: data.paymentStatus,
-        notes: data.notes,
-        items: data.items.map((item) => ({
-          productId: item.productId,
-          isBox: item.isBox === true,
-          quantity: Number(item.quantity),
-          unitPrice: Number(item.unitPrice),
-          totalPrice: Number(item.totalPrice)
-        }))
-      };
+        ...data,
+        items: data.items.map((item, index) => {
+          const itemType = itemTypes[index] || 'quantity';
+          const baseItem = {
+            productId: item.productId,
+            unitOfMeasureId: item.unitOfMeasureId,
+            quantity: item.quantity !== undefined ? Number(item.quantity) : 0,
+            unitPrice: item.unitPrice !== undefined ? Number(item.unitPrice) : 0,
+            totalPrice: (item.quantity || 0) * (item.unitPrice || 0)
+          };
 
+          if (itemType === 'dimension') {
+            return {
+              ...baseItem,
+              height: Number(item.height),
+              width: Number(item.width)
+            };
+          }
+
+          return baseItem;
+        })
+      };
 
       if (isEdit && initialData?.id) {
         await updatePurchase(initialData.id, payload);
         toast.success('Purchase updated successfully');
       } else {
-        const response = await createPurchase(payload);
+        await createPurchase(payload);
         toast.success('Purchase created successfully');
       }
       router.push('/dashboard/purchase');
       router.refresh();
     } catch (error: any) {
-      console.error('Error saving purchase:', error);
-      console.error('Error response:', error?.response?.data);
       const message =
         error?.response?.data?.message ||
         'An error occurred while saving purchase.';
@@ -367,7 +442,9 @@ export default function PurchaseForm({
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isFocused ? '#374151' : '#1f2937',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      cursor: state.isDisabled ? 'not-allowed' : 'default',
+      opacity: state.isDisabled ? 0.5 : 1
     }),
     singleValue: (base: any) => ({
       ...base,
@@ -381,6 +458,22 @@ export default function PurchaseForm({
       ...base,
       color: '#9ca3af'
     })
+  };
+
+  // Function to delete item (always allowed)
+  const deleteItem = (index: number, field: any) => {
+    const newItems = [...field.value];
+    newItems.splice(index, 1);
+    field.onChange(newItems);
+    
+    // Update item types
+    const newTypes = { ...itemTypes };
+    delete newTypes[index];
+    const reindexedTypes: { [key: number]: 'quantity' | 'dimension' } = {};
+    Object.values(newTypes).forEach((type, i) => {
+      reindexedTypes[i] = type;
+    });
+    setItemTypes(reindexedTypes);
   };
 
   if (!isMounted) {
@@ -466,115 +559,36 @@ export default function PurchaseForm({
                   )}
                 />
 
-                {/* Location Type Radio Group */}
                 <FormField
                   control={form.control}
-                  name='locationType'
+                  name='storeId'
                   render={({ field }) => (
-                    <FormItem className='col-span-full'>
-                      <FormLabel>Select Location Type</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={(value: 'store' | 'shop') => {
-                            field.onChange(value);
-                            // Clear the opposite field when switching
-                            if (value === 'store') {
-                              form.setValue('shopId', '');
-                              form.clearErrors('shopId');
-                            } else {
-                              form.setValue('storeId', '');
-                              form.clearErrors('storeId');
-                            }
-                          }}
-                          value={field.value}
-                          className='flex space-x-4'
-                        >
-                          <div className='flex items-center space-x-2'>
-                            <RadioGroupItem value='store' id='store' />
-                            <label htmlFor='store' className='cursor-pointer'>
-                              Store
-                            </label>
-                          </div>
-                          <div className='flex items-center space-x-2'>
-                            <RadioGroupItem value='shop' id='shop' />
-                            <label htmlFor='shop' className='cursor-pointer'>
-                              Shop
-                            </label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
+                    <FormItem>
+                      <FormLabel>Store</FormLabel>
+                      <ShadcnSelect
+                        value={field.value}
+                        onValueChange={(value: string) => field.onChange(value)}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder='Select a store' />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {stores.map((store) => (
+                            <SelectItem
+                              key={store.id}
+                              value={store.id.toString()}
+                            >
+                              {store.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </ShadcnSelect>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {/* Conditional Store Field */}
-                {locationType === 'store' && (
-                  <FormField
-                    control={form.control}
-                    name='storeId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Store</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select a store' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {stores.map((store) => (
-                              <SelectItem
-                                key={store.id}
-                                value={store.id.toString()}
-                              >
-                                {store.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {/* Conditional Shop Field */}
-                {locationType === 'shop' && (
-                  <FormField
-                    control={form.control}
-                    name='shopId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Shop</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select a shop' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {shops.map((shop) => (
-                              <SelectItem
-                                key={shop.id}
-                                value={shop.id.toString()}
-                              >
-                                {shop.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
 
                 <FormField
                   control={form.control}
@@ -593,42 +607,21 @@ export default function PurchaseForm({
 
               <FormField
                 control={form.control}
-                name='paymentStatus'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Status</FormLabel>
-                    <ShadcnSelect
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select payment status' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value='PENDING'>Pending</SelectItem>
-                   
-                      </SelectContent>
-                    </ShadcnSelect>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name='items'
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Items</FormLabel>
                     <FormControl>
                       <div className='space-y-4'>
-                        <div className='grid grid-cols-6 gap-4 text-sm font-semibold'>
+                        {/* Responsive header - hidden on mobile */}
+                        <div className='hidden lg:grid lg:grid-cols-8 xl:grid-cols-9 gap-4 text-sm font-semibold'>
                           <div>Product</div>
-                          <div>Box/Piece</div>
-                          <div>Quantity</div>
-                          <div>Purchase Price</div>
+                          <div>Unit</div>
+                          <div>Type</div>
+                          <div>Qty</div>
+                          <div>Height</div>
+                          <div>Width</div>
+                          <div>Price</div>
                           <div>Total</div>
                           <div>Action</div>
                         </div>
@@ -636,152 +629,448 @@ export default function PurchaseForm({
                         {field.value.map((item, index) => (
                           <div
                             key={index}
-                            className='grid grid-cols-6 items-center gap-4'
+                            className='border rounded-lg p-4 lg:p-0 lg:border-none space-y-4 lg:space-y-0'
                           >
-                            {/* Product */}
-                            <div>
-                              <Select
-                                instanceId={`product-select-${index}`}
-                                options={products.map((product) => ({
-                                  value: product.id.toString(),
-                                  label: product.name
-                                }))}
-                                onChange={(newValue) => {
-                                  const newItems = [...field.value];
-                                  newItems[index].productId =
-                                    newValue?.value || '';
-                                  field.onChange(newItems);
-                                }}
-                                value={products
-                                  .map((p) => ({
-                                    value: p.id.toString(),
-                                    label: p.name
-                                  }))
-                                  .find((p) => p.value === item.productId)}
-                                placeholder='Search product'
-                                isSearchable
-                                styles={isDark ? darkStyles : {}}
-                              />
-                            </div>
+                            {/* Mobile view - stacked layout */}
+                            <div className='lg:hidden space-y-3'>
+                              <div className='flex justify-between items-start'>
+                                <Label className='font-semibold'>Product</Label>
+                                <Button
+                                  type='button'
+                                  variant='destructive'
+                                  size='sm'
+                                  onClick={() => deleteItem(index, field)}
+                                >
+                                  <IconTrash size={16} />
+                                </Button>
+                              </div>
+                              
+                              <div>
+                                <Label className='text-sm'>Product</Label>
+                                <Select
+                                  instanceId={`product-select-mobile-${index}`}
+                                  options={getAvailableProducts(index).map((product) => ({
+                                    value: product.id.toString(),
+                                    label: product.name
+                                  }))}
+                                  onChange={(newValue) => {
+                                    const newItems = [...field.value];
+                                    newItems[index].productId = newValue?.value || '';
+                                    newItems[index].unitOfMeasureId = '';
+                                    field.onChange(newItems);
+                                    if (newValue?.value) {
+                                      fetchUnitsOfMeasure(newValue.value);
+                                    }
+                                  }}
+                                  value={products
+                                    .map((p) => ({
+                                      value: p.id.toString(),
+                                      label: p.name
+                                    }))
+                                    .find((p) => p.value === item.productId)}
+                                  placeholder='Search product'
+                                  isSearchable
+                                  isOptionDisabled={(option) => isProductSelected(option.value, index)}
+                                  styles={isDark ? darkStyles : {}}
+                                />
+                              </div>
 
-                            {/* isBox Switch */}
-                            <div>
-                              <FormField
-                                control={form.control}
-                                name={`items.${index}.isBox`}
-                                render={({ field: switchField }) => (
-                                  <div className='flex items-center justify-center'>
-                                    <Switch
-                                      checked={switchField.value}
-                                      onCheckedChange={switchField.onChange}
-                                      className='data-[state=checked]:bg-primary'
+                              <div>
+                                <Label className='text-sm'>Unit</Label>
+                                <Select
+                                  instanceId={`uom-select-mobile-${index}`}
+                                  options={
+                                    Array.isArray(unitsOfMeasure[item.productId])
+                                      ? unitsOfMeasure[item.productId].map(
+                                          (uom) => ({
+                                            value: uom.id.toString(),
+                                            label: uom.name
+                                          })
+                                        )
+                                      : []
+                                  }
+                                  onChange={(newValue) => {
+                                    const newItems = [...field.value];
+                                    newItems[index].unitOfMeasureId = newValue?.value || '';
+                                    field.onChange(newItems);
+                                  }}
+                                  value={
+                                    Array.isArray(unitsOfMeasure[item.productId])
+                                      ? unitsOfMeasure[item.productId]
+                                          .map((uom) => ({
+                                            value: uom.id.toString(),
+                                            label: uom.name
+                                          }))
+                                          ?.find(
+                                            (u) => u.value === item.unitOfMeasureId
+                                          )
+                                      : undefined
+                                  }
+                                  placeholder={
+                                    loadingUOM[item.productId]
+                                      ? 'Loading...'
+                                      : 'Select unit'
+                                  }
+                                  isSearchable
+                                  isDisabled={
+                                    !item.productId ||
+                                    loadingUOM[item.productId] ||
+                                    (Array.isArray(unitsOfMeasure[item.productId]) &&
+                                      unitsOfMeasure[item.productId].length === 1)
+                                  }
+                                  isLoading={loadingUOM[item.productId]}
+                                  styles={isDark ? darkStyles : {}}
+                                />
+                              </div>
+
+                              <div className='flex items-center space-x-2'>
+                                <Checkbox
+                                  id={`dimension-mobile-${index}`}
+                                  checked={itemTypes[index] === 'dimension'}
+                                  onCheckedChange={(checked) => {
+                                    setItemTypes(prev => ({
+                                      ...prev,
+                                      [index]: checked ? 'dimension' : 'quantity'
+                                    }));
+                                    if (!checked) {
+                                      const newItems = [...field.value];
+                                      newItems[index].height = undefined;
+                                      newItems[index].width = undefined;
+                                      field.onChange(newItems);
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor={`dimension-mobile-${index}`}>
+                                  Use Dimensions
+                                </Label>
+                              </div>
+
+                              <div className='grid grid-cols-2 gap-3'>
+                                <div>
+                                  <Label className='text-sm'>Quantity</Label>
+                                  <Input
+                                    type='number'
+                                    placeholder='Qty'
+                                    value={item.quantity === undefined ? '' : item.quantity}
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const value = e.target.value;
+                                      const quantity = value === '' ? undefined : Number(value);
+                                      if (quantity !== undefined && !isNaN(quantity) && quantity >= 0) {
+                                        newItems[index].quantity = quantity;
+                                        newItems[index].totalPrice = (quantity || 0) * (newItems[index].unitPrice || 0);
+                                      } else if (value === '') {
+                                        newItems[index].quantity = undefined;
+                                        newItems[index].totalPrice = 0;
+                                      }
+                                      field.onChange(newItems);
+                                      updateItemTotal(index);
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className='text-sm'>Unit Price</Label>
+                                  <Input
+                                    type='number'
+                                    placeholder='Price'
+                                    value={item.unitPrice === undefined ? '' : item.unitPrice}
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const value = e.target.value;
+                                      const unitPrice = value === '' ? undefined : Number(value);
+                                      if (unitPrice !== undefined && !isNaN(unitPrice) && unitPrice >= 0) {
+                                        newItems[index].unitPrice = unitPrice;
+                                        newItems[index].totalPrice = (newItems[index].quantity || 0) * unitPrice;
+                                      } else if (value === '') {
+                                        newItems[index].unitPrice = undefined;
+                                        newItems[index].totalPrice = 0;
+                                      }
+                                      field.onChange(newItems);
+                                      updateItemTotal(index);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              {itemTypes[index] === 'dimension' && (
+                                <div className='grid grid-cols-2 gap-3'>
+                                  <div>
+                                    <Label className='text-sm'>Height</Label>
+                                    <Input
+                                      type='number'
+                                      min={0}
+                                      placeholder='Height'
+                                      value={item.height || ''}
+                                      onChange={(e) => {
+                                        const newItems = [...field.value];
+                                        const height = Number(e.target.value);
+                                        newItems[index].height = isNaN(height) ? undefined : height;
+                                        field.onChange(newItems);
+                                      }}
                                     />
                                   </div>
-                                )}
-                              />
+                                  <div>
+                                    <Label className='text-sm'>Width</Label>
+                                    <Input
+                                      type='number'
+                                      min={0}
+                                      placeholder='Width'
+                                      value={item.width || ''}
+                                      onChange={(e) => {
+                                        const newItems = [...field.value];
+                                        const width = Number(e.target.value);
+                                        newItems[index].width = isNaN(width) ? undefined : width;
+                                        field.onChange(newItems);
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className='flex justify-between items-center pt-2 border-t'>
+                                <Label className='font-semibold'>Total</Label>
+                                <span className='text-lg font-bold text-green-600'>
+                                  {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
+                                </span>
+                              </div>
                             </div>
 
-                            {/* Quantity */}
-                            <div>
-                              <Input
-                                type='number'
-                                placeholder='Qty'
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const newItems = [...field.value];
-                                  const quantity = Number(e.target.value);
-                                  newItems[index].quantity = isNaN(quantity)
-                                    ? 0
-                                    : quantity;
-                                  newItems[index].totalPrice =
-                                    newItems[index].quantity *
-                                    newItems[index].unitPrice;
-                                  field.onChange(newItems);
-                                  updateItemTotal(index);
-                                }}
-                              />
-                            </div>
+                            {/* Desktop view - grid layout */}
+                            <div className='hidden lg:grid lg:grid-cols-8 xl:grid-cols-9 items-center gap-4'>
+                              <div>
+                                <Select
+                                  instanceId={`product-select-${index}`}
+                                  options={getAvailableProducts(index).map((product) => ({
+                                    value: product.id.toString(),
+                                    label: product.name
+                                  }))}
+                                  onChange={(newValue) => {
+                                    const newItems = [...field.value];
+                                    newItems[index].productId = newValue?.value || '';
+                                    newItems[index].unitOfMeasureId = '';
+                                    field.onChange(newItems);
+                                    if (newValue?.value) {
+                                      fetchUnitsOfMeasure(newValue.value);
+                                    }
+                                  }}
+                                  value={products
+                                    .map((p) => ({
+                                      value: p.id.toString(),
+                                      label: p.name
+                                    }))
+                                    .find((p) => p.value === item.productId)}
+                                  placeholder='Search product'
+                                  isSearchable
+                                  isOptionDisabled={(option) => isProductSelected(option.value, index)}
+                                  styles={isDark ? darkStyles : {}}
+                                />
+                              </div>
 
-                            {/* Unit Price */}
-                            <div>
-                              <Input
-                                type='number'
-                                placeholder='Price'
-                                value={item.unitPrice}
-                                onChange={(e) => {
-                                  const newItems = [...field.value];
-                                  const unitPrice = Number(e.target.value);
-                                  newItems[index].unitPrice = isNaN(unitPrice)
-                                    ? 0
-                                    : unitPrice;
-                                  newItems[index].totalPrice =
-                                    newItems[index].quantity *
-                                    newItems[index].unitPrice;
-                                  field.onChange(newItems);
-                                  updateItemTotal(index);
-                                }}
-                              />
-                            </div>
+                              <div>
+                                <Select
+                                  instanceId={`uom-select-${index}`}
+                                  options={
+                                    Array.isArray(unitsOfMeasure[item.productId])
+                                      ? unitsOfMeasure[item.productId].map(
+                                          (uom) => ({
+                                            value: uom.id.toString(),
+                                            label: uom.name
+                                          })
+                                        )
+                                      : []
+                                  }
+                                  onChange={(newValue) => {
+                                    const newItems = [...field.value];
+                                    newItems[index].unitOfMeasureId = newValue?.value || '';
+                                    field.onChange(newItems);
+                                  }}
+                                  value={
+                                    Array.isArray(unitsOfMeasure[item.productId])
+                                      ? unitsOfMeasure[item.productId]
+                                          .map((uom) => ({
+                                            value: uom.id.toString(),
+                                            label: uom.name
+                                          }))
+                                          ?.find(
+                                            (u) => u.value === item.unitOfMeasureId
+                                          )
+                                      : undefined
+                                  }
+                                  placeholder={
+                                    loadingUOM[item.productId]
+                                      ? 'Loading units...'
+                                      : 'Select unit'
+                                  }
+                                  isSearchable
+                                  isDisabled={
+                                    !item.productId ||
+                                    loadingUOM[item.productId] ||
+                                    (Array.isArray(unitsOfMeasure[item.productId]) &&
+                                      unitsOfMeasure[item.productId].length === 1)
+                                  }
+                                  isLoading={loadingUOM[item.productId]}
+                                  styles={isDark ? darkStyles : {}}
+                                  noOptionsMessage={() => 'No units available'}
+                                />
+                              </div>
 
-                            {/* Total Price */}
-                            <div className='flex items-center justify-center'>
-                              <span className='text-sm font-medium'>
-                                {(item.quantity * item.unitPrice).toFixed(2)}
-                              </span>
-                            </div>
+                              <div>
+                                <div className='flex items-center space-x-2'>
+                                  <Checkbox
+                                    id={`dimension-${index}`}
+                                    checked={itemTypes[index] === 'dimension'}
+                                    onCheckedChange={(checked) => {
+                                      setItemTypes(prev => ({
+                                        ...prev,
+                                        [index]: checked ? 'dimension' : 'quantity'
+                                      }));
+                                      if (!checked) {
+                                        const newItems = [...field.value];
+                                        newItems[index].height = undefined;
+                                        newItems[index].width = undefined;
+                                        field.onChange(newItems);
+                                      }
+                                    }}
+                                  />
+                                  <Label htmlFor={`dimension-${index}`}>
+                                    Dim
+                                  </Label>
+                                </div>
+                              </div>
 
-                            {/* Delete Button */}
-                            <div>
-                              <Button
-                                type='button'
-                                variant='destructive'
-                                size='sm'
-                                onClick={() => {
-                                  const newItems = [...field.value];
-                                  newItems.splice(index, 1);
-                                  field.onChange(newItems);
-                                }}
-                                disabled={field.value.length <= 1}
-                              >
-                                <IconTrash size={16} />
-                              </Button>
+                              <div>
+                                <Input
+                                  type='number'
+                                  placeholder='Qty'
+                                  value={item.quantity === undefined ? '' : item.quantity}
+                                  onChange={(e) => {
+                                    const newItems = [...field.value];
+                                    const value = e.target.value;
+                                    const quantity = value === '' ? undefined : Number(value);
+                                    if (quantity !== undefined && !isNaN(quantity) && quantity >= 0) {
+                                      newItems[index].quantity = quantity;
+                                      newItems[index].totalPrice = (quantity || 0) * (newItems[index].unitPrice || 0);
+                                    } else if (value === '') {
+                                      newItems[index].quantity = undefined;
+                                      newItems[index].totalPrice = 0;
+                                    }
+                                    field.onChange(newItems);
+                                    updateItemTotal(index);
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <Input
+                                  type='number'
+                                  min={0}
+                                  placeholder='Height'
+                                  value={item.height || ''}
+                                  disabled={itemTypes[index] !== 'dimension'}
+                                  className={itemTypes[index] !== 'dimension' ? 'opacity-50' : ''}
+                                  onChange={(e) => {
+                                    const newItems = [...field.value];
+                                    const height = Number(e.target.value);
+                                    newItems[index].height = isNaN(height) ? undefined : height;
+                                    field.onChange(newItems);
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <Input
+                                  type='number'
+                                  min={0}
+                                  placeholder='Width'
+                                  value={item.width || ''}
+                                  disabled={itemTypes[index] !== 'dimension'}
+                                  className={itemTypes[index] !== 'dimension' ? 'opacity-50' : ''}
+                                  onChange={(e) => {
+                                    const newItems = [...field.value];
+                                    const width = Number(e.target.value);
+                                    newItems[index].width = isNaN(width) ? undefined : width;
+                                    field.onChange(newItems);
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <Input
+                                  type='number'
+                                  placeholder='Price'
+                                  value={item.unitPrice === undefined ? '' : item.unitPrice}
+                                  onChange={(e) => {
+                                    const newItems = [...field.value];
+                                    const value = e.target.value;
+                                    const unitPrice = value === '' ? undefined : Number(value);
+                                    if (unitPrice !== undefined && !isNaN(unitPrice) && unitPrice >= 0) {
+                                      newItems[index].unitPrice = unitPrice;
+                                      newItems[index].totalPrice = (newItems[index].quantity || 0) * unitPrice;
+                                    } else if (value === '') {
+                                      newItems[index].unitPrice = undefined;
+                                      newItems[index].totalPrice = 0;
+                                    }
+                                    field.onChange(newItems);
+                                    updateItemTotal(index);
+                                  }}
+                                />
+                              </div>
+
+                              <div className='flex items-center justify-center'>
+                                <span className='text-sm font-medium'>
+                                  {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
+                                </span>
+                              </div>
+
+                              <div>
+                                <Button
+                                  type='button'
+                                  variant='destructive'
+                                  size='sm'
+                                  onClick={() => deleteItem(index, field)}
+                                >
+                                  <IconTrash size={16} />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ))}
 
-                        {/* Summary Row */}
-                        <div className='grid grid-cols-6 items-center gap-4 border-t pt-4'>
-                          <div className='col-span-4 text-right font-semibold'>
-                            Summary:
-                          </div>
-                          <div className='text-center text-lg font-bold'>
-                            {grandTotal.toFixed(2)}
-                          </div>
-                          <div></div>
-                        </div>
-
-                        <div className='grid grid-cols-6 items-center gap-4'>
-                          <div className='col-span-5 text-sm'>
-                            Total Products: {totalProducts}
-                          </div>
-                          <div className='text-right'>
-                            <Button
-                              type='button'
-                              onClick={() => {
-                                field.onChange([
-                                  ...field.value,
-                                  {
-                                    productId: '',
-                                    isBox: false,
-                                    quantity: 1,
-                                    unitPrice: 0,
-                                    totalPrice: 0
-                                  }
-                                ]);
-                              }}
-                            >
-                              Add Item
-                            </Button>
+                        {/* Summary Row - Responsive */}
+                        <div className='border-t pt-4 mt-4'>
+                          <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3'>
+                            <div className='text-sm'>
+                              Total Products: {totalProducts}
+                            </div>
+                            <div className='flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto'>
+                              <div className='flex justify-between items-center w-full sm:w-auto'>
+                                <span className='font-semibold mr-4'>Grand Total:</span>
+                                <span className='text-2xl font-bold text-green-600'>
+                                  {grandTotal.toFixed(2)}
+                                </span>
+                              </div>
+                              <Button
+                                type='button'
+                                onClick={() => {
+                                  field.onChange([
+                                    ...field.value,
+                                    {
+                                      productId: '',
+                                      unitOfMeasureId: '',
+                                      quantity: undefined,
+                                      unitPrice: undefined,
+                                      totalPrice: 0,
+                                      height: undefined,
+                                      width: undefined
+                                    }
+                                  ]);
+                                }}
+                                className='w-full sm:w-auto'
+                              >
+                                <IconPlus size={16} className='mr-2' />
+                                Add Item
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -790,16 +1079,6 @@ export default function PurchaseForm({
                   </FormItem>
                 )}
               />
-
-              {/* Grand Total Display */}
-              <div className='rounded-lg p-4'>
-                <div className='flex items-center justify-between'>
-                  <div className='text-lg font-semibold'>Grand Total</div>
-                  <div className='text-2xl font-bold text-green-600'>
-                    {grandTotal.toFixed(2)}
-                  </div>
-                </div>
-              </div>
 
               <FormField
                 control={form.control}
@@ -825,7 +1104,6 @@ export default function PurchaseForm({
         </CardContent>
       </Card>
 
-      {/* Supplier Creation Modal */}
       <Modal
         isOpen={showSupplierModal}
         onClose={() => setShowSupplierModal(false)}

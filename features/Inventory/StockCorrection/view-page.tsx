@@ -1,59 +1,25 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import FormCardSkeleton from "@/components/form-card-skeleton";
-import type { IStockCorrection } from "@/models/StockCorrection";
-import { getStockCorrectionById } from "@/service/StockCorrection";
-import StockCorrectionForm from "./form";
+import { getStockCorrectionById } from '@/service/StockCorrection';
+import StockCorrectionForm from './form';
+import { IStockCorrection } from '@/models/StockCorrection';
 
 type TStockCorrectionViewPageProps = {
   stockCorrectionId: string;
 };
 
-export default function StockCorrectionViewPage({
-  stockCorrectionId,
+export default async function StockCorrectionViewPage({
+  stockCorrectionId
 }: TStockCorrectionViewPageProps) {
-  const [stockCorrection, setStockCorrection] =
-    useState<IStockCorrection | null>(null);
-  const [loading, setLoading] = useState(stockCorrectionId !== "new");
+  let stockCorrection: IStockCorrection | null = null;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadStockCorrection = async () => {
-      if (stockCorrectionId === "new") {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const data = await getStockCorrectionById(stockCorrectionId);
-
-        if (!cancelled) {
-          setStockCorrection(data as IStockCorrection);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadStockCorrection();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [stockCorrectionId]);
-
-  if (loading) {
-    return <FormCardSkeleton />;
+  if (stockCorrectionId !== 'new') {
+    const data = await getStockCorrectionById(stockCorrectionId);
+    stockCorrection = data as IStockCorrection;
   }
 
   return (
     <StockCorrectionForm
       initialData={stockCorrection}
-      isEdit={stockCorrectionId !== "new"}
+      isEdit={stockCorrectionId !== 'new'}
     />
   );
 }

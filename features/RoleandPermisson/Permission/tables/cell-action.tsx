@@ -71,7 +71,7 @@ export const RolePermissionCellAction: React.FC<CellActionProps> = ({
             If you have an update page for role-permission link, adjust the URL below.
             Otherwise, you can remove this menu item or replace it with something else.
           */}
-          <PermissionGuard fallback="hide"
+          <PermissionGuard
             requiredPermission={PERMISSIONS.ROLE_PERMISSION.DELETE.name}
           >
             <DropdownMenuItem onClick={() => setOpen(true)}>

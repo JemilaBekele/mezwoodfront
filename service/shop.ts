@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { axiosInstance } from "./axiosIntance";
-import { IShop } from "@/models/shop";
-import { GetParams } from "./roleService";
+
+import { IShop } from '@/models/shop';
+import { GetParams } from './roleService';
+import { IProductBatch } from '@/models/Product';
 
 interface locationResponse {
   success: boolean;
@@ -13,7 +15,7 @@ export const getAllshop = async ({ page = 1, limit = 10 }: GetParams = {}) => {
   try {
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     const url = `shops/get/all?${query}`;
@@ -24,7 +26,7 @@ export const getAllshop = async ({ page = 1, limit = 10 }: GetParams = {}) => {
     return {
       shops: shops,
       totalCount: response.data.count ?? shops.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -42,6 +44,7 @@ export const getShops = async () => {
 export const getShopsall = async () => {
   try {
     const response = await axiosInstance.get(`/shops/get/all`);
+        console.log("store",response.data.shops)
 
     return response.data.shops as IShop[];
   } catch (error) {
@@ -51,7 +54,7 @@ export const getShopsall = async () => {
 export const getShopallapi = async () => {
   try {
     const response = await axiosInstance.get(`/shops/get/all`);
-
+console.log("store",response.data.shops)
     return response.data.shops as IShop[];
   } catch (error) {
     throw error;
@@ -75,7 +78,7 @@ export const getShopsBasedOnUser = async () => {
 };
 
 // Get a shop by ID
-export const getShopById = async (id: string) => {
+export const getShopById = async (id: string, ) => {
   try {
     const response = await axiosInstance.get(`/shops/${id}`);
     return response.data.shop as IShop;
@@ -85,11 +88,15 @@ export const getShopById = async (id: string) => {
 };
 
 // Create a shop
-export const createShop = async (data: any | FormData) => {
+export const createShop = async (
+  data: any | FormData,
+  
+) => {
   try {
+
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.post(`/shops`, data, config);
@@ -103,11 +110,13 @@ export const createShop = async (data: any | FormData) => {
 export const updateShop = async (
   id: string,
   data: Partial<IShop> | FormData,
+  
 ) => {
   try {
+
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.put(`/shops/${id}`, data, config);
@@ -118,7 +127,7 @@ export const updateShop = async (
 };
 
 // Delete a shop
-export const deleteShop = async (id: string) => {
+export const deleteShop = async (id: string, ) => {
   try {
     const response = await axiosInstance.delete(`/shops/${id}`);
     return response.data;
@@ -127,17 +136,18 @@ export const deleteShop = async (id: string) => {
   }
 };
 export interface IBatchesResponse {
-  batches: any[];
+  batches: IProductBatch[];
   count: number;
 }
 
 export const getAvailableBatchesByProductAndShop = async (
   shopId: string,
   productId: string,
+  
 ) => {
   try {
     const response = await axiosInstance.get(
-      `/shops/${shopId}/products/${productId}/batches`,
+      `/shops/${shopId}/products/${productId}/batches`
     );
     return response.data;
   } catch (error) {
@@ -147,10 +157,11 @@ export const getAvailableBatchesByProductAndShop = async (
 export const UsergetAvailableBatchesByProductAndShop = async (
   shopId: string,
   productId: string,
+  
 ): Promise<IBatchesResponse> => {
   try {
     const response = await axiosInstance.get(
-      `/shops/${shopId}/products/${productId}/batches/user/based`,
+      `/shops/${shopId}/products/${productId}/batches/user/based`
     );
     return response.data.batches as IBatchesResponse;
   } catch (error) {

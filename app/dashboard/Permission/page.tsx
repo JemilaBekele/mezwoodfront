@@ -5,8 +5,7 @@ import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
 import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
 import PermissionListingPage from '@/features/RoleandPermisson/permlist';
 import { searchParamsCache } from '@/lib/searchparams';
-import { PermissionGuard } from '@/components/PermissionGuard';
-import { PERMISSIONS } from '@/stores/permissions';
+
 import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 
@@ -27,23 +26,22 @@ export default async function PermissionPage(props: pageProps) {
   // const key = serialize({ ...searchParams });
 
   return (
-    <PermissionGuard requiredPermission={PERMISSIONS.PERMISSION.VIEW_ALL.name}>
-      <PageContainer scrollable={false}>
-        <div className='flex flex-1 flex-col space-y-4'>
-          <div className='flex items-start justify-between'>
-            <Heading title='Permission' description='Manage Permission ' />
-          </div>
-          <Separator />
-          <ItemTableAction />
-          <Suspense
-            fallback={
-              <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
-            }
-          >
-            <PermissionListingPage />
-          </Suspense>
+    <PageContainer scrollable={false}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+          <Heading title='Permission' description='Manage Permission ' />
         </div>
-      </PageContainer>
-    </PermissionGuard>
+        <Separator />
+        <ItemTableAction />
+        <Suspense
+          // key={key}
+          fallback={
+            <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
+          }
+        >
+          <PermissionListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
   );
 }

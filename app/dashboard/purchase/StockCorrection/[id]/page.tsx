@@ -7,6 +7,7 @@ import { Suspense } from 'react';
 
 export default async function StockPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
+  console.log('Rendering StockPage with id:', params.id);
 
   return (
     <PageContainer scrollable>

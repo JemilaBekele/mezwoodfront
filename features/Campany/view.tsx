@@ -1,80 +1,57 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import FormCardSkeleton from "@/components/form-card-skeleton";
-import type { ICompany } from "@/models/employee";
-import { getCompanyById } from "@/service/companyService";
-import CompanyForm from "./add";
+import { ICompany } from '@/models/employee';
+import { getCompanyById } from '@/service/companyService';
+import { toast } from 'sonner';
+import CompanyForm from './add';
 
 type CompanyViewPageProps = {
   companyId: string;
 };
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://store.smartdent.online";
+  process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.1:5000';
 
-const normalizeLogoPath = (path?: string | File) => {
-  if (!path || typeof path !== "string") {
-    return undefined;
-  }
+export default async function CompanyViewPage({
+  companyId
+}: CompanyViewPageProps) {
+  let company: ICompany | null = null;
+  let combinedCompanyData: ICompany | null = null;
+  let pageTitle = 'Create New Company';
 
-  const normalizedPath = path.replace(/\\/g, "/");
+  const normalizeLogoPath = (path?: string | File) => {
+    if (!path) return undefined;
+    if (typeof path !== 'string') {
+      // If path is a File, return undefined or handle as needed
+      return undefined;
+    }
+    const normalizedPath = path.replace(/\\/g, '/');
+    if (normalizedPath.startsWith('http')) {
+      return normalizedPath;
+    }
+    // Remove any leading slashes to prevent double slashes in URL
+    const cleanPath = normalizedPath.replace(/^\/+/, '');
+    return `${BACKEND_URL}/${cleanPath}`;
+  };
 
-  if (normalizedPath.startsWith("http")) {
-    return normalizedPath;
-  }
+  if (companyId !== 'new') {
+    try {
+      const response = await getCompanyById(companyId);
+      company = response || null;
 
-  const cleanPath = normalizedPath.replace(/^\/+/, "");
-  return `${BACKEND_URL}/${cleanPath}`;
-};
-
-export default function CompanyViewPage({ companyId }: CompanyViewPageProps) {
-  const [company, setCompany] = useState<ICompany | null>(null);
-  const [loading, setLoading] = useState(companyId !== "new");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCompany = async () => {
-      if (companyId === "new") {
-        setLoading(false);
-        return;
+      if (!company) {
       }
 
-      try {
-        const response = await getCompanyById(companyId);
+      combinedCompanyData = {
+        ...company,
+        logo: normalizeLogoPath(company?.logo)
+      };
 
-        if (!cancelled && response) {
-          setCompany({
-            ...response,
-            logo: normalizeLogoPath(response.logo),
-          });
-        }
-      } catch {
-        toast.error("Error loading company");
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadCompany();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId]);
-
-  if (loading) {
-    return <FormCardSkeleton />;
+      pageTitle = `Edit Company: ${company?.name || company.id}`;
+    } catch {
+      toast.error('Error loading company');
+    }
   }
 
-  const pageTitle =
-    companyId === "new"
-      ? "Create New Company"
-      : `Edit Company: ${company?.name || company?.id || ""}`;
-
-  return <CompanyForm initialData={company} pageTitle={pageTitle} />;
+  return (
+    <CompanyForm initialData={combinedCompanyData} pageTitle={pageTitle} />
+  );
 }

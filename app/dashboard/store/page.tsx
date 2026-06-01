@@ -31,29 +31,29 @@ export default async function StorePage(props: pageProps) {
   // const key = serialize({ ...searchParams });
 
   return (
-    <PermissionGuard requiredPermission={PERMISSIONS.STORE.VIEW_ALL.name}>
-      <PageContainer scrollable={false}>
-        <div className='flex flex-1 flex-col space-y-4'>
-          <div className='flex items-start justify-between'>
-            <Heading
-              title='Stores'
-              description='Manage all stores including their branch and location details'
-            />
-            <PermissionGuard requiredPermission={PERMISSIONS.STORE.CREATE.name}>
-              <StoreModal />
-            </PermissionGuard>
-          </div>
-          <Separator />
-          <ItemTableAction />
-          <Suspense
-            fallback={
-              <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
-            }
-          >
-            <StoreListingPage />
-          </Suspense>
+    <PageContainer scrollable={false}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+          <Heading
+            title='Stores'
+            description='Manage all stores including their branch and location details'
+          />
+          <PermissionGuard requiredPermission={PERMISSIONS.STORE.CREATE.name}>
+            <StoreModal />
+          </PermissionGuard>
         </div>
-      </PageContainer>
-    </PermissionGuard>
+        <Separator />
+        <ItemTableAction />
+
+        <Suspense
+          // key={key}
+          fallback={
+            <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
+          }
+        >
+          <StoreListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
   );
 }

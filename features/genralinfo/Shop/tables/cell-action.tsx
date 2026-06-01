@@ -83,12 +83,12 @@ export const ShopCellAction: React.FC<CellActionProps> = ({ data }) => {
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end'>
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.SHOP.UPDATE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.SHOP.UPDATE.name}>
             <DropdownMenuItem onClick={() => setOpenEditModal(true)}>
               <Edit className='mr-2 h-4 w-4' /> Update
             </DropdownMenuItem>
           </PermissionGuard>
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.SHOP.DELETE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.SHOP.DELETE.name}>
             <DropdownMenuItem onClick={() => setOpen(true)}>
               <IconTrash className='mr-2 h-4 w-4' /> Delete
             </DropdownMenuItem>

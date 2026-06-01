@@ -1,6 +1,6 @@
 import FormCardSkeleton from '@/components/form-card-skeleton';
 import PageContainer from '@/components/layout/page-container';
-import ProductStockForm from '@/features/Inventory/Products/addinitial';
+import ProductBatchForm from '@/features/Inventory/ProductBatch/form';
 import { Suspense } from 'react';
 
 export const metadata = {
@@ -19,7 +19,7 @@ export default async function ProductPage({ searchParams }: PageProps) {
     <PageContainer scrollable={true}>
       <div className='flex-1 space-y-4'>
         <Suspense fallback={<FormCardSkeleton />}>
-          {id ? <ProductStockForm productId={id} /> : <FormCardSkeleton />}
+          {id ? <ProductBatchForm productId={id} /> : <FormCardSkeleton />}
         </Suspense>
       </div>
     </PageContainer>

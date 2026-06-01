@@ -11,7 +11,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,12 +22,13 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { getStores } from '@/service/store';
 import { getShops } from '@/service/shop';
-import { useCallback, useEffect, useState } from 'react';
+import { getUnitOfMeasuresByProductId } from '@/service/Product';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { IconTrash } from '@tabler/icons-react';
 import { getAvailableProductsBySource } from '@/service/productBatchService';
+import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
 import { IStockCorrection } from '@/models/StockCorrection';
 import {
   createStockCorrection,
@@ -39,8 +39,11 @@ import { TransferEntityType } from '@/models/transfer';
 // Define types for form data
 interface FormItemType {
   productId: string;
-  isBox: boolean;
+  unitOfMeasureId: string;
   quantity: number | string;
+  height?: number;
+  width?: number;
+  variantId?: string;
 }
 
 interface FormDataType {
@@ -63,15 +66,60 @@ interface StoreStockItem {
   productId: string;
   quantity: number;
   status: string;
+  unitOfMeasureId: string;
+  createdAt: string;
+  updatedAt: string;
+  store: {
+    id: string;
+    name: string;
+    branchId: string;
+  };
   product: {
     id: string;
     productCode: string;
     name: string;
-    hasBox: boolean;
-    boxSize: number | null;
-    UnitOfMeasure: string | null;
+    generic: string | null;
+    description: string | null;
+    sellPrice: number | null;
+    imageUrl: string;
+    isActive: boolean;
+    warningQuantity: number;
+    category: any;
+    colour: {
+      id: string;
+      name: string;
+    } | null;
+    unitOfMeasure: IUnitOfMeasure;
   };
+  unitOfMeasure: IUnitOfMeasure;
+  availableQuantity: number;
+  conversionFactor: number;
+  variants?: Array<{
+    id: string;
+    height: number;
+    width: number;
+    quantity: number;
+    area: number;
+  }>;
+  stockType: 'dimension' | 'quantity';
+  hasVariants: boolean;
 }
+
+// Helper function to format product display with color
+const formatProductLabel = (product: any): string => {
+  const productName = product.name || 'Unknown Product';
+  const colourName = product.colour?.name;
+  
+  if (colourName) {
+    return `${productName} - ${colourName}`;
+  }
+  return productName;
+};
+
+// Helper function to format variant label
+const formatVariantLabel = (variant: any): string => {
+  return `${variant.height} x ${variant.width} (${variant.quantity} available)`;
+};
 
 export default function StockCorrectionForm({
   initialData,
@@ -81,11 +129,20 @@ export default function StockCorrectionForm({
   const [stores, setStores] = useState<any[]>([]);
   const [shops, setShops] = useState<any[]>([]);
   const [storeStockItems, setStoreStockItems] = useState<StoreStockItem[]>([]);
+  const [unitsOfMeasure, setUnitsOfMeasure] = useState<{
+    [key: string]: IUnitOfMeasure[];
+  }>({});
   const [isMounted, setIsMounted] = useState(false);
+  const [loadingUOM, setLoadingUOM] = useState<{ [key: string]: boolean }>({});
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [initialItemsLoaded, setInitialItemsLoaded] = useState(false);
+  const [initialSyncDone, setInitialSyncDone] = useState(false);
+  
+  const hasFetchedProductsRef = useRef(false);
+  const lastLocationRef = useRef<string>('');
+  
   const router = useRouter();
 
+  // Initialize form
   const form = useForm<FormDataType>({
     defaultValues: {
       storeId: initialData?.storeId || '',
@@ -93,116 +150,26 @@ export default function StockCorrectionForm({
       reason: initialData?.reason || 'MANUAL_ADJUSTMENT',
       reference: initialData?.reference || '',
       notes: initialData?.notes || '',
-      items: initialData?.items?.map((item) => ({
+      items: initialData?.items?.map((item: any) => ({
         productId: item.productId.toString(),
-        isBox: item.isBox || false,
-        quantity: Number(item.quantity)
-      })) || [{ productId: '', isBox: false, quantity: 1 }]
+        unitOfMeasureId: item.unitOfMeasureId.toString(),
+        quantity: Number(item.quantity),
+        height: item.height,
+        width: item.width,
+        variantId: item.variantId
+      })) || [{ productId: '', unitOfMeasureId: '', quantity: 1 }]
     }
   });
 
   const locationType = form.watch('storeId') ? 'store' : 'shop';
   const locationId = form.watch('storeId') || form.watch('shopId');
+  const items = form.watch('items');
 
-  // Get available stock for a product
-  const getAvailableStock = (productId: string): StoreStockItem | undefined => {
-    return storeStockItems.find((stock) => stock.product.id.toString() === productId);
-  };
-
-  // Get available pieces in stock
-  const getAvailablePieces = (productId: string): number => {
-    const stock = getAvailableStock(productId);
-    return stock?.quantity || 0;
-  };
-
-  // Get available boxes in stock
-  const getAvailableBoxes = (productId: string): number => {
-    const stock = getAvailableStock(productId);
-    if (!stock || !stock.product.hasBox || !stock.product.boxSize || stock.product.boxSize <= 0) return 0;
-    return Math.floor(stock.quantity / stock.product.boxSize);
-  };
-
-  // Get max quantity based on isBox flag
-  const getMaxQuantity = (productId: string, isBox: boolean): number => {
-    if (!productId) return 0;
-    if (isBox) {
-      return getAvailableBoxes(productId);
-    } else {
-      return getAvailablePieces(productId);
-    }
-  };
-
-  // Get display text for available stock
-  const getAvailableStockDisplay = (productId: string, isBox: boolean): string => {
-    if (!productId) return 'Select product';
-    
-    const stock = getAvailableStock(productId);
-    if (!stock) return 'Select product';
-    
-    const pieces = stock.quantity;
-    
-    if (isBox) {
-      if (!stock.product.hasBox) {
-        return 'Box not supported for this product';
-      }
-      if (!stock.product.boxSize || stock.product.boxSize <= 0) {
-        return 'Box size not configured';
-      }
-      const boxes = Math.floor(pieces / stock.product.boxSize);
-      const remainingPieces = pieces % stock.product.boxSize;
-      if (boxes === 0) {
-        return '0 boxes available';
-      }
-      return `${boxes} box(es) available${remainingPieces > 0 ? ` (${remainingPieces} pieces left)` : ''}`;
-    } else {
-      return `${pieces} piece(s) available`;
-    }
-  };
-
-  // Get box size info string
-  const getBoxSizeInfo = (productId: string): string => {
-    const stock = getAvailableStock(productId);
-    if (!stock?.product.hasBox || !stock.product.boxSize) return '';
-    return `${stock.product.boxSize} pieces per box`;
-  };
-
-  // Check if product supports boxing
-  const doesProductSupportBox = (productId: string): boolean => {
-    const stock = getAvailableStock(productId);
-    return stock?.product.hasBox || false;
-  };
-
-  // Validation function
-  const validateForm = (data: FormDataType) => {
-    const errors: any = {};
-
-    if (!data.storeId && !data.shopId) {
-      errors.storeId = 'Either store or shop must be selected';
-    }
-
-    if (!data.items || data.items.length === 0) {
-      errors.items = 'At least one item is required';
-    } else {
-      data.items.forEach((item, index) => {
-        if (!item.productId) {
-          errors.items = errors.items || {};
-          errors.items[index] = errors.items[index] || {};
-          errors.items[index].productId = 'Product is required';
-        }
-        const numQuantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
-        if (isNaN(numQuantity) || numQuantity === 0) {
-          errors.items = errors.items || {};
-          errors.items[index] = errors.items[index] || {};
-          errors.items[index].quantity = 'Quantity must be a non-zero number';
-        }
-      });
-    }
-
-    return errors;
-  };
+  // Create a stable location identifier
+  const currentLocation = `${locationType}-${locationId}`;
 
   // Get unique products from storeStockItems
-  const getUniqueProducts = () => {
+  const getUniqueProducts = (): StoreStockItem[] => {
     const seenProductIds = new Set<string>();
     return storeStockItems.filter((item) => {
       if (!seenProductIds.has(item.product.id)) {
@@ -213,10 +180,47 @@ export default function StockCorrectionForm({
     });
   };
 
+  // Get variants for a specific product
+  // const getVariantsForProduct = (productId: string): StoreStockItem['variants'] => {
+  //   const productItem = storeStockItems.find(item => item.product.id === productId);
+  //   return productItem?.variants || [];
+  // };
+
+  // Check if product has variants
+  const productHasVariants = (productId: string): boolean => {
+    const productItem = storeStockItems.find(item => item.product.id === productId);
+    return productItem?.hasVariants || false;
+  };
+
+  // Helper function to calculate available quantity in selected unit
+  const calculateAvailableQuantity = (
+    storeStockItem: any,
+    selectedUnitOfMeasureId: string,
+    variantId?: string
+  ) => {
+    if (!storeStockItem || !selectedUnitOfMeasureId) return 0;
+
+    // For variant-based items, get quantity from specific variant
+    if (storeStockItem.hasVariants && variantId) {
+      const variant = storeStockItem.variants?.find((v: { id: string; }) => v.id === variantId);
+      return variant?.quantity || 0;
+    }
+
+    const baseQuantity = storeStockItem.quantity;
+    const baseConversion = storeStockItem.unitOfMeasure?.conversionFactor || 1;
+    const selectedUnit = unitsOfMeasure[storeStockItem.product.id]?.find(
+      (unit: IUnitOfMeasure) => unit.id === selectedUnitOfMeasureId
+    );
+
+    if (!selectedUnit) return baseQuantity;
+    return (baseQuantity * baseConversion) / 1;
+  };
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Fetch stores and shops
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -226,43 +230,161 @@ export default function StockCorrectionForm({
         ]);
         setStores(storesData);
         setShops(shopsData);
-      } catch {
+      } catch  {
         toast.error('Failed to load stores or shops');
       }
     };
     fetchData();
   }, []);
 
-  useEffect(() => {
-    const fetchProductsFromLocation = async () => {
-      if (!locationId) {
-        setStoreStockItems([]);
-        return;
+  const fetchUnitsOfMeasure = useCallback(
+    async (productId: string) => {
+      if (!productId) return;
+
+      if (!unitsOfMeasure[productId] && !loadingUOM[productId]) {
+        setLoadingUOM((prev) => ({ ...prev, [productId]: true }));
+        try {
+          const uomData = await getUnitOfMeasuresByProductId(productId);
+
+          if (Array.isArray(uomData)) {
+            setUnitsOfMeasure((prev) => ({ ...prev, [productId]: uomData }));
+          } else {
+            setUnitsOfMeasure((prev) => ({
+              ...prev,
+              [productId]: uomData ? [uomData] : []
+            }));
+          }
+        } catch  {
+          toast.error('Failed to load units of measure');
+          setUnitsOfMeasure((prev) => ({ ...prev, [productId]: [] }));
+        } finally {
+          setLoadingUOM((prev) => ({ ...prev, [productId]: false }));
+        }
       }
+    },
+    [unitsOfMeasure, loadingUOM]
+  );
 
-      setLoadingProducts(true);
-      try {
-        const entityType = locationType === 'store'
-          ? TransferEntityType.STORE
-          : TransferEntityType.SHOP;
-
-        const stockData = await getAvailableProductsBySource(entityType, locationId);
-        setStoreStockItems(stockData);
-      } catch {
-        toast.error('Failed to load products from location');
-      } finally {
-        setLoadingProducts(false);
-      }
-    };
-
-    fetchProductsFromLocation();
-  }, [locationType, locationId]);
-
-  useEffect(() => {
-    if (isEdit && initialData && !initialItemsLoaded) {
-      setInitialItemsLoaded(true);
+  // Fetch products from location
+  const fetchProductsFromLocation = useCallback(async () => {
+    if (!locationId) {
+      setStoreStockItems([]);
+      hasFetchedProductsRef.current = false;
+      lastLocationRef.current = '';
+      setInitialSyncDone(false);
+      return;
     }
-  }, [isEdit, initialData, initialItemsLoaded]);
+
+    if (currentLocation === lastLocationRef.current && hasFetchedProductsRef.current) {
+      return;
+    }
+
+    setLoadingProducts(true);
+    hasFetchedProductsRef.current = true;
+    lastLocationRef.current = currentLocation;
+
+    try {
+      const entityType = locationType === 'store' ? TransferEntityType.STORE : TransferEntityType.SHOP;
+      const stockData = await getAvailableProductsBySource(entityType, locationId);
+      setStoreStockItems(stockData);
+    } catch {
+      toast.error('Failed to load products from location');
+      setStoreStockItems([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [currentLocation, locationType, locationId]);
+
+  // Debounced fetch effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchProductsFromLocation();
+    }, 300);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [fetchProductsFromLocation]);
+
+  // Sync form items with loaded variants for edit mode
+  useEffect(() => {
+    if (isEdit && storeStockItems.length > 0 && items.length > 0 && !initialSyncDone) {
+      const updatedItems = items.map((item) => {
+        if (!item.productId) return item;
+
+        const stockItem = storeStockItems.find(
+          (stock) => stock.product.id.toString() === item.productId
+        );
+
+        if (stockItem?.hasVariants && item.height && item.width) {
+          const matchingVariant = stockItem.variants?.find(
+            (v) => 
+              Math.abs(v.height - (item.height || 0)) < 0.01 && 
+              Math.abs(v.width - (item.width || 0)) < 0.01
+          );
+
+          if (matchingVariant && (!item.variantId || item.variantId !== matchingVariant.id)) {
+            return {
+              ...item,
+              variantId: matchingVariant.id
+            };
+          }
+        }
+        
+        return item;
+      });
+
+      const hasChanges = updatedItems.some((item, index) => 
+        item.variantId !== items[index].variantId
+      );
+
+      if (hasChanges) {
+        form.setValue('items', updatedItems);
+      }
+      
+      setInitialSyncDone(true);
+    }
+  }, [isEdit, storeStockItems, items, form, initialSyncDone]);
+
+  // Load units for initial items
+  useEffect(() => {
+    if (isEdit && initialData) {
+      const loadInitialUnits = async () => {
+        for (const item of initialData.items) {
+          const productId = item.productId.toString();
+          await fetchUnitsOfMeasure(productId);
+        }
+      };
+      loadInitialUnits();
+    }
+  }, [isEdit, initialData, fetchUnitsOfMeasure]);
+
+  // Clear variant selection when product changes
+  const handleProductChange = (index: number, productId: string) => {
+    const newItems = [...items];
+    newItems[index].productId = productId;
+    newItems[index].unitOfMeasureId = '';
+    newItems[index].quantity = 1;
+    newItems[index].height = undefined;
+    newItems[index].width = undefined;
+    newItems[index].variantId = undefined;
+    form.setValue('items', newItems);
+
+    if (productId) {
+      fetchUnitsOfMeasure(productId);
+    }
+  };
+
+  // Handle variant selection
+  const handleVariantChange = (index: number, variant: any) => {
+    const newItems = [...items];
+    newItems[index].height = variant.height;
+    newItems[index].width = variant.width;
+    newItems[index].variantId = variant.id;
+    newItems[index].quantity = 1;
+    form.setValue('items', newItems);
+    form.trigger(`items.${index}.quantity`);
+  };
 
   const [isDark, setIsDark] = useState(false);
 
@@ -310,6 +432,54 @@ export default function StockCorrectionForm({
     })
   };
 
+  const validateForm = (data: FormDataType) => {
+    const errors: any = {};
+
+    if (!data.storeId && !data.shopId) {
+      errors.storeId = 'Either store or shop must be selected';
+    }
+
+    if (!data.items || data.items.length === 0) {
+      errors.items = 'At least one item is required';
+    } else {
+      data.items.forEach((item, index) => {
+        if (!item.productId) {
+          errors.items = errors.items || {};
+          errors.items[index] = errors.items[index] || {};
+          errors.items[index].productId = 'Product is required';
+        }
+        if (!item.unitOfMeasureId) {
+          errors.items = errors.items || {};
+          errors.items[index] = errors.items[index] || {};
+          errors.items[index].unitOfMeasureId = 'Unit of measure is required';
+        }
+
+        // Check if variant is required
+        const hasVariants = productHasVariants(item.productId);
+        if (hasVariants && (!item.height || !item.width || !item.variantId)) {
+          errors.items = errors.items || {};
+          errors.items[index] = errors.items[index] || {};
+          errors.items[index].variantId = 'Variant selection is required';
+        }
+
+        if (item.quantity === '' || item.quantity === null || item.quantity === undefined) {
+          errors.items = errors.items || {};
+          errors.items[index] = errors.items[index] || {};
+          errors.items[index].quantity = 'Quantity is required';
+        } else if (typeof item.quantity === 'string') {
+          const num = parseFloat(item.quantity);
+          if (isNaN(num)) {
+            errors.items = errors.items || {};
+            errors.items[index] = errors.items[index] || {};
+            errors.items[index].quantity = 'Quantity must be a valid number';
+          }
+        }
+      });
+    }
+
+    return errors;
+  };
+
   const onSubmit = async (data: FormDataType) => {
     const errors = validateForm(data);
     
@@ -334,30 +504,35 @@ export default function StockCorrectionForm({
       return;
     }
 
-    // Validate stock availability
-    for (const item of data.items) {
-      if (item.productId) {
-        const numQuantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
-        const maxQty = getMaxQuantity(item.productId, item.isBox);
-        
-        if (Math.abs(numQuantity) > maxQty && maxQty > 0) {
-          const stock = getAvailableStock(item.productId);
-          const productName = stock?.product.name || 'Product';
-          const unit = item.isBox ? 'boxes' : 'pieces';
-          toast.error(`${productName}: Cannot adjust ${Math.abs(numQuantity)} ${unit}. Only ${maxQty} ${unit} available.`);
-          return;
-        }
-      }
-    }
-
     setIsLoading(true);
     try {
+      const validItems = data.items.filter((item) => {
+        if (!item.productId || !item.unitOfMeasureId) return false;
+        
+        const hasVariants = productHasVariants(item.productId);
+        if (hasVariants && (!item.height || !item.width || !item.variantId)) {
+          return false;
+        }
+        
+        const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
+        return quantity !== 0;
+      });
+
+      if (validItems.length === 0) {
+        toast.error('Please add at least one valid item with non-zero quantity');
+        setIsLoading(false);
+        return;
+      }
+
       const payload = {
         ...data,
-        items: data.items.map((item) => ({
-          productId: item.productId,
-          isBox: item.isBox,
-          quantity: typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity
+        items: validItems.map((item) => ({
+          productId: item.productId.toString(),
+          unitOfMeasureId: item.unitOfMeasureId,
+          quantity: typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity,
+          ...(item.height && { height: Number(item.height) }),
+          ...(item.width && { width: Number(item.width) }),
+          ...(item.variantId && { variantId: item.variantId })
         }))
       };
 
@@ -372,7 +547,9 @@ export default function StockCorrectionForm({
       router.push('/dashboard/StockCorrection');
       router.refresh();
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'An error occurred while saving stock correction.';
+      const message =
+        error?.response?.data?.message ||
+        'An error occurred while saving stock correction.';
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -388,7 +565,12 @@ export default function StockCorrectionForm({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div>Loading...</div>
+          <div className='flex items-center justify-center py-8'>
+            <div className='text-center'>
+              <div className='border-primary mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-b-2'></div>
+              <div>Loading form...</div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -418,8 +600,16 @@ export default function StockCorrectionForm({
                         if (value) {
                           form.setValue('shopId', '');
                         }
-                        form.setValue('items', [{ productId: '', isBox: false, quantity: 1 }]);
+                        form.setValue('items', [
+                          {
+                            productId: '',
+                            unitOfMeasureId: '',
+                            quantity: 1
+                          }
+                        ]);
                         setStoreStockItems([]);
+                        setUnitsOfMeasure({});
+                        setInitialSyncDone(false);
                       }}
                     >
                       <FormControl>
@@ -429,7 +619,10 @@ export default function StockCorrectionForm({
                       </FormControl>
                       <SelectContent>
                         {stores.map((store) => (
-                          <SelectItem key={store.id} value={store.id.toString()}>
+                          <SelectItem
+                            key={store.id}
+                            value={store.id.toString()}
+                          >
                             {store.name}
                           </SelectItem>
                         ))}
@@ -457,8 +650,16 @@ export default function StockCorrectionForm({
                         if (value) {
                           form.setValue('storeId', '');
                         }
-                        form.setValue('items', [{ productId: '', isBox: false, quantity: 1 }]);
+                        form.setValue('items', [
+                          {
+                            productId: '',
+                            unitOfMeasureId: '',
+                            quantity: 1
+                          }
+                        ]);
                         setStoreStockItems([]);
+                        setUnitsOfMeasure({});
+                        setInitialSyncDone(false);
                       }}
                     >
                       <FormControl>
@@ -489,18 +690,27 @@ export default function StockCorrectionForm({
                 render={({ field, fieldState }) => (
                   <FormItem>
                     <FormLabel>Reason</FormLabel>
-                    <ShadcnSelect value={field.value} onValueChange={field.onChange}>
+                    <ShadcnSelect
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder='Select reason' />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value='PURCHASE_ERROR'>Purchase Error</SelectItem>
-                        <SelectItem value='TRANSFER_ERROR'>Transfer Error</SelectItem>
+                        <SelectItem value='PURCHASE_ERROR'>
+                          Purchase Error
+                        </SelectItem>
+                        <SelectItem value='TRANSFER_ERROR'>
+                          Transfer Error
+                        </SelectItem>
                         <SelectItem value='EXPIRED'>Expired</SelectItem>
                         <SelectItem value='DAMAGED'>Damaged</SelectItem>
-                        <SelectItem value='MANUAL_ADJUSTMENT'>Manual Adjustment</SelectItem>
+                        <SelectItem value='MANUAL_ADJUSTMENT'>
+                          Manual Adjustment
+                        </SelectItem>
                       </SelectContent>
                     </ShadcnSelect>
                     {fieldState.error && (
@@ -540,57 +750,86 @@ export default function StockCorrectionForm({
                 return (
                   <FormItem>
                     <FormLabel>Items</FormLabel>
-                    {loadingProducts && <div></div>}
                     <FormControl>
                       <div className='space-y-4'>
-                        <div className='grid grid-cols-5 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
-                          <div>Product</div>
-                          <div>Box/Piece</div>
+                        <div className='grid grid-cols-7 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
+                          <div className='col-span-2'>Product</div>
+                          <div>Unit</div>
+                          <div>Dimensions</div>
                           <div>Quantity</div>
-                          <div>Available Stock</div>
+                          <div>Available</div>
                           <div>Action</div>
                         </div>
 
                         {field.value.map((item, index) => {
-                          const stockItem = getAvailableStock(item.productId);
-                          const isBox = item.isBox;
-                          const pieces = stockItem?.quantity || 0;
-                          const boxSize = stockItem?.product.boxSize || 1;
-                          const boxes = Math.floor(pieces / boxSize);
-                          const remainingPieces = pieces % boxSize;
-                          const hasBox = stockItem?.product.hasBox || false;
+                          const storeStockItem = storeStockItems.find(
+                            (stock) => stock.product.id.toString() === item.productId
+                          );
+
+                          const hasVariants = storeStockItem?.hasVariants || false;
+                          const variants = storeStockItem?.variants || [];
                           
-                          const maxQuantity = getMaxQuantity(item.productId, isBox);
-                          const availableDisplay = getAvailableStockDisplay(item.productId, isBox);
-                          const boxSizeInfo = getBoxSizeInfo(item.productId);
-                          const supportsBox = doesProductSupportBox(item.productId);
+                          const availableInSelectedUnit = hasVariants && item.variantId
+                            ? variants.find(v => v.id === item.variantId)?.quantity || 0
+                            : storeStockItem && item.unitOfMeasureId
+                              ? calculateAvailableQuantity(
+                                  storeStockItem,
+                                  item.unitOfMeasureId
+                                )
+                              : storeStockItem?.quantity || 0;
 
                           const uniqueProducts = getUniqueProducts();
-                          const productOptions = uniqueProducts.map((s) => ({
-                            value: s.product.id.toString(),
-                            label: s.product.name,
+                          const productOptions = uniqueProducts.map((storeStockItem) => ({
+                            value: storeStockItem.product.id.toString(),
+                            label: formatProductLabel(storeStockItem.product),
+                            data: storeStockItem
                           }));
 
+                          const variantOptions = variants.map((variant) => ({
+                            value: variant.id,
+                            label: formatVariantLabel(variant),
+                            data: variant
+                          }));
+
+                          // Find selected variant value
+                          let selectedVariantValue = null;
+                          if (item.variantId) {
+                            selectedVariantValue = variantOptions.find(
+                              (v) => v.value === item.variantId
+                            );
+                          } else if (item.height && item.width && !item.variantId) {
+                            selectedVariantValue = variantOptions.find(
+                              (v) => 
+                                Math.abs(v.data.height - (item.height || 0)) < 0.01 && 
+                                Math.abs(v.data.width - (item.width || 0)) < 0.01
+                            );
+                          }
+
                           const itemError = itemsError?.[index];
-                          const currentQuantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
-                          const isNegative = currentQuantity < 0;
 
                           return (
-                            <div key={index} className='grid grid-cols-5 items-center gap-4'>
-                              {/* Product Selection */}
-                              <div>
+                            <div
+                              key={index}
+                              className='grid grid-cols-7 items-center gap-4'
+                            >
+                              {/* Product Select */}
+                              <div className='col-span-2'>
                                 <Select
                                   instanceId={`product-select-${index}`}
                                   options={productOptions}
                                   onChange={(newValue: any) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].productId = newValue?.value || '';
-                                    newItems[index].isBox = false;
-                                    newItems[index].quantity = 1;
-                                    field.onChange(newItems);
+                                    handleProductChange(index, newValue?.value || '');
                                   }}
-                                  value={productOptions.find(p => p.value === item.productId) || null}
-                                  placeholder={loadingProducts ? 'Loading products...' : 'Search product'}
+                                  value={
+                                    productOptions.find(
+                                      (p) => p.value === item.productId
+                                    ) || null
+                                  }
+                                  placeholder={
+                                    loadingProducts
+                                      ? 'Loading products...'
+                                      : 'Search product'
+                                  }
                                   isSearchable
                                   isDisabled={loadingProducts}
                                   styles={isDark ? darkStyles : {}}
@@ -602,21 +841,78 @@ export default function StockCorrectionForm({
                                 )}
                               </div>
 
-                              {/* isBox Switch */}
+                              {/* Unit Select */}
                               <div>
-                                <div className='flex items-center justify-center'>
-                                  <Switch
-                                    checked={isBox}
-                                    onCheckedChange={(checked) => {
-                                      const newItems = [...field.value];
-                                      newItems[index].isBox = checked;
-                                      newItems[index].quantity = 1;
-                                      field.onChange(newItems);
+                                <Select
+                                  instanceId={`unit-select-${index}`}
+                                  options={
+                                    unitsOfMeasure[item.productId]?.map(
+                                      (unit) => ({
+                                        value: unit.id.toString(),
+                                        label: `${unit.name}`
+                                      })
+                                    ) || []
+                                  }
+                                  onChange={(newValue) => {
+                                    const newItems = [...field.value];
+                                    newItems[index].unitOfMeasureId =
+                                      newValue?.value || '';
+                                    field.onChange(newItems);
+                                  }}
+                                  value={
+                                    unitsOfMeasure[item.productId]
+                                      ?.map((u) => ({
+                                        value: u.id.toString(),
+                                        label: `${u.name} `
+                                      }))
+                                      .find(
+                                        (u) => u.value === item.unitOfMeasureId
+                                      ) ||
+                                    (item.unitOfMeasureId
+                                      ? {
+                                          value: item.unitOfMeasureId,
+                                          label: 'Loading...'
+                                        }
+                                      : null)
+                                  }
+                                  placeholder='Search unit'
+                                  isSearchable
+                                  isDisabled={!item.productId}
+                                  styles={isDark ? darkStyles : {}}
+                                />
+                                {itemError?.unitOfMeasureId && (
+                                  <p className='text-sm font-medium text-destructive mt-1'>
+                                    {itemError.unitOfMeasureId.message}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Variant/Dimensions Select */}
+                              <div>
+                                {hasVariants ? (
+                                  <Select
+                                    instanceId={`variant-select-${index}`}
+                                    options={variantOptions}
+                                    onChange={(newValue: any) => {
+                                      handleVariantChange(index, newValue?.data);
                                     }}
-                                    disabled={!item.productId || loadingProducts || !supportsBox}
-                                    className='data-[state=checked]:bg-primary'
+                                    value={selectedVariantValue}
+                                    placeholder={'Select dimensions'}
+                                    isSearchable
+                                    isDisabled={loadingProducts || !item.productId}
+                                    isLoading={loadingProducts}
+                                    styles={isDark ? darkStyles : {}}
                                   />
-                                </div>
+                                ) : (
+                                  <div className='text-muted-foreground text-sm'>
+                                    {item.productId ? 'Standard item' : '—'}
+                                  </div>
+                                )}
+                                {itemError?.variantId && (
+                                  <p className='text-sm font-medium text-destructive mt-1'>
+                                    {itemError.variantId.message}
+                                  </p>
+                                )}
                               </div>
 
                               {/* Quantity Input */}
@@ -629,11 +925,12 @@ export default function StockCorrectionForm({
                                       <Input
                                         type='text'
                                         inputMode='decimal'
-                                        placeholder='Qty (+ for add, - for remove)'
+                                        placeholder='Qty'
                                         value={quantityField.value.toString()}
                                         onChange={(e) => {
                                           const value = e.target.value;
                                           const validPattern = /^-?\d*\.?\d*$/;
+                                          
                                           if (validPattern.test(value)) {
                                             quantityField.onChange(value);
                                           }
@@ -646,6 +943,7 @@ export default function StockCorrectionForm({
                                             quantityField.onChange(value.slice(0, -1));
                                           }
                                         }}
+                                        disabled={loadingProducts || (hasVariants && !item.variantId)}
                                       />
                                       <div className='mt-1 text-xs text-gray-500'>
                                         {(() => {
@@ -653,7 +951,7 @@ export default function StockCorrectionForm({
                                           if (isNaN(numValue)) {
                                             return 'Enter valid number';
                                           }
-                                          return numValue < 0 ? '⚠️ Removing stock' : numValue > 0 ? '➕ Adding stock' : 'Zero adjustment';
+                                          return numValue < 0 ? 'Subtraction' : numValue > 0 ? 'Addition' : 'Zero adjustment';
                                         })()}
                                       </div>
                                       {quantityFieldState.error && (
@@ -666,27 +964,19 @@ export default function StockCorrectionForm({
                                 />
                               </div>
 
-                              {/* Available Stock Display */}
+                              {/* Available Quantity */}
                               <div className='text-muted-foreground text-sm'>
                                 {loadingProducts ? (
                                   <div className='flex items-center gap-1'>
                                     <div className='h-3 w-3 animate-spin rounded-full border-b-2 border-gray-400'></div>
                                     <span>Loading...</span>
                                   </div>
-                                ) : item.productId ? (
-                                  <div className='space-y-1'>
-                                    <div className={isBox ? 'font-semibold text-blue-600 dark:text-blue-400' : ''}>
-                                      {availableDisplay}
-                                    </div>
-                                    {isBox && boxSizeInfo && (
-                                      <div className='text-xs text-gray-500'>{boxSizeInfo}</div>
-                                    )}
-                                    {isBox && !supportsBox && (
-                                      <div className='text-xs text-red-500'>Box not supported</div>
-                                    )}
-                                  </div>
+                                ) : availableInSelectedUnit > 0 ? (
+                                  `${Math.floor(availableInSelectedUnit)} available`
+                                ) : hasVariants && item.productId && !item.variantId ? (
+                                  'Select variant'
                                 ) : (
-                                  'Select product'
+                                  'Out of stock'
                                 )}
                               </div>
 
@@ -716,7 +1006,11 @@ export default function StockCorrectionForm({
                             onClick={() => {
                               field.onChange([
                                 ...field.value,
-                                { productId: '', isBox: false, quantity: 1 }
+                                {
+                                  productId: '',
+                                  unitOfMeasureId: '',
+                                  quantity: 1
+                                }
                               ]);
                             }}
                             disabled={loadingProducts}
@@ -756,7 +1050,16 @@ export default function StockCorrectionForm({
 
             <div className='flex justify-end gap-2'>
               <Button type='submit' disabled={isLoading || loadingProducts}>
-                {isEdit ? 'Update' : 'Create'} Stock Correction
+                {isLoading ? (
+                  <div className='flex items-center gap-2'>
+                    <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-white'></div>
+                    {isEdit ? 'Updating...' : 'Creating...'}
+                  </div>
+                ) : isEdit ? (
+                  'Update Stock Correction'
+                ) : (
+                  'Create Stock Correction'
+                )}
               </Button>
             </div>
           </form>

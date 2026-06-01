@@ -1,99 +1,68 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { DataTable } from "@/components/ui/table/data-table";
-import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
-import { useTableQueryParams } from "@/hooks/use-table-query-params";
-import type { IStockLedger } from "@/models/store";
-import { getAllStockLedgers } from "@/service/store";
-import { stockLedgerColumns } from "./cloumn";
+import { searchParamsCache } from '@/lib/searchparams';
+import { getAllStockLedgers } from '@/service/store'; // your service
+import { stockLedgerColumns } from './cloumn'; // your columns
+import { DataTable } from '@/components/ui/table/data-table';
 
 type StockLedgerListingPageProps = object;
 
-export default function StockLedgerListingPage(
-  {}: StockLedgerListingPageProps,
-) {
-  const { page, search, limit, startDate, endDate } = useTableQueryParams();
-  const [stockLedgers, setStockLedgers] = useState<IStockLedger[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default async function StockLedgerListingPage({}: StockLedgerListingPageProps) {
+  const page = Number(searchParamsCache.get('page')) || 1;
+  const search = searchParamsCache.get('q') || '';
+  const limit = Number(searchParamsCache.get('limit')) || 10;
+  const startDate = searchParamsCache.get('startDate');
+  const endDate = searchParamsCache.get('endDate');
 
-  useEffect(() => {
-    let cancelled = false;
+  try {
+    // ────────────────────────────────────────────────
+    // Fetch data from API with optional date filters
+    // ────────────────────────────────────────────────
+    const { data, totalCount } = await getAllStockLedgers({
+      page,
+      limit,
+      startDate,
+      endDate
+    });
 
-    const loadStockLedgers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    // ────────────────────────────────────────────────
+    // Client-side search filter
+    // (matches movement type, reference, store/shop name, user, notes)
+    // ────────────────────────────────────────────────
+    const filteredData = data.filter((item) => {
+      const searchTerm = search.toLowerCase();
 
-        const response = await getAllStockLedgers({
-          page,
-          limit,
-          startDate,
-          endDate,
-        });
+      const movementType = item?.movementType?.toLowerCase() || '';
+      const reference = item?.reference?.toLowerCase() || '';
+      const notes = item?.notes?.toLowerCase() || '';
+      const storeName = item?.store?.name?.toLowerCase() || '';
+      const shopName = item?.shop?.name?.toLowerCase() || '';
+      const userName = item?.user?.name?.toLowerCase() || '';
 
-        if (cancelled) {
-          return;
-        }
+      return (
+        movementType.includes(searchTerm) ||
+        reference.includes(searchTerm) ||
+        notes.includes(searchTerm) ||
+        storeName.includes(searchTerm) ||
+        shopName.includes(searchTerm) ||
+        userName.includes(searchTerm)
+      );
+    });
 
-        setStockLedgers(response.data || []);
-        setTotalCount(response.totalCount || 0);
-      } catch {
-        if (!cancelled) {
-          setError("Error loading stock ledger records.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadStockLedgers();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [endDate, limit, page, startDate]);
-
-  if (loading) {
-    return <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />;
-  }
-
-  if (error) {
-    return <div>{error}</div>;
-  }
-
-  const filteredData = stockLedgers.filter((item) => {
-    const searchTerm = search.toLowerCase();
-    const movementType = item?.movementType?.toLowerCase() || "";
-    const reference = item?.reference?.toLowerCase() || "";
-    const notes = item?.notes?.toLowerCase() || "";
-    const storeName = item?.store?.name?.toLowerCase() || "";
-    const shopName = item?.shop?.name?.toLowerCase() || "";
-    const userName = item?.user?.name?.toLowerCase() || "";
+    // ────────────────────────────────────────────────
+    // Client-side pagination
+    // ────────────────────────────────────────────────
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
 
     return (
-      movementType.includes(searchTerm) ||
-      reference.includes(searchTerm) ||
-      notes.includes(searchTerm) ||
-      storeName.includes(searchTerm) ||
-      shopName.includes(searchTerm) ||
-      userName.includes(searchTerm)
+      // eslint-disable-next-line react-hooks/error-boundaries
+      <DataTable
+        data={paginatedData}
+        totalItems={totalCount}
+        columns={stockLedgerColumns}
+      />
     );
-  });
-
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-  const paginatedData = filteredData.slice(startIndex, endIndex);
-
-  return (
-    <DataTable
-      data={paginatedData}
-      totalItems={totalCount}
-      columns={stockLedgerColumns}
-    />
-  );
+  } catch  {
+    return <div>Error loading stock ledger records.</div>;
+  }
 }

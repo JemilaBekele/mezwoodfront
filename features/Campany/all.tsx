@@ -78,7 +78,7 @@ export default function CompaniesPage() {
       <Card>
         <CardHeader className='flex flex-row items-center justify-between'>
           <CardTitle>All Companies</CardTitle>
-          <PermissionGuard requiredPermission={PERMISSIONS.COMPANY.CREATE.name}>
+          {/* <PermissionGuard requiredPermission={PERMISSIONS.COMPANY.CREATE.name}> */}
             {companies.length === 0 && (
               <Link
                 href='/dashboard/Company/new'
@@ -88,7 +88,7 @@ export default function CompaniesPage() {
                 Add New Company
               </Link>
             )}
-          </PermissionGuard>
+          {/* </PermissionGuard> */}
         </CardHeader>
 
         <CardContent>
@@ -137,9 +137,9 @@ export default function CompaniesPage() {
                     <TableCell>{company.From || '-'}</TableCell>
 
                     <TableCell className='flex gap-2'>
-                      <PermissionGuard
+                      {/* <PermissionGuard
                         requiredPermission={PERMISSIONS.COMPANY.UPDATE.name}
-                      >
+                      > */}
                         <Link
                           href={`/dashboard/Company/${company.id}`}
                           className={cn(
@@ -149,10 +149,10 @@ export default function CompaniesPage() {
                         >
                           <IconEdit className='h-4 w-4' />
                         </Link>
-                      </PermissionGuard>
-                      <PermissionGuard
+                      {/* </PermissionGuard> */}
+                      {/* <PermissionGuard
                         requiredPermission={PERMISSIONS.COMPANY.DELETE.name}
-                      >
+                      > */}
                         <Button
                           variant='destructive'
                           size='icon'
@@ -163,7 +163,7 @@ export default function CompaniesPage() {
                         >
                           <IconTrash className='h-4 w-4' />
                         </Button>
-                      </PermissionGuard>
+                      {/* </PermissionGuard> */}
                     </TableCell>
                   </TableRow>
                 ))}

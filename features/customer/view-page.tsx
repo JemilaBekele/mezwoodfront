@@ -1,54 +1,21 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import FormCardSkeleton from "@/components/form-card-skeleton";
-import type { ICustomer } from "@/models/customer";
-import { getCustomerById } from "@/service/customer";
-import CustomerForm from "./form";
+import { getCustomerById } from '@/service/customer';
+import CustomerForm from './form';
+import { ICustomer } from '@/models/customer';
 
 type TCustomerViewPageProps = {
   customerId: string;
 };
 
-export default function CustomerViewPage({
-  customerId,
+export default async function CustomerViewPage({
+  customerId
 }: TCustomerViewPageProps) {
-  const [customer, setCustomer] = useState<ICustomer | null>(null);
-  const [loading, setLoading] = useState(customerId !== "new");
-  const pageTitle =
-    customerId === "new" ? "Create New Customer" : "Edit Customer";
+  let customer: ICustomer | null = null;
+  let pageTitle = 'Create New Customer';
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCustomer = async () => {
-      if (customerId === "new") {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const data = await getCustomerById(customerId);
-
-        if (!cancelled) {
-          setCustomer(data as ICustomer);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadCustomer();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [customerId]);
-
-  if (loading) {
-    return <FormCardSkeleton />;
+  if (customerId !== 'new') {
+    const data = await getCustomerById(customerId);
+    customer = data as ICustomer;
+    pageTitle = 'Edit Customer';
   }
 
   return <CustomerForm initialData={customer} pageTitle={pageTitle} />;

@@ -36,6 +36,26 @@ export const customerColumns: ColumnDef<ICustomer>[] = [
     enableColumnFilter: true
   },
   {
+    accessorKey: 'phone2',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Secondary Phone' />
+    ),
+    cell: ({ cell }) => (
+      <div>{cell.getValue<ICustomer['phone2']>() ?? '-'}</div>
+    ),
+    enableColumnFilter: true
+  },
+  {
+    accessorKey: 'tinNumber',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='TIN Number' />
+    ),
+    cell: ({ cell }) => (
+      <div>{cell.getValue<ICustomer['tinNumber']>() ?? '-'}</div>
+    ),
+    enableColumnFilter: false
+  },
+  {
     accessorKey: 'address',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Address' />

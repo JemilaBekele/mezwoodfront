@@ -26,6 +26,7 @@ import {
 interface FormValues {
   name: string;
   symbol?: string;
+  base: boolean;
 }
 
 interface UnitOfMeasureFormProps {
@@ -46,6 +47,7 @@ export default function UnitOfMeasureForm({
     defaultValues: {
       name: initialData?.name || '',
       symbol: initialData?.symbol || '',
+      base: initialData?.base || false
     }
   });
 

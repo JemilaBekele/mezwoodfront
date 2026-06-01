@@ -27,37 +27,35 @@ export default async function SupplierPage({ searchParams }: PageProps) {
   searchParamsCache.parse(parsedParams);
 
   return (
-    <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.VIEW_ALL.name}>
-      <PageContainer scrollable={true}>
-        <div className='flex flex-1 flex-col space-y-4'>
-          <div className='flex items-start justify-between'>
-            <Heading
-              title='Products'
-              description='Manage all product information and records.'
-            />
+    <PageContainer scrollable={true}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+          <Heading
+            title='Products'
+            description='Manage all product information and records.'
+          />
 
-            <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.CREATE.name}>
-              <Link
-                href='/dashboard/Products/new'
-                className={cn(buttonVariants(), 'text-xs md:text-sm')}
-              >
-                <IconPlus className='mr-2 h-4 w-4' />
-                Add New Product
-              </Link>
-            </PermissionGuard>
-          </div>
-          <Separator />
-          <Suspense
-            fallback={
-              <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />
-            }
-          >
-            {' '}
-            <ItemTableAction />
-            <ProductsListingPage />
-          </Suspense>
+          <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.CREATE.name}>
+            <Link
+              href='/dashboard/Products/new'
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+              <IconPlus className='mr-2 h-4 w-4' />
+              Add New Product
+            </Link>
+          </PermissionGuard>
         </div>
-      </PageContainer>
-    </PermissionGuard>
+        <Separator />
+        <Suspense
+          fallback={
+            <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />
+          }
+        >
+          {' '}
+          <ItemTableAction />
+          <ProductsListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
   );
 }

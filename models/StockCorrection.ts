@@ -1,9 +1,10 @@
 import { IEmployee } from './employee';
-import { IProduct } from './Product';
+import { IProduct, IProductBatch } from './Product';
 import { IPurchase } from './purchase';
 import { IShop } from './shop';
 import { IStore } from './store';
 import { ITransfer } from './transfer';
+import { IUnitOfMeasure } from './UnitOfMeasure';
 
 // ======================= ENUMS ======================= //
 
@@ -28,17 +29,24 @@ export interface IStockCorrectionItem {
   productId: string;
   product?: IProduct;
 
-isBox: boolean; // ✅ Box or Piece
+ 
+  unitOfMeasureId: string;
+  unitOfMeasure?: IUnitOfMeasure;
 
+  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
+  height?: number;
+  width?: number;
 
+  // ✅ Optional — for piece-based items
   quantity: number;
-
+  
   createdAt: string;
   updatedAt: string;
 }
 
 // ======================= MAIN ======================= //
 export interface IStockCorrection {
+  shortCode: string | undefined;
   id: string; // Prisma uses "id" instead of "_id"
   storeId?: string;
   shopId?: string;

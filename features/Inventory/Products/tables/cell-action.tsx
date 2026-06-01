@@ -67,14 +67,14 @@ export const ProductCellAction: React.FC<ProductCellActionProps> = ({
         <DropdownMenuContent align='end'>
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.PRODUCT.UPDATE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.UPDATE.name}>
             <DropdownMenuItem
               onClick={() => router.push(`/dashboard/Products/${data.id}`)}
             >
               <IconEdit className='mr-2 h-4 w-4' /> Update
             </DropdownMenuItem>
           </PermissionGuard>
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.PRODUCT.VIEW.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.VIEW.name}>
             <DropdownMenuItem
               onClick={() =>
                 router.push(`/dashboard/Products/view?id=${data.id}`)
@@ -84,7 +84,7 @@ export const ProductCellAction: React.FC<ProductCellActionProps> = ({
             </DropdownMenuItem>
           </PermissionGuard>
 
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.PRODUCT.DELETE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.DELETE.name}>
             <DropdownMenuItem onClick={() => setOpen(true)}>
               <IconTrash className='mr-2 h-4 w-4' /> Delete
             </DropdownMenuItem>

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable import/no-unresolved */
 
-import { IEmployee } from "@/models/employee";
+import { IEmployee } from '@/models/employee';
 import { axiosInstance } from "./axiosIntance";
 
 export interface GetParams {
@@ -21,20 +21,20 @@ export const getAllEmployees = async ({
   page = 1,
   limit = 10,
   startDate,
-  endDate,
+  endDate
 }: GetParams = {}) => {
   try {
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     // Add date filters to query if they exist
     if (startDate) {
-      query.append("startDate", startDate);
+      query.append('startDate', startDate);
     }
     if (endDate) {
-      query.append("endDate", endDate);
+      query.append('endDate', endDate);
     }
 
     const url = `users?${query}`;
@@ -45,7 +45,7 @@ export const getAllEmployees = async ({
     return {
       employees: employees,
       totalCount: response.data.count ?? employees.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -53,14 +53,6 @@ export const getAllEmployees = async ({
 };
 
 export const getAllEmploy = async () => {
-  try {
-    const response = await axiosInstance.get(`/users`);
-    return response.data.users;
-  } catch (error) {
-    throw error;
-  }
-};
-export const getAllEmployapi = async () => {
   try {
     const response = await axiosInstance.get(`/users`);
     return response.data.users;
@@ -80,14 +72,15 @@ export const changePassword = async (
   userId: string,
   currentPassword: string,
   newPassword: string,
+  
 ) => {
   try {
     const response = await axiosInstance.put(
       `/user/${userId}/change-password`,
       {
         currentPassword,
-        newPassword,
-      },
+        newPassword
+      }
     );
     return response.data;
   } catch (error) {
@@ -97,10 +90,11 @@ export const changePassword = async (
 export const resetUserPassword = async (
   userId: string,
   newPassword: string,
+  
 ) => {
   try {
     const response = await axiosInstance.put(`/user/reset-password/${userId}`, {
-      newPassword,
+      newPassword
     });
     return response.data;
   } catch (error) {
@@ -118,7 +112,7 @@ export const getAlldep = async () => {
 };
 export const fetchUserInvoices = async () => {
   try {
-    const response = await axiosInstance.get("/invoices/fetch/userinvoice");
+    const response = await axiosInstance.get('/invoices/fetch/userinvoice');
     return response.data.invoices;
   } catch (error) {
     throw error;
@@ -136,20 +130,20 @@ export const getAllTentant = async ({
   page = 1,
   limit = 10,
   startDate,
-  endDate,
+  endDate
 }: GetParams = {}) => {
   try {
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     // Add date filters to query if they exist
     if (startDate) {
-      query.append("startDate", startDate);
+      query.append('startDate', startDate);
     }
     if (endDate) {
-      query.append("endDate", endDate);
+      query.append('endDate', endDate);
     }
 
     const url = `/user/roletentant?${query}`;
@@ -160,7 +154,7 @@ export const getAllTentant = async ({
     return {
       employees: employees,
       totalCount: response.data.count ?? employees.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -170,7 +164,7 @@ export const getAllTentant = async ({
 export const getAllnotconfirm = async (page = 1, limit = 10) => {
   const query = new URLSearchParams({
     page: page.toString(),
-    limit: limit.toString(),
+    limit: limit.toString()
   });
 
   try {
@@ -181,7 +175,7 @@ export const getAllnotconfirm = async (page = 1, limit = 10) => {
 
     return {
       data: users as IEmployee[],
-      totalCount: users.length,
+      totalCount: users.length
     };
   } catch (error) {
     throw error;
@@ -198,9 +192,11 @@ export const getEmployeeById = async (id: string | number) => {
   }
 };
 
-export const getEmployeeId = async (id: string | number) => {
+export const getEmployeeId = async (
+  id: string | number,
+  
+) => {
   try {
-    // Send `id` as a query parameter
     const response = await axiosInstance.get(`/user/${id}`);
     return response.data;
   } catch (error) {
@@ -208,16 +204,23 @@ export const getEmployeeId = async (id: string | number) => {
   }
 };
 
-export const createEmployee = async (employeeData: any) => {
+export const createEmployee = async (
+  employeeData: any,
+  
+) => {
   try {
-    const response = await axiosInstance.post("/register", employeeData);
+    const response = await axiosInstance.post('/register', employeeData);
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-export const updateEmployee = async (id: string, formData: any) => {
+export const updateEmployee = async (
+  id: string,
+  formData: any,
+  
+) => {
   try {
     const response = await axiosInstance.put(`/users/${id}`, formData);
     return response;
@@ -226,9 +229,12 @@ export const updateEmployee = async (id: string, formData: any) => {
   }
 };
 
-export const deleteUser = async (id: string | number) => {
+export const deleteUser = async (
+  id: string | number,
+  
+) => {
   if (!id) {
-    throw new Error("Service ID is required");
+    throw new Error('Service ID is required');
   }
   try {
     const response = await axiosInstance.delete(`/users/${id}`);

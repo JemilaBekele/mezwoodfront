@@ -27,36 +27,37 @@ export default async function SupplierPage({ searchParams }: PageProps) {
   searchParamsCache.parse(parsedParams);
 
   return (
-    <PermissionGuard requiredPermission={PERMISSIONS.CUSTOMER.VIEW_ALL.name}>
-      <PageContainer scrollable={false}>
-        <div className='flex flex-1 flex-col space-y-4'>
-          <div className='flex items-start justify-between'>
-            <Heading
-              title='Customers'
-              description='Manage customer information and records.'
-            />
-            <PermissionGuard requiredPermission={PERMISSIONS.CUSTOMER.CREATE.name}>
-              <Link
-                href='/dashboard/customer/new'
-                className={cn(buttonVariants(), 'text-xs md:text-sm')}
-              >
-                <IconPlus className='mr-2 h-4 w-4' />
-                Add New Customer
-              </Link>
-            </PermissionGuard>
-          </div>
-          <Separator />
-          <Suspense
-            fallback={
-              <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />
-            }
+    <PageContainer scrollable={false}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+          <Heading
+            title='Customers'
+            description='Manage customer information and records.'
+          />
+
+          <PermissionGuard
+            requiredPermission={PERMISSIONS.CUSTOMER.CREATE.name}
           >
-            {' '}
-            <ItemTableAction />
-            <CustomersListingPage />
-          </Suspense>
+            <Link
+              href='/dashboard/customer/new'
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+              <IconPlus className='mr-2 h-4 w-4' />
+              Add New Customer
+            </Link>
+          </PermissionGuard>
         </div>
-      </PageContainer>
-    </PermissionGuard>
+        <Separator />
+        <Suspense
+          fallback={
+            <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />
+          }
+        >
+          {' '}
+          <ItemTableAction />
+          <CustomersListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
   );
 }

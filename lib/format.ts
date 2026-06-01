@@ -11,7 +11,16 @@ export function formatDate(
       year: opts.year ?? 'numeric',
       ...opts
     }).format(new Date(date));
-  } catch (_err) {
+  } catch {
     return '';
   }
 }
+
+
+  // Format currency
+ export const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'ETH',
+    }).format(amount);
+  };

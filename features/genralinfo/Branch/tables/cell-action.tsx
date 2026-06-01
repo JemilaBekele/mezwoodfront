@@ -87,12 +87,12 @@ export const BranchCellAction: React.FC<CellActionProps> = ({ data }) => {
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end'>
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.BRANCH.UPDATE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.BRANCH.UPDATE.name}>
             <DropdownMenuItem onClick={() => setOpenEditModal(true)}>
               <Edit className='mr-2 h-4 w-4' /> Update
             </DropdownMenuItem>
           </PermissionGuard>
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.BRANCH.DELETE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.BRANCH.DELETE.name}>
             <DropdownMenuItem onClick={() => setOpenDeleteModal(true)}>
               <IconTrash className='mr-2 h-4 w-4' /> Delete
             </DropdownMenuItem>

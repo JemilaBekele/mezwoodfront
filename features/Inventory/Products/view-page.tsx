@@ -1,90 +1,61 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import FormCardSkeleton from "@/components/form-card-skeleton";
-import { normalizeImagePath } from "@/lib/norm";
-import type { ICategory } from "@/models/Category";
-import type { IProduct } from "@/models/Product";
-import type { IShop } from "@/models/shop";
-import { getCategories } from "@/service/Category";
-import { getProductById } from "@/service/Product";
-import { getShopallapi } from "@/service/shop";
-import ProductForm from "./form";
+import { getProductById } from '@/service/Product';
+import ProductForm from './form';
+import { IProduct } from '@/models/Product';
+import { getCategories, getColours } from '@/service/Category';
+import { getUnitsOfMeasure } from '@/service/UnitOfMeasure';
+import { normalizeImagePath } from '@/lib/norm';
+import { toast } from 'sonner';
+import { getShopallapi } from '@/service/shop';
+import { getCurtainTypes } from '@/service/curtainType'; // 👈 import curtain types service
 
 type TProductViewPageProps = {
   productId: string;
 };
 
-export default function ProductViewPage({
-  productId,
+export default async function ProductViewPage({
+  productId
 }: TProductViewPageProps) {
-  const [product, setProduct] = useState<IProduct | null>(null);
-  const [categories, setCategories] = useState<ICategory[]>([]);
-  const [shops, setShops] = useState<IShop[]>([]);
-  const [loading, setLoading] = useState(true);
+  let product: IProduct | null = null;
+  let combinedProductData: IProduct | null = null;
+  let pageTitle = 'Create New Product';
 
-  useEffect(() => {
-    let cancelled = false;
+  if (productId !== 'new') {
+    try {
+      const data = await getProductById(productId);
+      product = data as IProduct | null;
 
-    const loadProductPage = async () => {
-      try {
-        const [categoriesData, shopsData, productData] = await Promise.all([
-          getCategories(),
-          getShopallapi(),
-          productId !== "new" ? getProductById(productId) : Promise.resolve(null),
-        ]);
+      if (product) {
+        combinedProductData = {
+          ...product,
+          imageUrl:
+            typeof product?.imageUrl === 'string'
+              ? normalizeImagePath(product.imageUrl)
+              : undefined
+        };
 
-        if (cancelled) {
-          return;
-        }
-
-        setCategories(categoriesData || []);
-        setShops(shopsData || []);
-
-        if (productData) {
-          const typedProduct = productData as IProduct;
-          setProduct({
-            ...typedProduct,
-            imageUrl:
-              typeof typedProduct.imageUrl === "string"
-                ? normalizeImagePath(typedProduct.imageUrl)
-                : undefined,
-          });
-        } else {
-          setProduct(null);
-        }
-      } catch {
-        toast.error("Error loading product");
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        pageTitle = `Edit Product: ${product?.name || product.id}`;
       }
-    };
-
-    loadProductPage();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [productId]);
-
-  if (loading) {
-    return <FormCardSkeleton />;
+    } catch  {
+      toast.error('Error loading product');
+    }
   }
 
-  const pageTitle =
-    productId === "new"
-      ? "Create New Product"
-      : `Edit Product: ${product?.name || product?.id || ""}`;
+  // Fetch all dropdown data in parallel including curtain types
+  const [categories, unitsOfMeasure, shops, colours] = await Promise.all([
+    getCategories(),
+    getUnitsOfMeasure(),
+    getShopallapi(),
+    getColours(),
+  ]);
 
   return (
     <ProductForm
-      initialData={product}
+      initialData={combinedProductData}
       pageTitle={pageTitle}
       categories={categories}
+      unitsOfMeasure={unitsOfMeasure}
       shops={shops}
+      colours={colours}
     />
   );
 }

@@ -4,17 +4,13 @@ import { useEffect, useState } from "react";
 import { DataTable } from "@/components/ui/table/data-table";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
-import {
-  getAllRolePermissions,
-  type IRolePermission,
-} from "@/service/roleService";
+import type { IRolePermission } from '@/service/roleService';
+import { getAllRolePermissions } from "@/service/roleService";
 import { rolePermissionColumns } from "./tables/columns";
 
 type PermissionListingPageProps = object;
 
-export default function RolePermissionListingPage(
-  {}: PermissionListingPageProps,
-) {
+export default function RolePermissionListingPage({}: PermissionListingPageProps) {
   const { page, search, limit, startDate, endDate } = useTableQueryParams();
   const [rolePermissions, setRolePermissions] = useState<IRolePermission[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -33,7 +29,7 @@ export default function RolePermissionListingPage(
           page,
           limit,
           startDate,
-          endDate,
+          endDate
         });
 
         if (cancelled) {
@@ -58,7 +54,7 @@ export default function RolePermissionListingPage(
     return () => {
       cancelled = true;
     };
-  }, [endDate, limit, page, startDate]);
+  }, [limit, page, startDate, endDate]);
 
   if (loading) {
     return <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />;
@@ -68,13 +64,15 @@ export default function RolePermissionListingPage(
     return <div className="text-red-500">{error}</div>;
   }
 
-  const loweredSearch = search.toLowerCase();
+  // Client-side search filter on role name or permission name
+  const searchLower = search.toLowerCase();
   const filteredData = rolePermissions.filter(
     (perm) =>
-      perm.role?.name?.toLowerCase().includes(loweredSearch) ||
-      (perm.permission?.name?.toLowerCase() ?? "").includes(loweredSearch),
+      perm.role?.name.toLowerCase().includes(searchLower) ||
+      (perm.permission?.name?.toLowerCase() ?? "").includes(searchLower)
   );
 
+  // Client-side pagination
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
   const paginatedData = filteredData.slice(startIndex, endIndex);

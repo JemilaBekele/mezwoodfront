@@ -27,36 +27,37 @@ export default async function SupplierPage({ searchParams }: PageProps) {
   searchParamsCache.parse(parsedParams);
 
   return (
-    <PermissionGuard requiredPermission={PERMISSIONS.TRANSFER.VIEW_ALL.name}>
-      <PageContainer scrollable={false}>
-        <div className='flex flex-1 flex-col space-y-4'>
-          <div className='flex items-start justify-between'>
-            <Heading
-              title='Transfers'
-              description='Manage all transfer records between branches and locations.'
-            />
-            <PermissionGuard requiredPermission={PERMISSIONS.TRANSFER.CREATE.name}>
-              <Link
-                href='/dashboard/Transfer/new'
-                className={cn(buttonVariants(), 'text-xs md:text-sm')}
-              >
-                <IconPlus className='mr-2 h-4 w-4' />
-                Add New Transfer
-              </Link>
-            </PermissionGuard>
-          </div>
-          <Separator />
-          <Suspense
-            fallback={
-              <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />
-            }
+    <PageContainer scrollable={false}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+          <Heading
+            title='Transfers'
+            description='Manage all transfer records between branches and locations.'
+          />
+
+          <PermissionGuard
+            requiredPermission={PERMISSIONS.TRANSFER.CREATE.name}
           >
-            {' '}
-            <ItemTableAction />
-            <TransfersListingPage />
-          </Suspense>
+            <Link
+              href='/dashboard/Transfer/new'
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+              <IconPlus className='mr-2 h-4 w-4' />
+              Add New Transfer
+            </Link>
+          </PermissionGuard>
         </div>
-      </PageContainer>
-    </PermissionGuard>
+        <Separator />
+        <Suspense
+          fallback={
+            <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />
+          }
+        >
+          {' '}
+          <ItemTableAction />
+          <TransfersListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
   );
 }

@@ -1,19 +1,26 @@
 import { IEmployee } from './employee';
 import { IProduct } from './Product';
-import { IShop } from './shop';
 import { IStore } from './store';
 import { ISupplier } from './supplier';
+import { IUnitOfMeasure } from './UnitOfMeasure';
 
 export interface PurchaseItem {
     productId: string;
 
- isBox: boolean; // ✅ Box or Piece
+  unitOfMeasureId: string; // foreign key
+  unitOfMeasure?: IUnitOfMeasure;
     product: IProduct;
 
-  quantity: number;
-  unitPrice: number;
+  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
+  height?: number;
+  width?: number;
+
+  // ✅ Optional — for piece-based items
+  quantity: number; 
+   unitPrice: number;
   totalPrice: number;
   id?: string;
+
 
 }
 export enum PaymentStatus {
@@ -25,12 +32,8 @@ export enum PaymentStatus {
 export interface IPurchase {
   id: string;
   invoiceNo: string;
-   imageUrl      ? : string;
-  documentUrl?  : string;
   supplierId: string;
-  storeId?: string;
-    shopId?: string;
-    shop?: IShop;
+  storeId: string;
   purchaseDate: Date;
   paymentStatus: PaymentStatus;
   notes?: string;

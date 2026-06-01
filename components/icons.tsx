@@ -55,6 +55,13 @@ import {
   IconArrowsRightLeft,
   IconBuildingEstate,
   IconRuler,
+  IconArrowsMove,
+  IconBuildingFactory,
+  IconPackageExport,
+  IconPalette,
+  IconWallet,
+  IconBuildingWarehouse,
+  IconLock,
 } from '@tabler/icons-react';
 import { Trophy } from 'lucide-react';
 
@@ -81,42 +88,73 @@ export const Icons = {
   billing: IconCreditCard,
   ellipsis: IconDotsVertical,
   add: IconPlus,
-Trophy: Trophy,
+
+  // General
+  Trophy: Trophy,
   warning: IconAlertTriangle,
-  user: IconUser,
-  arrowRight: IconArrowRight,
+  alertTriangle: IconAlertTriangle,
+  alertCircle: IconAlertCircle,
+  check: IconCheck,
   help: IconHelpCircle,
-  pizza: IconPizza,
+  arrowRight: IconArrowRight,
+
+  // Theme
   sun: IconSun,
   moon: IconMoon,
   laptop: IconDeviceLaptop,
+lock: IconLock,
+  // Social
   github: IconBrandGithub,
   twitter: IconBrandTwitter,
-  check: IconCheck,
-  building: IconBuildingSkyscraper,
-  bed: IconBed,
-  home: IconHome,
-  bath: IconBath,
-  ruler: IconRuler,
-  alertCircle: IconAlertCircle,
-  
-  // New icons for sidebar
-  chart: IconChartBar,
-  trendingUp: IconTrendingUp,
-  receipt: IconReceipt,
-  cash: IconCash,
-  shoppingCart: IconShoppingCart,
-  box: IconBox,
-  truck: IconTruckDelivery,
-  clipboard: IconClipboardList,
-  store: IconBuildingStore,
+
+  // User
+  user: IconUser,
   users: IconUsers,
   shield: IconShieldLock,
   key: IconKey,
+
+  // Building / Store
+  building: IconBuildingSkyscraper,
+  store: IconBuildingStore,
+  estate: IconBuildingEstate,
+  warehouse: IconBuildingWarehouse,
+  home: IconHome,
+
+  // Furniture / Room
+  bed: IconBed,
+  bath: IconBath,
+
+  // Measurement
+  ruler: IconRuler,
+
+  // Charts / Reports
+  chart: IconChartBar,
+  trendingUp: IconTrendingUp,
   list: IconListDetails,
-  tags: IconTags,
+
+  // Sales / POS
+  receipt: IconReceipt,
+  cash: IconCash,
+  shoppingCart: IconShoppingCart,
+  wallet: IconWallet,
+
+  // Product / Inventory
+  box: IconBox,
   category: IconCategory,
+  tags: IconTags,
+  palette: IconPalette,
   adjustments: IconAdjustmentsAlt,
   transfer: IconArrowsRightLeft,
-  estate: IconBuildingEstate,
+
+  // Logistics
+  truck: IconTruckDelivery,
+  clipboard: IconClipboardList,
+  packageCheck: IconPackageExport,
+
+  // Production
+  factory: IconBuildingFactory,
+  move: IconArrowsMove,
+
+  // Misc
+  pizza: IconPizza
 };

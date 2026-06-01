@@ -25,26 +25,25 @@ export default async function RolePage(props: pageProps) {
   searchParamsCache.parse(searchParams);
 
   return (
-    <PermissionGuard requiredPermission={PERMISSIONS.ROLE.VIEW_ALL.name}>
-      <PageContainer scrollable={false}>
-        <div className='flex flex-1 flex-col space-y-4'>
-          <div className='flex items-start justify-between'>
-            <Heading title='Role' description='Manage Role ' />
-            <PermissionGuard requiredPermission={PERMISSIONS.ROLE.CREATE.name}>
-              <RoleModal />
-            </PermissionGuard>
-          </div>
-          <Separator />
-          <ItemTableAction />
-          <Suspense
-            fallback={
-              <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
-            }
-          >
-            <RoleListingPage />
-          </Suspense>
+    <PageContainer scrollable={false}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+          <Heading title='Role' description='Manage Role ' />
+          <PermissionGuard requiredPermission={PERMISSIONS.ROLE.CREATE.name}>
+            <RoleModal />
+          </PermissionGuard>
         </div>
-      </PageContainer>
-    </PermissionGuard>
+        <Separator />
+        <ItemTableAction />
+        <Suspense
+          // key={key}
+          fallback={
+            <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
+          }
+        >
+          <RoleListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
   );
 }

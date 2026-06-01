@@ -20,90 +20,86 @@ export const navItems: NavItem[] = [
     shortcut: ['d', 'd'],
     permission: 'VIEW_MAIN_DASHBOARD',
     group: 'Main',
-    items: [] 
+    items: []
   },
+
   {
     title: 'Report',
     url: '#',
     icon: 'chart',
     isActive: false,
-    shortcut: ['d', 'd'],
-    permission: 'VIEW_SALES_REPORT_VIEW_DASHBOARD',
+    shortcut: ['r', 'r'],
+    permission: 'VIEW_REPORT_DASHBOARD',
     group: 'Analytics',
     items: [
       {
-        title: 'All Sells Trend',
-        url: '/dashboard/Selllist',
-        icon: 'trendingUp',
-        shortcut: ['ps', 'ps'],
-        permission: 'VIEW_ALL_SELLS_TREND'
+        title: 'Top Performers',
+        url: '/dashboard/topperformance',
+        icon: 'Trophy',
+        shortcut: ['tp', 'tp']
       },
       {
-        title: 'Sales Rank',
-        url: '/dashboard/Reportsellstatic',
-        icon: 'list',
-        shortcut: ['ps', 'ps'],
-        permission: 'VIEW_SALES_RANK'
+        title: 'Invoice Report',
+        url: '/dashboard/invoicerreport',
+        icon: 'receipt',
+        shortcut: ['ir', 'ir']
       },
-         {
-        title: 'Top Product Report',
-        url: '/dashboard/TopProductsReport',
-        icon: 'Trophy',        
-shortcut: ['ps', 'ps'],
-        permission: 'VIEW_SALES_RANK'
+      {
+        title: 'Worker Payment Report',
+        url: '/dashboard/workcomission',
+        icon: 'wallet',
+        shortcut: ['wp', 'wp'],
+        permission: 'GIVE_WORKER_PAYMENT'
+      },
+      {
+        title: 'Worker Report',
+        url: '/dashboard/WorkerCommissionReport',
+        icon: 'users',
+        shortcut: ['wr', 'wr'],
+        permission: 'VIEW_WORKER_PAYMENT_REPORT'
+      },
+      {
+        title: 'Low Stock',
+        url: '/dashboard/lowstock',
+        icon: 'alertTriangle',
+        shortcut: ['ls', 'ls']
       }
     ]
   },
+
   {
-    title: 'POS',
+    title: 'Production',
     url: '#',
-    icon: 'receipt',
+    icon: 'factory',
     isActive: false,
-    shortcut: ['d', 'd'],
-    permission: 'VIEW_SELL_DASHBOARD',
-    group: 'Sales',
+    shortcut: ['p', 'p'],
+    permission: 'VIEW_ALL_CURTAIN_ORDERS',
+    group: 'Production',
     items: [
       {
-        title: 'Order',
-        url: '/dashboard/Pos',
-        icon: 'add',
-        shortcut: ['ro', 'ro'],
-        permission: 'CREATE_SELL'
-      },
-      {
-        title: 'View All Orders',
-        url: '/dashboard/Sell',
+        title: 'Curtain Order',
+        url: '/dashboard/CurtainOrder',
         icon: 'clipboard',
-        shortcut: ['rs', 'rs'],
-        permission: 'VIEW_ALL_SELLS'
+        shortcut: ['co', 'co'],
+        permission: 'VIEW_ALL_CURTAIN_ORDERS'
       },
       {
-        title: 'My Orders',
-        url: '/dashboard/UserBasedSell',
-        icon: 'shoppingCart',
-        shortcut: ['rs', 'rs'],
-        permission: 'CREATE_SELL'
+        title: 'My Delivery Curtain Order',
+        url: '/dashboard/deliverby',
+        icon: 'truck',
+        shortcut: ['md', 'md'],
+        permission: 'VIEW_ALL_CURTAIN_ORDERS'
+      },
+      {
+        title: 'Delivery Management',
+        url: '/dashboard/Delivertcurtainorder',
+        icon: 'packageCheck',
+        shortcut: ['dm', 'dm'],
+        permission: 'VIEW_ALL_CURTAIN_ORDERS'
       }
     ]
   },
-  {
-    title: 'Manage Store and shops',
-    url: '#',
-    icon: 'store',
-    isActive: false,
-    shortcut: ['d', 'd'],
-    permission: 'VIEW_AND_MANAGE_STORE_AND_SHOPS',
-    group: 'Sales',
-    items: [
-      {
-        title: 'Orders',
-        url: '/dashboard/StoreOrder',
-        icon: 'clipboard',
-        shortcut: ['so', 'so'],
-        permission: 'VIEW_AND_MANAGE_STORE_AND_SHOPS'
-      }
-    ]
-  },
+
   {
     title: 'Product Management',
     url: '#',
@@ -120,15 +116,22 @@ shortcut: ['ps', 'ps'],
         permission: 'VIEW_ALL_CATEGORIES'
       },
       {
-        title: 'Brand',
-        url: '/dashboard/brand',
-        icon: 'tags',
-        shortcut: ['b', 'b'],
-        permission: 'VIEW_ALL_BRANDS'
+        title: 'Colour',
+        url: '/dashboard/Colour',
+        icon: 'palette',
+        shortcut: ['cl', 'cl'],
+        permission: 'VIEW_ALL_COLOURS'
       },
-   {
+      {
+        title: 'Movement Type',
+        url: '/dashboard/MovementType',
+        icon: 'move',
+        shortcut: ['mt', 'mt'],
+        permission: 'VIEW_ALL_MOVEMENT_TYPES'
+      },
+      {
         title: 'Unit OfMeasure',
-        url: '/dashboard/UnitOfMeasure', // Update to your actual subcategory page route UnitOfMeasure ProductUnit
+        url: '/dashboard/UnitOfMeasure',
         icon: 'ruler',
         shortcut: ['u', 'u'],
         permission: 'VIEW_ALL_UNIT_OF_MEASURE'
@@ -137,39 +140,39 @@ shortcut: ['ps', 'ps'],
         title: 'Products',
         url: '/dashboard/Products',
         icon: 'box',
-        shortcut: ['u', 'u'],
+        shortcut: ['p', 'p'],
         permission: 'VIEW_PRODUCT_ALL'
       },
       {
         title: 'Purchase',
         url: '/dashboard/purchase',
         icon: 'shoppingCart',
-        shortcut: ['P', 'P'],
+        shortcut: ['pu', 'pu'],
         permission: 'VIEW_ALL_PURCHASES'
       },
       {
         title: 'Transfer',
         url: '/dashboard/Transfer',
         icon: 'transfer',
-        shortcut: ['y', 'y'],
+        shortcut: ['tr', 'tr'],
         permission: 'VIEW_ALL_TRANSFERS'
-      },
-        {
-        title: 'Proforma',
-        url: '/dashboard/proforma',
-        icon: 'receipt',
-        shortcut: ['p', 'p'],
-        // permission: 'VIEW_ALL_PROFORMAS'
       },
       {
         title: 'Stock Correction',
         url: '/dashboard/StockCorrection',
         icon: 'adjustments',
-        shortcut: ['s', 's'],
+        shortcut: ['sc', 'sc'],
         permission: 'VIEW_ALL_STOCK_CORRECTIONS'
+      },
+      {
+        title: 'Expense',
+        url: '/dashboard/expense',
+        icon: 'wallet',
+        shortcut: ['ex', 'ex']
       }
     ]
   },
+
   {
     title: 'User',
     url: '#',
@@ -189,18 +192,19 @@ shortcut: ['ps', 'ps'],
         title: 'Customer',
         url: '/dashboard/customer',
         icon: 'users',
-        shortcut: ['b', 'b'],
+        shortcut: ['cu', 'cu'],
         permission: 'VIEW_ALL_CUSTOMERS'
       },
       {
         title: 'Supplier',
         url: '/dashboard/supplier',
         icon: 'truck',
-        shortcut: ['l', 'l'],
+        shortcut: ['su', 'su'],
         permission: 'VIEW_ALL_SUPPLIERS'
       }
     ]
   },
+
   {
     title: 'System',
     url: '#',
@@ -220,18 +224,19 @@ shortcut: ['ps', 'ps'],
         title: 'Shop',
         url: '/dashboard/Shop',
         icon: 'store',
-        shortcut: ['h', 'h'],
+        shortcut: ['sh', 'sh'],
         permission: 'VIEW_ALL_SHOPS'
       },
       {
         title: 'Store',
         url: '/dashboard/store',
-        icon: 'estate',
-        shortcut: ['sm', 'sm'],
+        icon: 'warehouse',
+        shortcut: ['st', 'st'],
         permission: 'VIEW_ALL_STORES'
       }
     ]
   },
+
   {
     title: 'Account',
     url: '#',
@@ -247,6 +252,7 @@ shortcut: ['ps', 'ps'],
       }
     ]
   },
+
   {
     title: 'Role and Permission',
     url: '#',
@@ -266,13 +272,13 @@ shortcut: ['ps', 'ps'],
         title: 'Role Permission',
         url: '/dashboard/RolePermission',
         icon: 'key',
-        shortcut: ['po', 'po'],
+        shortcut: ['rp', 'rp'],
         permission: 'VIEW_ALL_ROLE_PERMISSIONS'
-      }, 
+      },
       {
         title: 'Permission',
         url: '/dashboard/Permission',
-        icon: 'key',
+        icon: 'lock',
         shortcut: ['pr', 'pr'],
         permission: 'VIEW_ALL_PERMISSIONS'
       }

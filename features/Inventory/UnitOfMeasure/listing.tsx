@@ -40,13 +40,11 @@ export default async function UnitsListingPage({}: UnitsListingPageProps) {
         columns={unitOfMeasureColumns}
       />
     );
-  } catch (error) {
-  console.error('UnitsListingPage error:', error);
-
-  return (
-    <div className='p-4 text-red-500'>
-      Error loading units of measure. Please try again later.
-    </div>
-  );
-}
+  } catch  {
+    return (
+      <div className='p-4 text-red-500'>
+        Error loading units of measure. Please try again later.
+      </div>
+    );
+  }
 }

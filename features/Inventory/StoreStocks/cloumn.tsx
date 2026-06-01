@@ -27,13 +27,7 @@ export const storeStockColumns: ColumnDef<IStoreStock>[] = [
       </div>
     )
   },
-  {
-    accessorKey: 'batch',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Batch Number' />
-    ),
-    cell: ({ row }) => <div>{row.original.batch?.batchNumber ?? '-'}</div>
-  },
+
 
   {
     accessorKey: 'quantity',

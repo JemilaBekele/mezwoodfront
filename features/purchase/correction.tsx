@@ -25,10 +25,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { useEffect, useState } from 'react';
-import { IconTrash } from '@tabler/icons-react';
+import { getUnitOfMeasuresByProductId } from '@/service/Product';
+import { useCallback, useEffect, useState } from 'react';
+import { IconTrash, IconRuler } from '@tabler/icons-react';
 import { getAvailableProductsBySource } from '@/service/productBatchService';
+import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
 import { IStockCorrection } from '@/models/StockCorrection';
 import {
   createStockCorrection,
@@ -54,8 +55,7 @@ import {
   Check,
   X,
   Info,
-  Box,
-  PackageOpen
+  Ruler,
 } from 'lucide-react';
 
 // Helper function to format dates
@@ -69,7 +69,27 @@ const formatDate = (dateString: string | Date) => {
   });
 };
 
-// Updated Zod schema - make isBox required with default
+// Helper function to format product display with color and dimensions
+const formatProductLabel = (product: any, includeDimensions = false): string => {
+  const productName = product.name || 'Unknown Product';
+  const colourName = product.colour?.name;
+  
+  let label = productName;
+  if (colourName) {
+    label = `${productName} - ${colourName}`;
+  }
+  
+  return label;
+};
+
+// Helper function to check if product has dimensions
+const hasDimensions = (item: any): boolean => {
+  return item.height !== undefined && item.height !== null && 
+         item.width !== undefined && item.width !== null &&
+         item.height > 0 && item.width > 0;
+};
+
+// Updated Zod schema with dimension support
 const formSchema = z.object({
   storeId: z.string().min(1, 'Store ID is required'),
   reason: z.enum([
@@ -79,14 +99,18 @@ const formSchema = z.object({
     'DAMAGED',
     'MANUAL_ADJUSTMENT'
   ]),
-  purchaseId: z.string().min(1, 'Purchase ID is required for purchase corrections'),
+  purchaseId: z
+    .string()
+    .min(1, 'Purchase ID is required for purchase corrections'),
   reference: z.string().optional(),
   notes: z.string().optional(),
   items: z
     .array(
       z.object({
         productId: z.string().min(1, 'Product is required'),
-        isBox: z.boolean(),
+        unitOfMeasureId: z.string().min(1, 'Unit of measure is required'),
+        height: z.number().optional().nullable(),
+        width: z.number().optional().nullable(),
         quantity: z.union([z.number(), z.null()]).optional()
       })
     )
@@ -103,8 +127,6 @@ const formSchema = z.object({
     )
 });
 
-type FormValues = z.infer<typeof formSchema>;
-
 interface PurchaseCorrectionFormProps {
   purchaseId: string;
   initialData?: IStockCorrection | null;
@@ -112,20 +134,13 @@ interface PurchaseCorrectionFormProps {
   purchaseData: IPurchase | null;
 }
 
-interface StoreStockItem {
-  id: string;
-  storeId: string;
-  productId: string;
+// Interface for product with variants
+interface ProductVariant {
+  height: number;
+  width: number;
   quantity: number;
-  status: string;
-  product: {
-    id: string;
-    productCode: string;
-    name: string;
-    hasBox: boolean;
-    boxSize: number | null;
-    UnitOfMeasure: string | null;
-  };
+  unitOfMeasureId: string;
+  unitOfMeasure?: IUnitOfMeasure;
 }
 
 export default function PurchaseCorrectionForm({
@@ -135,25 +150,27 @@ export default function PurchaseCorrectionForm({
   purchaseData
 }: PurchaseCorrectionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [storeStockItems, setStoreStockItems] = useState<StoreStockItem[]>([]);
+  const [storeStockItems, setStoreStockItems] = useState<any[]>([]);
+  const [unitsOfMeasure, setUnitsOfMeasure] = useState<{
+    [key: string]: IUnitOfMeasure[];
+  }>({});
   const [isMounted, setIsMounted] = useState(false);
+  const [loadingUOM, setLoadingUOM] = useState<{ [key: string]: boolean }>({});
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [initialItemsLoaded, setInitialItemsLoaded] = useState(false);
+  const [showDimensions, setShowDimensions] = useState<{ [key: string]: boolean }>({});
+  const [productVariants, setProductVariants] = useState<{ [key: string]: ProductVariant[] }>({});
   const router = useRouter();
 
-  const form = useForm<FormValues>({
+  // Initialize form with null quantities instead of default values
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: initialData
       ? {
-          storeId: initialData.storeId || '',
-          reason: initialData.reason,
-          purchaseId: initialData.purchaseId || purchaseId,
-          reference: initialData.reference || '',
-          notes: initialData.notes || '',
+          ...initialData,
           items: initialData.items.map((item) => ({
-            productId: item.productId,
-            isBox: item.isBox || false,
-            quantity: null
+            ...item,
+            quantity: null // Set quantity to null instead of past value
           }))
         }
       : {
@@ -162,92 +179,70 @@ export default function PurchaseCorrectionForm({
           purchaseId,
           reference: '',
           notes: '',
-          items: [{ productId: '', isBox: false, quantity: null }]
+          items: [
+            { productId: '', unitOfMeasureId: '', quantity: null, height: null, width: null }
+          ]
         }
   });
 
   const storeId = form.watch('storeId');
+  const items = form.watch('items');
 
-  // Get available stock for a product
-  const getAvailableStock = (productId: string): StoreStockItem | undefined => {
-    return storeStockItems.find((stock) => stock.product.id.toString() === productId);
-  };
+  // Helper function to calculate available quantity in selected unit
+  const calculateAvailableQuantity = useCallback((
+    storeStockItem: any,
+    selectedUnitOfMeasureId: string,
+    height?: number | null,
+    width?: number | null
+  ) => {
+    if (!storeStockItem || !selectedUnitOfMeasureId) return 0;
 
-  // Get available pieces in stock
-  const getAvailablePieces = (productId: string): number => {
-    const stock = getAvailableStock(productId);
-    return stock?.quantity || 0;
-  };
-
-  // Get available boxes in stock
-  const getAvailableBoxes = (productId: string): number => {
-    const stock = getAvailableStock(productId);
-    if (!stock || !stock.product.hasBox || !stock.product.boxSize || stock.product.boxSize <= 0) return 0;
-    return Math.floor(stock.quantity / stock.product.boxSize);
-  };
-
-  // Get max allowed removal quantity based on isBox flag
-  const getMaxRemovalQuantity = (productId: string, isBox: boolean): number => {
-    if (!productId) return 0;
-    if (isBox) {
-      return getAvailableBoxes(productId);
-    } else {
-      return getAvailablePieces(productId);
+    // Check if it's a dimension-based item
+    if (height && width && height > 0 && width > 0) {
+      // Look for variant with matching dimensions
+      const variant = storeStockItem.variants?.find(
+        (v: any) => 
+          Math.abs(v.height - height) < 0.01 && 
+          Math.abs(v.width - width) < 0.01
+      );
+      return variant?.quantity || 0;
     }
-  };
 
-  // Validate if removal quantity is valid (doesn't exceed available stock)
-  const isValidRemoval = (productId: string, isBox: boolean, quantity: number | null | undefined): boolean => {
-    if (!productId || quantity === null || quantity === undefined) return true;
-    if (quantity >= 0) return true; // Additions are always valid
-    
-    const removalAmount = Math.abs(quantity);
-    const maxAllowed = getMaxRemovalQuantity(productId, isBox);
-    return removalAmount <= maxAllowed;
-  };
+    // Regular quantity-based item
+    const baseQuantity = storeStockItem.quantity;
+    const baseConversion = storeStockItem.unitOfMeasure?.conversionFactor || 1;
+    const selectedUnit = unitsOfMeasure[storeStockItem.product.id]?.find(
+      (unit: IUnitOfMeasure) => unit.id === selectedUnitOfMeasureId
+    );
 
-  // Get display text for available stock
-  const getAvailableStockDisplay = (productId: string, isBox: boolean): string => {
-    if (!productId) return 'Select product';
-    
-    const stock = getAvailableStock(productId);
-    if (!stock) return 'Select product';
-    
-    const pieces = stock.quantity;
-    
-    if (isBox) {
-      if (!stock.product.hasBox) {
-        return 'Box not supported';
-      }
-      if (!stock.product.boxSize || stock.product.boxSize <= 0) {
-        return 'Box size not configured';
-      }
-      const boxes = Math.floor(pieces / stock.product.boxSize);
-      const remainingPieces = pieces % stock.product.boxSize;
-      if (boxes === 0) {
-        return '0 boxes available';
-      }
-      return `${boxes} box(es) available${remainingPieces > 0 ? ` (${remainingPieces} pieces left)` : ''}`;
-    } else {
-      return `${pieces} piece(s) available`;
-    }
-  };
+    if (!selectedUnit) return baseQuantity;
+    return (baseQuantity * baseConversion) / 1;
+  }, [unitsOfMeasure]);
 
-  // Get box size info
-  const getBoxSizeInfo = (productId: string): string => {
-    const stock = getAvailableStock(productId);
-    if (!stock?.product.hasBox || !stock.product.boxSize) return '';
-    return `${stock.product.boxSize} pieces per box`;
-  };
+  // Helper function to get past quantity from purchase data
+  const getPastQuantity = useCallback((
+    productId: string,
+    unitOfMeasureId: string,
+    height?: number | null,
+    width?: number | null
+  ) => {
+    if (!purchaseData?.items) return 0;
 
-  // Check if product supports boxing
-  const doesProductSupportBox = (productId: string): boolean => {
-    const stock = getAvailableStock(productId);
-    return stock?.product.hasBox || false;
-  };
+    const purchaseItem = purchaseData.items.find(
+      (item) =>
+        item.productId.toString() === productId &&
+        (!unitOfMeasureId || item.unitOfMeasureId?.toString() === unitOfMeasureId) &&
+        // Match dimensions if provided
+        (height && width ? 
+          (item.height === height && item.width === width) : 
+          (!item.height && !item.width))
+    );
 
-  // Get unique products from storeStockItems
-  const getUniqueProducts = () => {
+    return purchaseItem?.quantity || 0;
+  }, [purchaseData]);
+
+  // Helper function to get unique products from storeStockItems
+  const getUniqueProducts = useCallback(() => {
     const seenProductIds = new Set<string>();
     return storeStockItems.filter((item) => {
       if (!seenProductIds.has(item.product.id)) {
@@ -256,18 +251,88 @@ export default function PurchaseCorrectionForm({
       }
       return false;
     });
-  };
+  }, [storeStockItems]);
+
+  // Extract variants from a product - wrapped in useCallback
+  const extractVariants = useCallback((productId: string): ProductVariant[] => {
+    const productStocks = storeStockItems.filter(
+      stock => stock.product.id.toString() === productId
+    );
+    
+    const variants: ProductVariant[] = [];
+    
+    productStocks.forEach(stock => {
+      if (stock.variants && stock.variants.length > 0) {
+        stock.variants.forEach((variant: any) => {
+          variants.push({
+            height: variant.height,
+            width: variant.width,
+            quantity: variant.quantity,
+            unitOfMeasureId: stock.unitOfMeasureId,
+            unitOfMeasure: stock.unitOfMeasure
+          });
+        });
+      }
+    });
+    
+    return variants;
+  }, [storeStockItems]);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Load initial items when editing
+  const fetchUnitsOfMeasure = useCallback(
+    async (productId: string) => {
+      if (!productId) return;
+
+      if (!unitsOfMeasure[productId] && !loadingUOM[productId]) {
+        setLoadingUOM((prev) => ({ ...prev, [productId]: true }));
+        try {
+          const uomData = await getUnitOfMeasuresByProductId(productId);
+          setUnitsOfMeasure((prev) => ({
+            ...prev,
+            [productId]: Array.isArray(uomData)
+              ? uomData
+              : uomData
+                ? [uomData]
+                : []
+          }));
+        } catch  {
+          toast.error('Failed to load units of measure');
+          setUnitsOfMeasure((prev) => ({ ...prev, [productId]: [] }));
+        } finally {
+          setLoadingUOM((prev) => ({ ...prev, [productId]: false }));
+        }
+      }
+    },
+    [unitsOfMeasure, loadingUOM]
+  );
+
+  // Load units for initial items when editing
   useEffect(() => {
     if (isEdit && initialData && !initialItemsLoaded) {
-      setInitialItemsLoaded(true);
+      const loadInitialUnits = async () => {
+        for (const item of initialData.items) {
+          const productId = item.productId.toString();
+          await fetchUnitsOfMeasure(productId);
+          
+          // Extract variants for this product
+          if (storeStockItems.length > 0) {
+            const variants = extractVariants(productId);
+            if (variants.length > 0) {
+              setProductVariants(prev => ({
+                ...prev,
+                [productId]: variants
+              }));
+            }
+          }
+        }
+        setInitialItemsLoaded(true);
+      };
+      loadInitialUnits();
     }
-  }, [isEdit, initialData, initialItemsLoaded]);
+  }, [isEdit, initialData, initialItemsLoaded, fetchUnitsOfMeasure, storeStockItems, extractVariants]);
 
   useEffect(() => {
     const fetchProductsFromStore = async () => {
@@ -280,7 +345,28 @@ export default function PurchaseCorrectionForm({
           storeId
         );
         setStoreStockItems(stockData);
-      } catch {
+        
+        // Extract variants for each product
+        const variantsMap: { [key: string]: ProductVariant[] } = {};
+        stockData.forEach((stock: any) => {
+          const productId = stock.product.id.toString();
+          if (stock.variants && stock.variants.length > 0) {
+            if (!variantsMap[productId]) {
+              variantsMap[productId] = [];
+            }
+            stock.variants.forEach((variant: any) => {
+              variantsMap[productId].push({
+                height: variant.height,
+                width: variant.width,
+                quantity: variant.quantity,
+                unitOfMeasureId: stock.unitOfMeasureId,
+                unitOfMeasure: stock.unitOfMeasure
+              });
+            });
+          }
+        });
+        setProductVariants(variantsMap);
+      } catch  {
         toast.error('Failed to load products from store');
       } finally {
         setLoadingProducts(false);
@@ -336,27 +422,9 @@ export default function PurchaseCorrectionForm({
     })
   };
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     try {
-      // First, validate all removal quantities against available stock
-      for (const item of data.items) {
-        if (item.quantity !== null && item.quantity !== undefined && item.quantity < 0) {
-          const productStock = getAvailableStock(item.productId);
-          const removalAmount = Math.abs(item.quantity);
-          const maxAllowed = getMaxRemovalQuantity(item.productId, item.isBox);
-          
-          if (removalAmount > maxAllowed) {
-            const productName = productStock?.product.name || 'Product';
-            const unit = item.isBox ? 'boxes' : 'pieces';
-            const available = item.isBox ? getAvailableBoxes(item.productId) : getAvailablePieces(item.productId);
-            toast.error(`${productName}: Cannot remove ${removalAmount} ${unit}. Only ${available} ${unit} available in stock.`);
-            setIsLoading(false);
-            return;
-          }
-        }
-      }
-
       // Filter out items with null, undefined, or zero quantities
       const filteredItems = data.items.filter(
         (item) =>
@@ -365,6 +433,7 @@ export default function PurchaseCorrectionForm({
           item.quantity !== 0
       );
 
+      // Check if there are any items left after filtering
       if (filteredItems.length === 0) {
         toast.error('At least one item must have a quantity');
         setIsLoading(false);
@@ -374,9 +443,11 @@ export default function PurchaseCorrectionForm({
       const payload = {
         ...data,
         items: filteredItems.map((item) => ({
-          productId: item.productId,
-          isBox: item.isBox,
-          quantity: Number(item.quantity)
+          ...item,
+          quantity: Number(item.quantity),
+          // Include dimensions if present
+          height: item.height && item.height > 0 ? item.height : undefined,
+          width: item.width && item.width > 0 ? item.width : undefined
         }))
       };
 
@@ -388,7 +459,7 @@ export default function PurchaseCorrectionForm({
         toast.success('Purchase correction created successfully');
       }
 
-      router.push('/dashboard/purchase');
+      router.push('/dashboard/StockCorrection');
       router.refresh();
     } catch (error: any) {
       const message =
@@ -399,6 +470,39 @@ export default function PurchaseCorrectionForm({
       setIsLoading(false);
     }
   };
+
+  // Toggle dimension fields for an item
+  const toggleDimensions = (index: number) => {
+    setShowDimensions(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+    
+    // Clear dimension values when toggling off
+    if (showDimensions[index]) {
+      const newItems = [...items];
+      newItems[index].height = null;
+      newItems[index].width = null;
+      form.setValue('items', newItems);
+    }
+  };
+
+  // Check if selected product has variants
+  const productHasVariants = useCallback((productId: string): boolean => {
+    return productVariants[productId] && productVariants[productId].length > 0;
+  }, [productVariants]);
+
+  // Get variant options for a product
+  const getVariantOptions = useCallback((productId: string) => {
+    const variants = productVariants[productId] || [];
+    return variants.map((variant, idx) => ({
+      value: `${variant.height}x${variant.width}`,
+      label: `${variant.height} x ${variant.width} (${variant.quantity} available)`,
+      height: variant.height,
+      width: variant.width,
+      unitOfMeasureId: variant.unitOfMeasureId
+    }));
+  }, [productVariants]);
 
   if (!isMounted) {
     return (
@@ -563,7 +667,7 @@ export default function PurchaseCorrectionForm({
             </div>
           </div>
 
-          {/* Purchased Items Table Section - Updated for isBox */}
+          {/* Purchased Items Table Section with Dimension Info */}
           {purchaseData.items && purchaseData.items.length > 0 ? (
             <div className='space-y-4'>
               <h3 className='text-lg font-semibold'>Purchased Items</h3>
@@ -571,8 +675,8 @@ export default function PurchaseCorrectionForm({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
-                    <TableHead>Type</TableHead>
                     <TableHead>Unit</TableHead>
+                    <TableHead>Dimensions</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Unit Price</TableHead>
                     <TableHead>Total Price</TableHead>
@@ -580,38 +684,36 @@ export default function PurchaseCorrectionForm({
                 </TableHeader>
                 <TableBody>
                   {purchaseData.items.map(
-                    (item: PurchaseItem, index: number) => (
-                      <TableRow key={item.id || `${item.productId}-${index}`}>
-                        <TableCell className='font-medium'>
-                          {item.product?.name || 'Unknown Product'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={item.isBox ? 'default' : 'secondary'} className='text-xs'>
-                            {item.isBox ? (
-                              <>
-                                <Box className='mr-1 h-3 w-3' />
-                                Box
-                              </>
+                    (item: PurchaseItem, index: number) => {
+                      const itemHasDimensions = hasDimensions(item);
+                      return (
+                        <TableRow key={item.id || `${item.productId}-${index}`}>
+                          <TableCell className='font-medium'>
+                            {formatProductLabel(item.product || { name: 'Unknown Product' })}
+                          </TableCell>
+                          <TableCell>
+                            {item.unitOfMeasure?.name || 'Unknown Unit'}
+                          </TableCell>
+                          <TableCell>
+                            {itemHasDimensions ? (
+                              <Badge variant="outline" className='bg-blue-50'>
+                                <Ruler className='mr-1 h-3 w-3' />
+                                {item.height} x {item.width}
+                              </Badge>
                             ) : (
-                              <>
-                                <PackageOpen className='mr-1 h-3 w-3' />
-                                Piece
-                              </>
+                              <span className='text-muted-foreground text-xs'>-</span>
                             )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.product?.unitOfMeasure?.symbol || 'N/A'}
-                        </TableCell>
-                        <TableCell>{item.quantity || 0}</TableCell>
-                        <TableCell>
-                          {(item.unitPrice || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          {(item.totalPrice || 0).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    )
+                          </TableCell>
+                          <TableCell>{item.quantity || 0}</TableCell>
+                          <TableCell>
+                            {(item.unitPrice || 0).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            {(item.totalPrice || 0).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
                   )}
                 </TableBody>
               </Table>
@@ -712,169 +814,309 @@ export default function PurchaseCorrectionForm({
                     )}
                     <FormControl>
                       <div className='space-y-4'>
-                        <div className='grid grid-cols-6 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
-                          <div>Product</div>
-                          <div>Box/Piece</div>
-                          <div>Adjust by (Quantity)</div>
-                          <div>Available Stock</div>
+                        {/* Header with dimension support */}
+                        <div className='grid grid-cols-8 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
+                          <div className='col-span-2'>Product</div>
                           <div>Unit</div>
+                          <div>Dimensions</div>
+                          <div>Past Qty</div>
+                          <div>Adjust by</div>
+                          <div>Available</div>
                           <div>Action</div>
                         </div>
+                        
                         {field.value.map((item, index) => {
-                          const stockItem = getAvailableStock(item.productId);
-                          const isBox = item.isBox;
-                          const pieces = stockItem?.quantity || 0;
-                          const boxSize = stockItem?.product.boxSize || 1;
-                          const boxes = Math.floor(pieces / boxSize);
-                          const hasBox = stockItem?.product.hasBox || false;
+                          const storeStockItem = storeStockItems.find(
+                            (stock) => stock.product.id.toString() === item.productId
+                          );
                           
-                          const maxRemoval = getMaxRemovalQuantity(item.productId, isBox);
-                          const availableDisplay = getAvailableStockDisplay(item.productId, isBox);
-                          const boxSizeInfo = getBoxSizeInfo(item.productId);
-                          const supportsBox = doesProductSupportBox(item.productId);
+                          const availableInSelectedUnit =
+                            storeStockItem && item.unitOfMeasureId
+                              ? calculateAvailableQuantity(
+                                  storeStockItem,
+                                  item.unitOfMeasureId,
+                                  item.height,
+                                  item.width
+                                )
+                              : storeStockItem?.quantity || 0;
                           
-                          // Check if current quantity is valid
-                          const currentQuantity = item.quantity;
-                          const isRemovalValid = isValidRemoval(item.productId, isBox, currentQuantity);
+                          const pastQuantity = getPastQuantity(
+                            item.productId,
+                            item.unitOfMeasureId,
+                            item.height,
+                            item.width
+                          );
                           
                           const uniqueProducts = getUniqueProducts();
-                          const productOptions = uniqueProducts.map((s) => ({
-                            value: s.product.id.toString(),
-                            label: s.product.name,
-                          }));
+                          const productOptions =
+                            isEdit && initialItemsLoaded
+                              ? [
+                                  ...uniqueProducts.map((storeStockItem) => ({
+                                    value: storeStockItem.product.id.toString(),
+                                    label: formatProductLabel(storeStockItem.product),
+                                    data: storeStockItem
+                                  })),
+                                  ...(item.productId &&
+                                  !uniqueProducts.some(
+                                    (stock) =>
+                                      stock.product.id.toString() ===
+                                      item.productId
+                                  )
+                                    ? [
+                                        {
+                                          value: item.productId,
+                                          label: `[Current] ${
+                                            initialData?.items.find(
+                                              (i) =>
+                                                i.productId.toString() ===
+                                                item.productId
+                                            )?.product?.name || item.productId
+                                          }`,
+                                          data: null
+                                        }
+                                      ]
+                                    : [])
+                                ]
+                              : uniqueProducts.map((storeStockItem) => ({
+                                  value: storeStockItem.product.id.toString(),
+                                  label: formatProductLabel(storeStockItem.product),
+                                  data: storeStockItem
+                                }));
+
+                          const hasVariants = item.productId && productHasVariants(item.productId);
+                          const variantOptions = item.productId ? getVariantOptions(item.productId) : [];
 
                           return (
-                            <div key={index} className='grid grid-cols-6 items-center gap-4'>
-                              {/* Product Selection */}
-                              <div>
-                                <Select
-                                  instanceId={`product-select-${index}`}
-                                  options={productOptions}
-                                  onChange={async (newValue) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].productId = newValue?.value || '';
-                                    newItems[index].isBox = false;
-                                    newItems[index].quantity = null;
-                                    field.onChange(newItems);
-                                  }}
-                                  value={
-                                    productOptions.find(
-                                      (p) => p.value === item.productId
-                                    ) || null
-                                  }
-                                  placeholder={
-                                    loadingProducts
-                                      ? 'Loading products...'
-                                      : 'Search product'
-                                  }
-                                  isSearchable
-                                  isDisabled={loadingProducts}
-                                  styles={isDark ? darkStyles : {}}
-                                />
-                              </div>
-
-                              {/* isBox Switch */}
-                              <div>
-                                <div className='flex items-center justify-center'>
-                                  <Switch
-                                    checked={isBox}
-                                    onCheckedChange={(checked) => {
+                            <div key={index}>
+                              <div className='grid grid-cols-8 gap-4 items-start'>
+                                <div className='col-span-2'>
+                                  <Select
+              
+                                    instanceId={`product-select-${index}`}
+                                    options={productOptions}
+                                    onChange={async (newValue) => {
                                       const newItems = [...field.value];
-                                      newItems[index].isBox = checked;
+                                      newItems[index].productId = newValue?.value || '';
+                                      newItems[index].unitOfMeasureId = '';
+                                      newItems[index].height = null;
+                                      newItems[index].width = null;
                                       newItems[index].quantity = null;
                                       field.onChange(newItems);
+                                      
+                                      if (newValue?.value) {
+                                        await fetchUnitsOfMeasure(newValue.value);
+                                      }
                                     }}
-                                    disabled={!item.productId || loadingProducts || !supportsBox}
-                                    className='data-[state=checked]:bg-primary'
+                                    value={
+                                      productOptions.find(
+                                        (p) => p.value === item.productId
+                                      ) || null
+                                    }
+                                    placeholder={
+                                      loadingProducts
+                                        ? 'Loading products...'
+                                        : 'Search product'
+                                    }
+                                    isSearchable
+   isDisabled={
+                                      !item.productId ||
+                                      unitsOfMeasure[item.productId]?.length === 1
+                                    }                                    styles={isDark ? darkStyles : {}}
+                                    
                                   />
                                 </div>
-                              </div>
-
-                              {/* Quantity Input */}
-                              <div>
-                                <Input
-                                  type='number'
-                                  placeholder='Enter quantity (+ for add, - for remove)'
-                                  value={item.quantity === null ? '' : item.quantity}
-                                  onChange={(e) => {
-                                    const newItems = [...field.value];
-                                    const value = e.target.value;
-                                    if (value === '') {
-                                      newItems[index].quantity = null;
-                                    } else {
-                                      const quantity = Number(value);
-                                      newItems[index].quantity = isNaN(quantity) ? null : quantity;
+                                
+                                <div>
+                                  <Select
+                                    instanceId={`unit-select-${index}`}
+                                    options={
+                                      unitsOfMeasure[item.productId]?.map(
+                                        (unit) => ({
+                                          value: unit.id.toString(),
+                                          label: `${unit.name}`
+                                        })
+                                      ) || []
                                     }
-                                    field.onChange(newItems);
-                                  }}
-                                  className={
-                                    !isRemovalValid && currentQuantity !== undefined && currentQuantity !== null && currentQuantity < 0
-                                      ? 'border-red-500 focus:ring-red-500'
-                                      : ''
-                                  }
-                                />
-                                {currentQuantity !== null && currentQuantity !== undefined && currentQuantity < 0 && !isRemovalValid && (
-                                  <div className='mt-1 text-xs text-red-500'>
-                                    Maximum removal: {maxRemoval} {isBox ? 'box(es)' : 'piece(s)'}
+                                    onChange={(newValue) => {
+                                      const newItems = [...field.value];
+                                      newItems[index].unitOfMeasureId = newValue?.value || '';
+                                      field.onChange(newItems);
+                                    }}
+                                    value={
+                                      unitsOfMeasure[item.productId]
+                                        ?.map((u) => ({
+                                          value: u.id.toString(),
+                                          label: `${u.name}`
+                                        }))
+                                        .find(
+                                          (u) => u.value === item.unitOfMeasureId
+                                        ) ||
+                                      (unitsOfMeasure[item.productId]?.length > 0
+                                        ? {
+                                            value:
+                                              unitsOfMeasure[
+                                                item.productId
+                                              ][0].id.toString(),
+                                            label:
+                                              unitsOfMeasure[item.productId][0]
+                                                .name
+                                          }
+                                        : null)
+                                    }
+                                    placeholder='Search unit'
+                                    isSearchable
+                                    isDisabled={
+                                      !item.productId ||
+                                      unitsOfMeasure[item.productId]?.length === 1
+                                    }
+                                    styles={isDark ? darkStyles : {}}
+                                  />
+                                </div>
+                                
+                                <div>
+                                  {item.productId && hasVariants ? (
+                                    <Select
+                                      instanceId={`variant-select-${index}`}
+                                      options={variantOptions}
+                                      onChange={(newValue) => {
+                                        if (newValue) {
+                                          const newItems = [...field.value];
+                                          newItems[index].height = newValue.height;
+                                          newItems[index].width = newValue.width;
+                                          // Auto-select the unit of measure from the variant
+                                          newItems[index].unitOfMeasureId = newValue.unitOfMeasureId;
+                                          field.onChange(newItems);
+                                        }
+                                      }}
+                                      value={
+                                        item.height && item.width
+                                          ? variantOptions.find(
+                                              v => v.height === item.height && v.width === item.width
+                                            ) || null
+                                          : null
+                                      }
+                                      placeholder='Select dimensions'
+                                      isSearchable
+                                         isDisabled={
+                                      !item.productId ||
+                                      unitsOfMeasure[item.productId]?.length === 1
+                                    }
+                                      styles={isDark ? darkStyles : {}}
+                                    />
+                                  ) : (
+                                    <div className='flex items-center gap-2'>
+                                      <div className='grid grid-cols-2 gap-1 flex-1'>
+                                        <Input
+                                          type='number'
+                                          placeholder='H'
+                                          value={item.height || ''}
+                                          onChange={(e) => {
+                                            const newItems = [...field.value];
+                                            newItems[index].height = e.target.value ? Number(e.target.value) : null;
+                                            field.onChange(newItems);
+                                          }}
+                                          className='h-9'
+                                          disabled={!item.productId}
+                                        />
+                                        <Input
+                                          type='number'
+                                          placeholder='W'
+                                          value={item.width || ''}
+                                          onChange={(e) => {
+                                            const newItems = [...field.value];
+                                            newItems[index].width = e.target.value ? Number(e.target.value) : null;
+                                            field.onChange(newItems);
+                                          }}
+                                          className='h-9'
+                                          disabled={!item.productId}
+                                        />
+                                      </div>
+                                      <Button
+                                        type='button'
+                                        variant='ghost'
+                                        size='sm'
+                                        onClick={() => toggleDimensions(index)}
+                                        className='h-9 w-9 p-0'
+                                      >
+                                        <IconRuler size={16} />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className='text-muted-foreground flex items-center justify-center rounded-md bg-gray-50 px-3 py-2 text-sm dark:bg-gray-800'>
+                                  {pastQuantity}
+                                </div>
+                                
+                                <div>
+                                  <Input
+                                    type='number'
+                                    placeholder='Enter qty'
+                                    value={
+                                      item.quantity === null ? '' : item.quantity
+                                    }
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const value = e.target.value;
+
+                                      if (value === '') {
+                                        newItems[index].quantity = null;
+                                      } else {
+                                        const quantity = Number(value);
+                                        newItems[index].quantity = isNaN(quantity)
+                                          ? null
+                                          : quantity;
+                                      }
+
+                                      field.onChange(newItems);
+                                    }}
+                                  />
+                                  <div className='mt-1 text-xs text-gray-500'>
+                                    {item.quantity != null && item.quantity < 0
+                                      ? 'Subtraction'
+                                      : item.quantity != null && item.quantity > 0
+                                        ? 'Addition'
+                                        : ''}
                                   </div>
-                                )}
-                                <div className='mt-1 text-xs text-gray-500'>
-                                  {currentQuantity != null && currentQuantity < 0
-                                    ? '⚠️ Removing stock'
-                                    : currentQuantity != null && currentQuantity > 0
-                                      ? '➕ Adding stock'
-                                      : ''}
+                                </div>
+                                
+                                <div className='text-muted-foreground text-sm flex items-center'>
+                                  {availableInSelectedUnit > 0
+                                    ? `${Math.floor(availableInSelectedUnit)}`
+                                    : '0'}
+                                </div>
+                                
+                                <div>
+                                  <Button
+                                    type='button'
+                                    variant='destructive'
+                                    size='sm'
+                                    onClick={() => {
+                                      const newItems = [...field.value];
+                                      newItems.splice(index, 1);
+                                      field.onChange(newItems);
+                                    }}
+                                    disabled={field.value.length <= 1}
+                                  >
+                                    <IconTrash size={16} />
+                                  </Button>
                                 </div>
                               </div>
-
-                              {/* Available Stock Display */}
-                              <div className='text-muted-foreground text-sm'>
-                                {loadingProducts ? (
-                                  <div className='flex items-center gap-1'>
-                                    <div className='h-3 w-3 animate-spin rounded-full border-b-2 border-gray-400'></div>
-                                    <span>Loading...</span>
-                                  </div>
-                                ) : item.productId ? (
-                                  <div className='space-y-1'>
-                                    <div className={isBox ? 'font-semibold text-blue-600 dark:text-blue-400' : ''}>
-                                      {availableDisplay}
-                                    </div>
-                                    {isBox && boxSizeInfo && (
-                                      <div className='text-xs text-gray-500'>{boxSizeInfo}</div>
-                                    )}
-                                    {isBox && !supportsBox && (
-                                      <div className='text-xs text-red-500'>Box not supported</div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  'Select product'
-                                )}
-                              </div>
-
-                              {/* Unit of Measure */}
-                              <div className='text-muted-foreground text-sm'>
-                                {stockItem?.product?.UnitOfMeasure || <span className='text-gray-400'>Select product</span>}
-                              </div>
-
-                              {/* Delete Button */}
-                              <div>
-                                <Button
-                                  type='button'
-                                  variant='destructive'
-                                  size='sm'
-                                  onClick={() => {
-                                    const newItems = [...field.value];
-                                    newItems.splice(index, 1);
-                                    field.onChange(newItems);
-                                  }}
-                                  disabled={field.value.length <= 1}
-                                >
-                                  <IconTrash size={16} />
-                                </Button>
-                              </div>
+                              
+                              {/* Dimension info display if dimensions are set */}
+                              {item.height && item.width && item.height > 0 && item.width > 0 && (
+                                <div className='mt-1 text-xs text-blue-600 dark:text-blue-400'>
+                                  <Badge variant="outline" className='bg-blue-50 dark:bg-blue-950'>
+                                    <Ruler className='mr-1 h-3 w-3' />
+                                    Dimensions: {item.height} x {item.width}
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
+                        
+               
                       </div>
                     </FormControl>
                     <FormMessage />

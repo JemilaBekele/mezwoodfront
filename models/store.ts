@@ -1,7 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { IBranch } from './Branch';
 import { IEmployee } from './employee';
+import { IProduct, IProductBatch } from './Product';
 import { IShop } from './shop';
+import { IUnitOfMeasure } from './UnitOfMeasure';
 
 export interface IStore {
   id: string;
@@ -32,14 +33,19 @@ export interface IStoreStock {
   storeId: string;
   store?: IStore;
   batchId: number;
-  batch?: any;
-  quantity: number;
+  batch?: IProductBatch;
+  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
+  height?: number;
+  width?: number;
+
+  // ✅ Optional — for piece-based items
+  quantity?: number;  
   status: StockStatus;
   branch?: IBranch;
   createdAt: string; // ISO date
   updatedAt: string;
   unitOfMeasureId: string; // foreign key
-  unitOfMeasure?: any; // ISO date
+  unitOfMeasure?: IUnitOfMeasure; // ISO date
 }
 
 // ShopStock
@@ -47,24 +53,28 @@ export interface IShopStock {
   id: string;
   shopId: string;
   shop?: IShop;
-  batchId: number;
-  batch?: any;
-  quantity: number;
-  status: StockStatus;
+   productId: string;
+      product: IProduct;
+  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
+  height?: number;
+  width?: number;
+
+  // ✅ Optional — for piece-based items
+  quantity?: number;  status: StockStatus;
   createdAt: string; // ISO date
   updatedAt: string;
   unitOfMeasureId: string;
   // foreign key
-  unitOfMeasure?: any; // ISO date
+  unitOfMeasure?: IUnitOfMeasure; // ISO date
 }
 
 // StockLedger
 export interface IStockLedger {
   id: string;
   batchId: number;
-  batch?: any;
+  batch?: IProductBatch;
   unitOfMeasureId: string; // foreign key
-  unitOfMeasure?: any;
+  unitOfMeasure?: IUnitOfMeasure;
   storeId?: string;
   store?: IStore;
 
@@ -72,8 +82,12 @@ export interface IStockLedger {
   shop?: IShop;
 
   movementType: StockMovementType;
-  quantity: number;
+  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
+  height?: number;
+  width?: number;
 
+  // ✅ Optional — for piece-based items
+  quantity?: number;
   reference?: string;
   userId?: string;
   user?: IEmployee;

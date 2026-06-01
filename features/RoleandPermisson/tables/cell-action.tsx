@@ -80,7 +80,7 @@ export const RoleCellAction: React.FC<CellActionProps> = ({ data }) => {
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end'>
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.ROLE.UPDATE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.ROLE.UPDATE.name}>
             <DropdownMenuItem onClick={() => setOpenEditModal(true)}>
               <Edit className='mr-2 h-4 w-4' /> Update
             </DropdownMenuItem>
@@ -91,7 +91,7 @@ export const RoleCellAction: React.FC<CellActionProps> = ({ data }) => {
               <Edit className='mr-2 h-4 w-4' /> Update Role Permissions
             </DropdownMenuItem>
           </PermissionGuard>
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.ROLE.DELETE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.ROLE.DELETE.name}>
             <DropdownMenuItem onClick={() => setOpen(true)}>
               <IconTrash className='mr-2 h-4 w-4' /> Delete
             </DropdownMenuItem>

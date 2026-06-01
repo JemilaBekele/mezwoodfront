@@ -96,8 +96,8 @@ export const CellAction: React.FC<CellActionProps> = ({ data }) => {
         <DropdownMenuContent align='end'>
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-          <PermissionGuard fallback="hide"
-            requiredPermission={PERMISSIONS.EMPLOYEE.UPDATE.name}
+          <PermissionGuard
+            requiredPermission={PERMISSIONS.Employee.UPDATE.name}
           >
             <DropdownMenuItem
               onClick={() => router.push(`/dashboard/employee/${data.id}`)}
@@ -106,22 +106,22 @@ export const CellAction: React.FC<CellActionProps> = ({ data }) => {
             </DropdownMenuItem>
           </PermissionGuard>
 
-          <PermissionGuard fallback="hide" requiredPermission={PERMISSIONS.EMPLOYEE.VIEW.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.Employee.VIEW.name}>
             <DropdownMenuItem onClick={() => setViewOpen(true)}>
               <IconEdit className='mr-2 h-4 w-4' /> View
             </DropdownMenuItem>
           </PermissionGuard>
 
-          <PermissionGuard fallback="hide"
-            requiredPermission={PERMISSIONS.EMPLOYEE.CHANGE_PASSWORD.name}
+          <PermissionGuard
+            requiredPermission={PERMISSIONS.Employee.CHANGE_PASSWORD.name}
           >
             <DropdownMenuItem onClick={onResetPassword}>
               <IconKey className='mr-2 h-4 w-4' /> Reset Password
             </DropdownMenuItem>
           </PermissionGuard>
 
-          <PermissionGuard fallback="hide"
-            requiredPermission={PERMISSIONS.EMPLOYEE.DELETE.name}
+          <PermissionGuard
+            requiredPermission={PERMISSIONS.Employee.DELETE.name}
           >
             <DropdownMenuItem onClick={() => setOpen(true)}>
               <IconTrash className='mr-2 h-4 w-4' /> Delete

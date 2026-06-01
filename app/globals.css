@@ -48,8 +48,8 @@
 }
 
 :root {
-  --background: oklch(1 0 0);          /* white */
-  --foreground: oklch(0.145 0 0);      /* black text */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
 
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -57,8 +57,8 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
 
-  /* 🔵 LOGIN / PRIMARY BLUE */
-  --primary: oklch(0.30 0.12 255);     
+  /* 🟠 PRIMARY DARK ORANGE */
+  --primary: oklch(0.55 0.18 45);
   --primary-foreground: oklch(1 0 0);
 
   --secondary: oklch(0.97 0 0);
@@ -74,66 +74,76 @@
 
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.30 0.12 255);
-  --sidebar: oklch(0.30 0.12 255);              /* main blue */
-  --sidebar-foreground: oklch(0.98 0 0);       /* white text */
+  --ring: oklch(0.55 0.18 45);
 
-  --sidebar-primary: oklch(0.42 0.16 255);     /* active item */
+  /* 🟠 SIDEBAR */
+  --sidebar: oklch(0.45 0.15 45);
+  --sidebar-foreground: oklch(0.98 0 0);
+
+  --sidebar-primary: oklch(0.55 0.18 45);
   --sidebar-primary-foreground: oklch(1 0 0);
 
-  --sidebar-accent: oklch(0.36 0.10 255);      /* hover */
+  --sidebar-accent: oklch(0.50 0.12 45);
   --sidebar-accent-foreground: oklch(0.98 0 0);
 
-  --sidebar-border: oklch(0.42 0.10 255 / 30%);
-  --sidebar-ring: oklch(0.55 0.18 255);
+  --sidebar-border: oklch(0.55 0.18 45 / 30%);
+  --sidebar-ring: oklch(0.60 0.20 45);
+
   --radius: 0.625rem;
 }
 
 /* ===========================
-   DARK MODE (NO PURE BLACK)
-   MODERN NAVY ERP THEME
+   DARK MODE (DARK ORANGE)
 =========================== */
 .dark {
-  --background: oklch(0.20 0.03 255);        /* deep navy base */
-  --foreground: oklch(0.98 0 0);             /* soft white */
+  /* Base */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
 
-  --card: oklch(0.24 0.04 255);              /* elevated navy card */
-  --card-foreground: oklch(0.98 0 0);
+  /* Cards / surfaces */
+  --card: oklch(0.18 0.01 85);
+  --card-foreground: oklch(0.985 0 0);
 
-  --popover: oklch(0.24 0.04 255);
-  --popover-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.18 0.01 85);
+  --popover-foreground: oklch(0.985 0 0);
 
-  /* 🔵 PRIMARY BLUE (bright but soft) */
-  --primary: oklch(0.55 0.18 255);
-  --primary-foreground: oklch(1 0 0);
+  /* Primary orange */
+  --primary: oklch(0.68 0.21 42);
+  --primary-foreground: oklch(0.985 0 0);
 
-  /* 🔵 SURFACES */
-  --secondary: oklch(0.28 0.03 255);
-  --secondary-foreground: oklch(0.98 0 0);
+  /* Secondary */
+  --secondary: oklch(0.24 0.01 85);
+  --secondary-foreground: oklch(0.985 0 0);
 
-  --muted: oklch(0.28 0.03 255);
-  --muted-foreground: oklch(0.75 0 0);
+  /* Muted */
+  --muted: oklch(0.22 0.01 85);
+  --muted-foreground: oklch(0.70 0 0);
 
-  --accent: oklch(0.32 0.04 255);
-  --accent-foreground: oklch(0.98 0 0);
+  /* Accent */
+  --accent: oklch(0.28 0.02 42);
+  --accent-foreground: oklch(0.985 0 0);
 
-  /* ALERT */
-  --destructive: oklch(0.65 0.20 25);
---sidebar: oklch(0.24 0.04 255);             /* navy base */
-  --sidebar-foreground: oklch(0.98 0 0);       /* white */
+  /* Danger */
+  --destructive: oklch(0.62 0.23 25);
+  --destructive-foreground: oklch(0.985 0 0);
 
-  --sidebar-primary: oklch(0.55 0.18 255);     /* active item bright blue */
+  /* Borders / inputs */
+  --border: oklch(0.28 0.01 85);
+  --input: oklch(0.28 0.01 85);
+  --ring: oklch(0.68 0.21 42);
+
+  /* Sidebar */
+  --sidebar: oklch(0.17 0.01 85);
+  --sidebar-foreground: oklch(0.96 0 0);
+
+  --sidebar-primary: oklch(0.68 0.21 42);
   --sidebar-primary-foreground: oklch(1 0 0);
 
-  --sidebar-accent: oklch(0.30 0.05 255);      /* hover */
+  --sidebar-accent: oklch(0.24 0.02 42);
   --sidebar-accent-foreground: oklch(0.98 0 0);
 
-  --sidebar-border: oklch(0.40 0.05 255 / 35%);
-  --sidebar-ring: oklch(0.55 0.18 255);
-  /* BORDERS / INPUTS */
-  --border: oklch(0.35 0.03 255 / 35%);
-  --input: oklch(0.35 0.03 255 / 45%);
-  --ring: oklch(0.55 0.18 255);
+  --sidebar-border: oklch(0.28 0.01 85);
+  --sidebar-ring: oklch(0.68 0.21 42);
 }
 
 @layer base {
@@ -145,6 +155,107 @@
   }
 }
 
+/* Print Styles */
+@media print {
+  /* Hide buttons, modals, and interactive elements */
+  button,
+  .no-print,
+  .permission-guard,
+  [role="dialog"],
+  .modal,
+  .sticky,
+  .fixed {
+    display: none !important;
+  }
+
+  /* Show all content */
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Ensure containers are visible */
+  .container,
+  .card,
+  .space-y-6,
+  .grid,
+  .flex {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Card styling for print */
+  .card {
+    border: 1px solid #ddd !important;
+    margin-bottom: 20px !important;
+    page-break-inside: avoid;
+  }
+
+  /* Table styling for print */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+    text-align: left !important;
+  }
+
+  th {
+    background-color: #f3f4f6 !important;
+    font-weight: bold !important;
+  }
+
+  /* Badge styling for print */
+  .badge {
+    border: 1px solid #000 !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+  }
+
+  /* Headers */
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+  }
+
+  /* Ensure page breaks don't happen in the middle of cards */
+  .card, .grid > div {
+    page-break-inside: avoid;
+  }
+
+  /* Remove sticky positioning for print */
+  .sticky {
+    position: static !important;
+  }
+
+  /* Ensure all content is visible */
+  .overflow-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  /* Remove min-width constraints for print */
+  .min-w-300,
+  .min-w-200,
+  .min-w-30,
+  .min-w-25 {
+    min-width: auto !important;
+  }
+
+  /* Show full tables without scroll */
+  .relative.w-full.overflow-auto {
+    overflow: visible !important;
+  }
+
+  /* Text colors */
+  .text-red-600, .text-red-800, .text-green-600, .text-green-800 {
+    color: black !important;
+  }
+}
 /* ═══════════════════════════════════════════════════
    Branded Splash Screen (shared by ProtectedRoute + Login)
    ═══════════════════════════════════════════════════ */

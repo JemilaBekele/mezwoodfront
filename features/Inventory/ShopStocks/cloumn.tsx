@@ -19,32 +19,7 @@ export const shopStockColumns: ColumnDef<IShopStock>[] = [
     ),
     enableColumnFilter: true
   },
-  {
-    accessorKey: 'product',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Product' />
-    ),
-    cell: ({ row }) => (
-      <div>
-        {row.original.batch?.product?.name ??
-          row.original.batch?.productId ??
-          '-'}
-      </div>
-    )
-  },
-  {
-    accessorKey: 'batchId',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Batch' />
-    ),
-    cell: ({ row }) => (
-      <div className='flex items-center gap-1'>
-        <Layers className='h-4 w-4' />
-        {row.original.batch?.batchNumber ?? row.original.batchId}
-      </div>
-    ),
-    enableColumnFilter: true
-  },
+
   {
     accessorKey: 'quantity',
     header: ({ column }) => (

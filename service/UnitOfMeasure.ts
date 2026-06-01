@@ -1,3 +1,4 @@
+import { IncomingMessage } from 'http';
 import { axiosInstance } from "./axiosIntance";
 
 import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
@@ -52,6 +53,7 @@ export const getUnitsOfMeasure = async () => {
 // Get UnitOfMeasure by ID
 export const getUnitOfMeasureById = async (
   id: string,
+  
 ) => {
   try {
     const response = await axiosInstance.get(`/units-of-measure/${id}`);
@@ -64,8 +66,10 @@ export const getUnitOfMeasureById = async (
 // Create UnitOfMeasure
 export const createUnitOfMeasure = async (
   data: Partial<IUnitOfMeasure> | FormData,
+  
 ) => {
   try {
+    
     const config =
       data instanceof FormData
         ? { headers: { 'Content-Type': 'multipart/form-data' } }
@@ -86,8 +90,10 @@ export const createUnitOfMeasure = async (
 export const updateUnitOfMeasure = async (
   id: string,
   data: Partial<IUnitOfMeasure> | FormData,
+  
 ) => {
   try {
+    
     const config =
       data instanceof FormData
         ? { headers: { 'Content-Type': 'multipart/form-data' } }
@@ -107,8 +113,10 @@ export const updateUnitOfMeasure = async (
 // Delete UnitOfMeasure
 export const deleteUnitOfMeasure = async (
   id: string,
+  
 ) => {
   try {
+    
     const response = await axiosInstance.delete(`/units-of-measure/${id}`);
     return response.data;
   } catch (error) {

@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { axiosInstance } from "./axiosIntance";
-import { GetParams } from "./roleService";
-import { IPurchase } from "@/models/purchase";
-import { IStockCorrection } from "@/models/StockCorrection";
+
+import { GetParams } from './roleService';
+import { IPurchase } from '@/models/purchase';
+import { IStockCorrection } from '@/models/StockCorrection';
 
 // Types
 
@@ -17,18 +18,18 @@ export const getAllPurchases = async (
   params: GetParams & {
     startDate?: string;
     endDate?: string;
-  } = {},
+  } = {}
 ) => {
   try {
     const { page = 1, limit = 10, ...filters } = params;
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     // Add filter params if they exist
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
+      if (value !== undefined && value !== null && value !== '') {
         query.append(key, value.toString());
       }
     });
@@ -40,7 +41,7 @@ export const getAllPurchases = async (
     return {
       purchases,
       totalCount: response.data.count ?? purchases.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -58,7 +59,7 @@ export const getPurchases = async () => {
 };
 
 // Get a purchase by ID
-export const getPurchaseById = async (id: string) => {
+export const getPurchaseById = async (id: string, ) => {
   try {
     const response = await axiosInstance.get(`/purchases/${id}`);
     return response.data.purchase as IPurchase;
@@ -66,7 +67,7 @@ export const getPurchaseById = async (id: string) => {
     throw error;
   }
 };
-export const getPurchaseId = async (id: string) => {
+export const getPurchaseId = async (id: string, ) => {
   try {
     const response = await axiosInstance.get(`/purchases/${id}`);
     return response.data.purchase as IPurchase;
@@ -76,10 +77,11 @@ export const getPurchaseId = async (id: string) => {
 };
 export const getStockCorrectionsByPurchaseId = async (
   id: string,
+  
 ): Promise<IStockCorrection[]> => {
   try {
     const response = await axiosInstance.get(
-      `/stock-corrections/purchase/${id}`,
+      `/stock-corrections/purchase/${id}`
     );
     return response.data.stockCorrection as IStockCorrection[];
   } catch (error) {
@@ -87,7 +89,10 @@ export const getStockCorrectionsByPurchaseId = async (
   }
 };
 // Get a purchase by invoice number
-export const getPurchaseByInvoiceNo = async (invoiceNo: string) => {
+export const getPurchaseByInvoiceNo = async (
+  invoiceNo: string,
+  
+) => {
   try {
     const response = await axiosInstance.get(`/purchases/invoice/${invoiceNo}`);
     return response.data.purchase as IPurchase;
@@ -97,7 +102,7 @@ export const getPurchaseByInvoiceNo = async (invoiceNo: string) => {
 };
 
 // Create a purchase
-export const createPurchase = async (data: any) => {
+export const createPurchase = async (data: any, ) => {
   try {
     const response = await axiosInstance.post(`/purchases`, data);
     return response.data;
@@ -107,7 +112,11 @@ export const createPurchase = async (data: any) => {
 };
 
 // Update a purchase
-export const updatePurchase = async (id: string, data: any) => {
+export const updatePurchase = async (
+  id: string,
+  data: any,
+  
+) => {
   try {
     const response = await axiosInstance.put(`/purchases/${id}`, data);
     return response.data;
@@ -115,11 +124,16 @@ export const updatePurchase = async (id: string, data: any) => {
     throw error;
   }
 };
-export const acceptPurchase = async (id: string, paymentStatus: string) => {
+export const acceptPurchase = async (
+  id: string,
+  paymentStatus: string,
+  
+) => {
   try {
+
     // ✅ Send paymentStatus inside request body
     const response = await axiosInstance.put(`/purchases/accept/${id}`, {
-      paymentStatus,
+      paymentStatus
     });
 
     return response.data;
@@ -127,29 +141,9 @@ export const acceptPurchase = async (id: string, paymentStatus: string) => {
     throw error;
   }
 };
-export const uploadPurchasesFiles = async (
-  id: string,
-  data: FormData,
-) => {
-  try {
 
-    const response = await axiosInstance.put(
-      `/purchases/${id}/upload/file`,
-      data,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
 // Delete a purchase
-export const deletePurchase = async (id: string) => {
+export const deletePurchase = async (id: string, ) => {
   try {
     const response = await axiosInstance.delete(`/purchases/${id}`);
     return response.data;

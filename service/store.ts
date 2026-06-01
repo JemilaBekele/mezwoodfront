@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { axiosInstance } from "./axiosIntance";
-import { IShopStock, IStockLedger, IStore, IStoreStock } from "@/models/store";
-import { GetParams } from "./roleService";
+
+import { IShopStock, IStockLedger, IStore, IStoreStock } from '@/models/store';
+import { GetParams } from './roleService';
 
 // Get all stores
 
@@ -15,7 +16,7 @@ export const getAllstore = async ({ page = 1, limit = 10 }: GetParams = {}) => {
   try {
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     const url = `stores/get/all?${query}`;
@@ -26,7 +27,7 @@ export const getAllstore = async ({ page = 1, limit = 10 }: GetParams = {}) => {
     return {
       stores: stores,
       totalCount: response.data.count ?? stores.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -44,6 +45,7 @@ export const getStores = async () => {
 export const getStoresall = async () => {
   try {
     const response = await axiosInstance.get(`/stores/get/all`);
+    console.log("store",response.data.stores)
     return response.data.stores as IStore[];
   } catch (error) {
     throw error;
@@ -51,7 +53,7 @@ export const getStoresall = async () => {
 };
 
 // Get a store by ID
-export const getStoreById = async (id: string) => {
+export const getStoreById = async (id: string, ) => {
   try {
     const response = await axiosInstance.get(`/stores/${id}`);
     return response.data.store as IStore;
@@ -61,11 +63,15 @@ export const getStoreById = async (id: string) => {
 };
 
 // Create a store
-export const createStore = async (data: any | FormData) => {
+export const createStore = async (
+  data: any | FormData,
+  
+) => {
   try {
+
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.post(`/stores`, data, config);
@@ -79,11 +85,13 @@ export const createStore = async (data: any | FormData) => {
 export const updateStore = async (
   id: string,
   data: Partial<IStore> | FormData,
+  
 ) => {
   try {
+
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.put(`/stores/${id}`, data, config);
@@ -94,7 +102,7 @@ export const updateStore = async (
 };
 
 // Delete a store
-export const deleteStore = async (id: string) => {
+export const deleteStore = async (id: string, ) => {
   try {
     const response = await axiosInstance.delete(`/stores/${id}`);
     return response.data;
@@ -114,23 +122,24 @@ export const getAllStockLedgers = async ({
   page = 1,
   limit = 10,
   startDate,
-  endDate,
+  endDate
 }: PaginationParams = {}): Promise<{
   data: IStockLedger[];
   totalCount: number;
   success?: boolean;
 }> => {
   try {
+
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     if (startDate) {
-      query.append("startDate", startDate);
+      query.append('startDate', startDate);
     }
     if (endDate) {
-      query.append("endDate", endDate);
+      query.append('endDate', endDate);
     }
 
     const url = `/stores/ledgers/all?${query}`;
@@ -140,7 +149,7 @@ export const getAllStockLedgers = async ({
     return {
       data: response.data.stockLedgers,
       totalCount: response.data.count ?? response.data.stockLedgers.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -158,23 +167,24 @@ export const getAllShopStocks = async ({
   page = 1,
   limit = 10,
   startDate,
-  endDate,
+  endDate
 }: PaginationParams = {}): Promise<{
   data: IShopStock[];
   totalCount: number;
   success?: boolean;
 }> => {
   try {
+
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     if (startDate) {
-      query.append("startDate", startDate);
+      query.append('startDate', startDate);
     }
     if (endDate) {
-      query.append("endDate", endDate);
+      query.append('endDate', endDate);
     }
 
     const url = `/stores/shop/stocks?${query}`;
@@ -184,7 +194,7 @@ export const getAllShopStocks = async ({
     return {
       data: response.data.shopStocks,
       totalCount: response.data.count ?? response.data.shopStocks.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -208,23 +218,24 @@ export const getAllStoreStocks = async ({
   page = 1,
   limit = 10,
   startDate,
-  endDate,
+  endDate
 }: PaginationParams = {}): Promise<{
   data: IStoreStock[];
   totalCount: number;
   success?: boolean;
 }> => {
   try {
+
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     if (startDate) {
-      query.append("startDate", startDate);
+      query.append('startDate', startDate);
     }
     if (endDate) {
-      query.append("endDate", endDate);
+      query.append('endDate', endDate);
     }
 
     const url = `/stores/store/stocks?${query}`;
@@ -234,7 +245,7 @@ export const getAllStoreStocks = async ({
     return {
       data: response.data.storeStocks,
       totalCount: response.data.count ?? response.data.storeStocks.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;

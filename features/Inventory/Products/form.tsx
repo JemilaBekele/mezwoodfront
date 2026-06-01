@@ -20,46 +20,55 @@ import { useEffect, useMemo, useState } from 'react';
 import { IProduct } from '@/models/Product';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
+import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
 import Select from 'react-select';
-import CreatableSelect from 'react-select/creatable';
-
+import { Modal } from '@/components/ui/modal';
+import { getUnitsOfMeasure } from '@/service/UnitOfMeasure';
+import UnitOfMeasureForm from '../UnitOfMeasure/form';
+import { RefreshCw, Plus, Trash2, Ruler } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { IShop } from '@/models/shop';
-import { IBrand } from '@/models/brand';
-import { getBrands } from '@/service/brand';
-import { Plus, Trash2 } from 'lucide-react';
-import { getUnitsOfMeasure } from '@/service/UnitOfMeasure';
-
-interface IUnitOfMeasure {
-  id: string;
-  name: string;
-  symbol?: string;
-}
+import { IColour } from '@/models/Category';
+import { ICurtainType } from '@/models/curtainType';
+import { getCategoryById } from '@/service/Category';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface ProductFormValues {
   productCode: string;
   name: string;
-  generic?: string;
   description?: string;
+  
+  // Curtain-specific fields
+  fabricName?: string;
+  thickCurtain?: boolean;
+  thinCurtain?: boolean;
+
+  
+    pullsCurtain?: boolean;
+  poleCurtain?: boolean;
+  bracketsCurtain?: boolean;
+  shatterVertical?: boolean;
+  // Relationships
   categoryId: string;
-  brandId?: string;
-  unitOfMeasureId: string; // foreign key
-  unitOfMeasure?: IUnitOfMeasure;
-  numberunitOfMeasure?: number;
-  sellPrice: number | null;
+  colourId?: string | null;
+  unitOfMeasureId: string;
+  
+  // Pricing
+  sellPrice?: number;
+  pricePerMeter: boolean;
+  warningQuantity?: number;
+  
+  // Media
   imageUrl: string;
-  hasBox: boolean;
-  boxSize?: number | null;
+  
+  // Status
   isActive: boolean;
-  viscosity?: string;
-  oilType?: string;
-  additiveType?: string;
-  warningQuantity?: number | null;
+  
+  // Additional prices
   additionalPrices: {
     label: string;
     price: number;
     shopId?: string;
-    isBox: boolean;
   }[];
 }
 
@@ -72,88 +81,82 @@ interface ProductFormProps {
   initialData: IProduct | null;
   pageTitle: string;
   categories?: { id: string; name: string }[];
-  subCategories?: { id: string; name: string; categoryId: string }[];
+  unitsOfMeasure?: IUnitOfMeasure[];
   shops?: IShop[];
+  colours?: IColour[];
+  curtainTypes?: ICurtainType[];
 }
 
 export default function ProductForm({
   initialData,
   pageTitle,
   categories = [],
-  shops: initialShops = []
+  unitsOfMeasure: initialUnits = [],
+  shops: initialShops = [],
+  colours: initialColours = [],
+  curtainTypes: initialCurtainTypes = []
 }: ProductFormProps) {
   const router = useRouter();
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isRefreshingUnits, setIsRefreshingUnits] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [brands, setBrands] = useState<IBrand[]>([]);
-  const [isLoadingBrands, setIsLoadingBrands] = useState(false);
-  const [unitOfMeasures, setUnitOfMeasures] = useState<IUnitOfMeasure[]>([]);
-  const [isLoadingUnitOfMeasures, setIsLoadingUnitOfMeasures] = useState(false);
+  const [unitsOfMeasure, setUnitsOfMeasure] = useState<IUnitOfMeasure[]>(
+    initialUnits || []
+  );
+  const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [isCurtainCategory, setIsCurtainCategory] = useState(false);
 
-  // Use shops directly from props
+  // Use data directly from props
   const shops = initialShops;
-
-  // Fetch brands on component mount
-  useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        setIsLoadingBrands(true);
-        const fetchedBrands = await getBrands();
-        setBrands(fetchedBrands || []);
-      } catch (error) {
-        console.error('Failed to fetch brands:', error);
-        toast.error('Failed to load brands');
-      } finally {
-        setIsLoadingBrands(false);
-      }
-    };
-    fetchBrands();
-  }, []);
-
-  // Fetch unit of measures on component mount
-  useEffect(() => {
-    const fetchUnitOfMeasures = async () => {
-      try {
-        setIsLoadingUnitOfMeasures(true);
-        const fetchedUnits = await getUnitsOfMeasure();
-        setUnitOfMeasures(fetchedUnits || []);
-      } catch (error) {
-        console.error('Failed to fetch unit of measures:', error);
-        toast.error('Failed to load unit of measures');
-      } finally {
-        setIsLoadingUnitOfMeasures(false);
-      }
-    };
-    fetchUnitOfMeasures();
-  }, []);
+  const colours = initialColours;
+  const curtainTypes = initialCurtainTypes;
 
   const defaultValues = useMemo<ProductFormValues>(
     () => ({
       productCode: initialData?.productCode || '',
       name: initialData?.name || '',
-      generic: initialData?.generic || '',
       description: initialData?.description || '',
+      
+      // Curtain-specific fields
+      fabricName: initialData?.fabricName || '',
+      thickCurtain: initialData?.thickCurtain || false,
+
+      thinCurtain: initialData?.thinCurtain || false,
+
+      
+            pullsCurtain: initialData?.pullsCurtain || false,
+
+                  poleCurtain: initialData?.poleCurtain || false,
+
+                        bracketsCurtain: initialData?.bracketsCurtain || false,
+
+                        shatterVertical: initialData?.shatterVertical || false,
+
+      // Relationships
       categoryId: initialData?.categoryId || '',
-      brandId: initialData?.brandId || '',
+      colourId: initialData?.colourId || null,
       unitOfMeasureId: initialData?.unitOfMeasureId || '',
-      numberunitOfMeasure: initialData?.numberunitOfMeasure || undefined,
-      sellPrice: initialData?.sellPrice || null,
+      
+      // Pricing
+      sellPrice: initialData?.sellPrice || undefined,
+      pricePerMeter: initialData?.pricePerMeter ?? true,
+      warningQuantity: initialData?.warningQuantity || 0,
+      
+      // Media
       imageUrl: initialData?.imageUrl || '',
-      hasBox: initialData?.hasBox ?? false,
-      boxSize: initialData?.boxSize || null,
+      
+      // Status
       isActive: initialData?.isActive ?? true,
-      viscosity: initialData?.viscosity || '',
-      oilType: initialData?.oilType || '',
-      additiveType: initialData?.additiveType || '',
-      warningQuantity: initialData?.warningQuantity || null,
-      additionalPrices: initialData?.AdditionalPrice?.map((price, index) => ({
+      
+      // Additional prices
+      additionalPrices: initialData?.additionalPrices?.map((price, index) => ({
         label: price.label || `Label ${index + 1}`,
         price: price.price,
-        shopId: price.shopId || '',
-        isBox: price.isBox ?? false
+        shopId: price.shopId || ''
       })) || [
-        { label: 'Label 1', price: 0, shopId: '', isBox: false },
-        { label: 'Label 2', price: 0, shopId: '', isBox: false }
+        { label: 'Label 1', price: 0, shopId: '' },
+        { label: 'Label 2', price: 0, shopId: '' }
       ]
     }),
     [initialData]
@@ -168,6 +171,36 @@ export default function ProductForm({
     name: 'additionalPrices'
   });
 
+  // Check if selected category is a curtain category
+  useEffect(() => {
+    const checkCurtainCategory = async () => {
+      const categoryId = form.watch('categoryId');
+      if (categoryId) {
+        try {
+          const category = await getCategoryById(categoryId);
+          setIsCurtainCategory(category?.name?.toLowerCase().includes('curtain') || false);
+          setSelectedCategory(categoryId);
+        } catch {
+          setIsCurtainCategory(false);
+        }
+      } else {
+        setIsCurtainCategory(false);
+        setSelectedCategory('');
+      }
+    };
+    
+    checkCurtainCategory();
+    
+    // Subscribe to categoryId changes
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'categoryId') {
+        checkCurtainCategory();
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   // Handle image preview
   useEffect(() => {
     if (initialData?.imageUrl) {
@@ -177,33 +210,18 @@ export default function ProductForm({
     }
   }, [initialData]);
 
-  const brandOptions: SelectOption[] = useMemo(
-    () => [
-      { value: '', label: 'None' },
-      ...(brands || []).map((brand) => ({
-        value: brand.id,
-        label: brand.name
-      }))
-    ],
-    [brands]
-  );
-
-  const categoryOptions: SelectOption[] = useMemo(
-    () => (categories || []).map((c) => ({ value: c.id, label: c.name })),
-    [categories]
-  );
-
-  const unitOfMeasureOptions: SelectOption[] = useMemo(
-    () => (unitOfMeasures || []).map((unit) => ({
-      value: unit.id,
-      label: `${unit.name} (${unit.symbol})`
-    })),
-    [unitOfMeasures]
+  const unitOptions: SelectOption[] = useMemo(
+    () =>
+      (unitsOfMeasure || []).map((unit) => ({
+        value: unit.id,
+        label: `${unit.name}${unit.symbol ? ` (${unit.symbol})` : ''}`
+      })),
+    [unitsOfMeasure]
   );
 
   const shopOptions: SelectOption[] = useMemo(
     () => [
-      { value: '', label: 'None' },
+      { value: '', label: '' },
       ...(shops || []).map((shop) => ({
         value: shop.id,
         label: shop.name
@@ -212,76 +230,45 @@ export default function ProductForm({
     [shops]
   );
 
-  // Viscosity options
-  const viscosityOptions: SelectOption[] = [
-    { value: '0W-16', label: '0W-16' },
-    { value: '0W-20', label: '0W-20' },
-    { value: '0W-30', label: '0W-30' },
-    { value: '0W-40', label: '0W-40' },
-    { value: '5W-20', label: '5W-20' },
-    { value: '5W-30', label: '5W-30' },
-    { value: '5W-40', label: '5W-40' },
-    { value: '5W-50', label: '5W-50' },
-    { value: '10W-30', label: '10W-30' },
-    { value: '10W-40', label: '10W-40' },
-    { value: '10W-50', label: '10W-50' },
-    { value: '10W-60', label: '10W-60' },
-    { value: '15W-40', label: '15W-40' },
-    { value: '15W-50', label: '15W-50' },
-    { value: '20W-20', label: '20W-20' },
-    { value: '20W-50', label: '20W-50' },
-    { value: '75W-80', label: '75W-80' },
-    { value: '75W-90', label: '75W-90' },
-    { value: '75W-140', label: '75W-140' },
-    { value: '80W-90', label: '80W-90' },
-    { value: '85W-90', label: '85W-90' },
-    { value: '85W-140', label: '85W-140' },
-    { value: '0W-8', label: '0W-8' },
-    { value: '25W-40', label: '25W-40' },
-    { value: '75W-85', label: '75W-85' },
-    { value: '10', label: '10' },
-    { value: '100', label: '100' },
-    { value: '10W', label: '10W' },
-    { value: '140', label: '140' },
-    { value: '15', label: '15' },
-    { value: '150', label: '150' },
-    { value: '15w', label: '15w' },
-    { value: '22', label: '22' },
-    { value: '220', label: '220' },
-    { value: '30', label: '30' },
-    { value: '32', label: '32' },
-    { value: '40', label: '40' },
-    { value: '46', label: '46' },
-    { value: '50', label: '50' },
-    { value: '5w', label: '5w' },
-    { value: '68', label: '68' },
-    { value: '7,5W', label: '7,5W' },
-    { value: '70w75', label: '70w75' },
-    { value: '75w', label: '75w' },
-    { value: '80w', label: '80w' },
-    { value: '90', label: '90' },
-    { value: 'other', label: 'other' }
-  ];
-  
-  // Oil Type options
-  const oilTypeOptions: SelectOption[] = [
-    { value: 'Fully Synthetic', label: 'Fully Synthetic' },
-    { value: 'Synthetic technology', label: 'Synthetic technology' },
-    { value: 'Semi Synthetic', label: 'Semi Synthetic' },
-    { value: 'Mineral-based', label: 'Mineral-based' },
-    { value: 'Advanced full synthetic', label: 'Advanced full synthetic' },
-    { value: 'Synthetic Blend', label: 'Synthetic Blend' },
-    { value: 'other', label: 'other' }
-  ];
+  const categoryOptions: SelectOption[] = useMemo(
+    () => (categories || []).map((c) => ({ value: c.id, label: c.name })),
+    [categories]
+  );
 
-  // Additive Type options
-  const additiveTypeOptions: SelectOption[] = [
-    { value: 'Gasoline additive', label: 'Gasoline additive' },
-    { value: 'Diesel additive', label: 'Diesel additive' },
-    { value: 'Oil additive', label: 'Oil additive' },
-    { value: 'Radiator Additive', label: 'Radiator Additive' },
-    { value: 'other', label: 'other' }
-  ];
+  const colourOptions: SelectOption[] = useMemo(
+    () => [
+      { value: '', label: 'None' },
+      ...(colours || []).map((colour) => ({
+        value: colour.id,
+        label: colour.name
+      }))
+    ],
+    [colours]
+  );
+
+  const curtainTypeOptions: SelectOption[] = useMemo(
+    () => [
+      { value: '', label: 'None' },
+      ...(curtainTypes || []).map((type) => ({
+        value: type.id,
+        label: type.name
+      }))
+    ],
+    [curtainTypes]
+  );
+
+  const refetchUnits = async () => {
+    try {
+      setIsRefreshingUnits(true);
+      const data = await getUnitsOfMeasure();
+      setUnitsOfMeasure(data || []);
+      toast.success('Units of measure refreshed');
+    } catch {
+      toast.error('Failed to refresh units');
+    } finally {
+      setIsRefreshingUnits(false);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -300,83 +287,85 @@ export default function ProductForm({
     }
   };
 
-  const onSubmit = async (data: ProductFormValues) => {
-    try {
-      const formData = new FormData();
+const onSubmit = async (data: ProductFormValues) => {
+  try {
+    const formData = new FormData();
 
-      // Convert boolean values properly
-      const processedData = {
-        ...data,
-        isActive:
-          typeof data.isActive === 'string'
-            ? data.isActive === 'true'
-            : Boolean(data.isActive),
-        hasBox: Boolean(data.hasBox),
-        boxSize: data.hasBox ? data.boxSize : null,
-        warningQuantity: data.warningQuantity ? Number(data.warningQuantity) : null,
-        numberunitOfMeasure: data.numberunitOfMeasure ? Number(data.numberunitOfMeasure) : null
-      };
+    // Process boolean values
+    const processedData = {
+      ...data,
+      isActive: Boolean(data.isActive),
+      thickCurtain: data.thickCurtain ? Boolean(data.thickCurtain) : false,
+      thinCurtain: data.thinCurtain ? Boolean(data.thinCurtain) : false,
+      pullsCurtain: data.pullsCurtain ? Boolean(data.pullsCurtain) : false,
+      poleCurtain: data.poleCurtain ? Boolean(data.poleCurtain) : false,
+      bracketsCurtain: data.bracketsCurtain ? Boolean(data.bracketsCurtain) : false,
+      shatterVertical: data.shatterVertical ? Boolean(data.shatterVertical) : false,
+      pricePerMeter: Boolean(data.pricePerMeter),
+      colourId: data.colourId || null,
+      warningQuantity: data.warningQuantity || 0
+    };
 
-      const { additionalPrices, ...formValues } = processedData;
+    const { additionalPrices, ...formValues } = processedData;
 
-      // Ensure description is included even if empty
-      const descriptionValue = formValues.description || '';
-      
-      // Append main product data
-      const importantFields = ['description', 'generic', 'viscosity', 'oilType', 'additiveType', 'unitOfMeasureId', 'numberunitOfMeasure'];
-      
-      Object.entries(formValues).forEach(([key, value]) => {
-        // For important fields, always send them (even if empty)
-        if (importantFields.includes(key)) {
-          const finalValue = value || '';
-          formData.append(key, String(finalValue));
+    // Filter out additional prices where price is zero or falsy (0, null, undefined, empty string)
+    const filteredAdditionalPrices = additionalPrices.filter(price => {
+      // Check if price exists and is not zero
+      // This handles: 0, "0", null, undefined, empty string
+      const priceValue = parseFloat(price.price as any);
+      return !isNaN(priceValue) && priceValue !== 0;
+    });
+
+    // Append main product data
+    Object.entries(formValues).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (typeof value === 'boolean') {
+          formData.append(key, value.toString());
+        } else if (typeof value === 'number') {
+          formData.append(key, value.toString());
+        } else {
+          formData.append(key, value.toString());
         }
-        // For other fields, only send if they have values
-        else if (value !== undefined && value !== null && value !== '') {
-          formData.append(key, String(value));
-        }
-      });
-
-      // Append additional prices with isBox field
-      additionalPrices.forEach((price, index) => {
-        if (price.label && price.price > 0) {
-          formData.append(`additionalPrices[${index}][label]`, String(price.label));
-          formData.append(
-            `additionalPrices[${index}][price]`,
-            String(price.price)
-          );
-          if (price.shopId) {
-            formData.append(`additionalPrices[${index}][shopId]`, String(price.shopId));
-          }
-          formData.append(`additionalPrices[${index}][isBox]`, String(price.isBox));
-        }
-      });
-
-      const imageInput = document.getElementById('image') as HTMLInputElement;
-      if (imageInput?.files?.[0]) {
-        formData.append('image', imageInput.files[0]);
       }
+    });
 
-      setIsUploading(true);
-
-      if (initialData?.id) {
-        await updateProduct(initialData.id, formData);
-        toast.success('Product updated successfully');
-        router.push(`/dashboard/Products`);
-      } else {
-        const createdProduct = await createProduct(formData);
-        toast.success('Product created successfully');
-        router.push(
-          `/dashboard/Products/ProductBatch?id=${createdProduct.product.id}`
-        );
+    // Append filtered additional prices (skip zero price entries)
+    filteredAdditionalPrices.forEach((price, index) => {
+      formData.append(`additionalPrices[${index}][label]`, price.label);
+      formData.append(
+        `additionalPrices[${index}][price]`,
+        price.price.toString()
+      );
+      if (price.shopId) {
+        formData.append(`additionalPrices[${index}][shopId]`, price.shopId);
       }
-      router.refresh();
-    } catch (error: any) {
-      toast.error(error?.message || 'Error saving product');
-    } finally {
-      setIsUploading(false);
+    });
+
+    const imageInput = document.getElementById('image') as HTMLInputElement;
+    if (imageInput?.files?.[0]) {
+      formData.append('image', imageInput.files[0]);
     }
-  };
+
+    setIsUploading(true);
+
+    if (initialData?.id) {
+      await updateProduct(initialData.id, formData);
+      toast.success('Product updated successfully');
+      router.push(`/dashboard/Products`);
+    } else {
+      const createdProduct = await createProduct(formData);
+      toast.success('Product created successfully');
+      router.push(
+        `/dashboard/Products/ProductBatch?id=${createdProduct.product.id}`
+      );
+    }
+    router.refresh();
+  } catch (error: any) {
+    toast.error(error?.message || 'Error saving product');
+  } finally {
+    setIsUploading(false);
+  }
+};
 
   const [isDark, setIsDark] = useState(false);
 
@@ -410,10 +399,7 @@ export default function ProductForm({
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isFocused ? '#374151' : '#1f2937',
-      color: '#f9fafb',
-      ':active': {
-        backgroundColor: '#4b5563'
-      }
+      color: '#f9fafb'
     }),
     singleValue: (base: any) => ({
       ...base,
@@ -434,13 +420,9 @@ export default function ProductForm({
     append({
       label: `Label ${newIndex}`,
       price: 0,
-      shopId: '',
-      isBox: false
+      shopId: ''
     });
   };
-
-  // Watch hasBox to conditionally show boxSize field
-  const hasBox = form.watch('hasBox');
 
   return (
     <>
@@ -451,7 +433,7 @@ export default function ProductForm({
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
-              <div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
+              <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
                 {/* Left Column */}
                 <div className='space-y-4'>
                   <FormField
@@ -474,39 +456,174 @@ export default function ProductForm({
                       <FormItem>
                         <FormLabel>Product Name</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder='e.g., Engine Oil 5W-30'
-                            {...field}
-                          />
+                          <Input placeholder='e.g., Velvet Curtain' {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   
-                  <FormField
-                    name='generic'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Generic Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder='e.g., Acetaminophen' {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* Curtain-specific fields - only show if curtain category */}
+                    <>
+                      <FormField
+                        name='fabricName'
+                        control={form.control}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className='flex items-center gap-2'>
+                              <Ruler className='h-4 w-4' />
+                              Fabric Name (Optional)
+                            </FormLabel>
+                            <FormControl>
+                              <Input placeholder='e.g., Velvet, Linen, Silk' {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+    <div className='flex flex-col gap-4 rounded-lg border p-4'>
+  <div className='flex items-center gap-2'>
+    <Ruler className='h-4 w-4' />
+    <FormLabel>Curtain Type (Optional)</FormLabel>
+  </div>
+
+  <RadioGroup
+    value={(() => {
+      // Determine which curtain type is currently selected
+      if (form.watch('thickCurtain')) return 'thick';
+      if (form.watch('thinCurtain')) return 'thin';
+      if (form.watch('pullsCurtain')) return 'belt';
+      if (form.watch('poleCurtain')) return 'rod';
+      if (form.watch('bracketsCurtain')) return 'holder';
+      if (form.watch('shatterVertical')) return 'shutter';
+      return '';
+    })()}
+    onValueChange={(value) => {
+      // Clear all curtain type fields
+      form.setValue('thickCurtain', false);
+      form.setValue('thinCurtain', false);
+      form.setValue('pullsCurtain', false);
+      form.setValue('poleCurtain', false);
+      form.setValue('bracketsCurtain', false);
+      form.setValue('shatterVertical', false);
+      
+      // Set the selected one
+      switch (value) {
+        case 'thick':
+          form.setValue('thickCurtain', true);
+          break;
+        case 'thin':
+          form.setValue('thinCurtain', true);
+          break;
+        case 'belt':
+          form.setValue('pullsCurtain', true);
+          break;
+        case 'rod':
+          form.setValue('poleCurtain', true);
+          break;
+        case 'holder':
+          form.setValue('bracketsCurtain', true);
+          break;
+        case 'shutter':
+          form.setValue('shatterVertical', true);
+          break;
+      }
+    }}
+    className='grid grid-cols-2 gap-4'
+  >
+    {/* Thick Curtain */}
+    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+      <FormControl>
+        <RadioGroupItem value='thick' />
+      </FormControl>
+      <div className='space-y-1 leading-none'>
+        <FormLabel>Thick Curtain</FormLabel>
+        <div className='text-muted-foreground text-sm'>
+          Heavy, insulated curtains
+        </div>
+      </div>
+    </FormItem>
+
+    {/* Thin Curtain */}
+    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+      <FormControl>
+        <RadioGroupItem value='thin' />
+      </FormControl>
+      <div className='space-y-1 leading-none'>
+        <FormLabel>Thin Curtain</FormLabel>
+        <div className='text-muted-foreground text-sm'>
+          Light, sheer curtains
+        </div>
+      </div>
+    </FormItem>
+
+    {/* Belt Curtain */}
+    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+      <FormControl>
+        <RadioGroupItem value='belt' />
+      </FormControl>
+      <div className='space-y-1 leading-none'>
+        <FormLabel>Belt Curtain</FormLabel>
+        <div className='text-muted-foreground text-sm'>
+          Curtain operated using a belt-driven mechanism
+        </div>
+      </div>
+    </FormItem>
+
+    {/* Curtain Rod */}
+    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+      <FormControl>
+        <RadioGroupItem value='rod' />
+      </FormControl>
+      <div className='space-y-1 leading-none'>
+        <FormLabel>Curtain Rod</FormLabel>
+        <div className='text-muted-foreground text-sm'>
+          Curtain mounted on a rod system
+        </div>
+      </div>
+    </FormItem>
+
+    {/* Holder Curtain */}
+    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+      <FormControl>
+        <RadioGroupItem value='holder' />
+      </FormControl>
+      <div className='space-y-1 leading-none'>
+        <FormLabel>Holder Curtain</FormLabel>
+        <div className='text-muted-foreground text-sm'>
+          Curtain supported using holders
+        </div>
+      </div>
+    </FormItem>
+
+    {/* Shutter or Vertical */}
+    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+      <FormControl>
+        <RadioGroupItem value='shutter' />
+      </FormControl>
+      <div className='space-y-1 leading-none'>
+        <FormLabel>Shutter or Vertical</FormLabel>
+        <div className='text-muted-foreground text-sm'>
+          Vertical or shutter-style curtain system
+        </div>
+      </div>
+    </FormItem>
+  </RadioGroup>
+</div>
+                    </>
+                  
                   
                   <FormField
                     name='description'
                     control={form.control}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel>Description (Optional)</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder='Product description...'
+                            rows={3}
                             {...field}
                           />
                         </FormControl>
@@ -520,18 +637,18 @@ export default function ProductForm({
                     control={form.control}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Standard Sell Price</FormLabel>
+                        <FormLabel>Standard Sell Price (Optional)</FormLabel>
                         <FormControl>
                           <Input
                             type='number'
                             step='0.01'
                             min='0'
                             placeholder='Enter sell price'
-                            value={field.value === null ? '' : field.value}
+                            value={field.value === undefined || field.value === null ? '' : field.value}
                             onChange={(e) => {
                               const value = e.target.value;
                               field.onChange(
-                                value === '' ? null : parseFloat(value)
+                                value === '' ? undefined : parseFloat(value)
                               );
                             }}
                           />
@@ -540,45 +657,159 @@ export default function ProductForm({
                       </FormItem>
                     )}
                   />
-
-                  {/* Warning Quantity */}
+                  
                   <FormField
                     name='warningQuantity'
                     control={form.control}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Warning Quantity</FormLabel>
+                        <FormLabel>Warning Quantity (Optional)</FormLabel>
                         <FormControl>
                           <Input
                             type='number'
                             min='0'
-                            placeholder='Enter warning quantity threshold'
-                            value={field.value === null ? '' : field.value}
+                            placeholder='Enter warning quantity'
+                            value={field.value || 0}
                             onChange={(e) => {
                               const value = e.target.value;
-                              field.onChange(
-                                value === '' ? null : parseInt(value)
-                              );
+                              field.onChange(value === '' ? 0 : parseInt(value));
                             }}
+                          />
+                        </FormControl>
+                        <div className='text-muted-foreground text-sm'>
+                          Low stock warning threshold (0 = disabled)
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Right Column */}
+                <div className='space-y-4'>
+                  <FormField
+                    name='categoryId'
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category *</FormLabel>
+                        <FormControl>
+                          <Select
+                            options={categoryOptions}
+                            onChange={(option) => field.onChange(option?.value)}
+                            value={
+                              categoryOptions.find(
+                                (c) => c.value === field.value
+                              ) || null
+                            }
+                            placeholder='Select a category'
+                            styles={isDark ? darkStyles : {}}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-
-                  {/* Box Support Section */}
+                  
+               
+              
+                  
+                  <FormField
+                    name='unitOfMeasureId'
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className='flex items-center justify-between'>
+                          <span>Unit of Measure *</span>
+                          <div className='flex gap-2'>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={refetchUnits}
+                              disabled={isRefreshingUnits}
+                              className='h-8 w-8 p-0'
+                              title='Refresh units'
+                            >
+                              <RefreshCw
+                                className={`h-4 w-4 ${isRefreshingUnits ? 'animate-spin' : ''}`}
+                              />
+                            </Button>
+                            <Button
+                              type='button'
+                              variant='link'
+                              size='sm'
+                              onClick={() => setIsUnitModalOpen(true)}
+                            >
+                              + Add New
+                            </Button>
+                          </div>
+                        </FormLabel>
+                        <FormControl>
+                          <Select
+                            options={unitOptions}
+                            value={
+                              unitOptions.find(
+                                (option) => option.value === field.value
+                              ) || null
+                            }
+                            onChange={(selectedOption) => {
+                              field.onChange(selectedOption?.value || '');
+                            }}
+                            onBlur={field.onBlur}
+                            placeholder='Search or select a unit...'
+                            isSearchable
+                            isClearable
+                            className='react-select-container'
+                            classNamePrefix='react-select'
+                            styles={isDark ? darkStyles : {}}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    name='colourId'
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Colour (Optional)</FormLabel>
+                        <FormControl>
+                          <Select
+                            options={colourOptions}
+                            onChange={(option) => 
+                              field.onChange(option?.value || null)
+                            }
+                            value={
+                              field.value
+                                ? colourOptions.find(
+                                    (c) => c.value === field.value
+                                  ) || null
+                                : colourOptions[0] // "None" option
+                            }
+                            placeholder='Select a colour'
+                            styles={isDark ? darkStyles : {}}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {/* Price Per Meter Switch - show for all products, not just curtains */}
                   <FormField
                     control={form.control}
-                    name='hasBox'
+                    name='pricePerMeter'
                     render={({ field }) => (
                       <FormItem className='flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm'>
                         <div className='space-y-0.5'>
-                          <FormLabel>Has Box/Packaging</FormLabel>
+                          <FormLabel>Pricing Method</FormLabel>
                           <div className='text-muted-foreground text-sm'>
                             {field.value
-                              ? 'Product is sold in boxes/packs'
-                              : 'Product is sold individually'}
+                              ? 'Priced per meter/unit'
+                              : 'Fixed price per item'}
                           </div>
                         </div>
                         <FormControl>
@@ -590,33 +821,6 @@ export default function ProductForm({
                       </FormItem>
                     )}
                   />
-
-                  {hasBox && (
-                    <FormField
-                      name='boxSize'
-                      control={form.control}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Box Size (Quantity per Box)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type='number'
-                              min='1'
-                              placeholder='e.g., 12'
-                              value={field.value === null ? '' : field.value}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                field.onChange(
-                                  value === '' ? null : parseInt(value)
-                                );
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
 
                   {/* Active Status Switch */}
                   <FormField
@@ -638,198 +842,6 @@ export default function ProductForm({
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Right Column */}
-                <div className='space-y-4'>
-                  {/* Unit of Measure Selection */}
-                  <FormField
-                    name='unitOfMeasureId'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Unit of Measure</FormLabel>
-                        <FormControl>
-                          <Select
-                            options={unitOfMeasureOptions}
-                            onChange={(option) => field.onChange(option?.value)}
-                            value={
-                              unitOfMeasureOptions.find(
-                                (u) => u.value === field.value
-                              ) || null
-                            }
-                            placeholder={
-                              isLoadingUnitOfMeasures
-                                ? 'Loading units...'
-                                : 'Select unit of measure'
-                            }
-                            isDisabled={isLoadingUnitOfMeasures}
-                            styles={isDark ? darkStyles : {}}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Number of Unit of Measure */}
-                  <FormField
-                    name='numberunitOfMeasure'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Number of Units</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            min='0'
-                            step='1'
-                            placeholder='e.g., 1, 2, 5'
-                            value={field.value === undefined ? '' : field.value}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              field.onChange(
-                                value === '' ? undefined : parseInt(value)
-                              );
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    name='categoryId'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <FormControl>
-                          <Select
-                            options={categoryOptions}
-                            onChange={(option) => field.onChange(option?.value)}
-                            value={
-                              categoryOptions.find(
-                                (c) => c.value === field.value
-                              ) || null
-                            }
-                            placeholder='Select a category'
-                            styles={isDark ? darkStyles : {}}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    name='brandId'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Brand (Optional)</FormLabel>
-                        <FormControl>
-                          <Select
-                            options={brandOptions}
-                            onChange={(option) => field.onChange(option?.value)}
-                            value={
-                              brandOptions.find(
-                                (b) => b.value === field.value
-                              ) || null
-                            }
-                            placeholder={
-                              isLoadingBrands
-                                ? 'Loading brands...'
-                                : 'Select a brand'
-                            }
-                            isDisabled={isLoadingBrands}
-                            isClearable
-                            styles={isDark ? darkStyles : {}}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Viscosity Selection */}
-                  <FormField
-                    name='viscosity'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Viscosity</FormLabel>
-                        <FormControl>
-                          <Select
-                            options={viscosityOptions}
-                            onChange={(option) => field.onChange(option?.value || '')}
-                            value={
-                              viscosityOptions.find(
-                                (v) => v.value === field.value
-                              ) || null
-                            }
-                            placeholder='Select viscosity grade'
-                            isClearable
-                            styles={isDark ? darkStyles : {}}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Oil Type Selection */}
-                  <FormField
-                    name='oilType'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Oil Type</FormLabel>
-                        <FormControl>
-                          <Select
-                            options={oilTypeOptions}
-                            onChange={(option) => field.onChange(option?.value || '')}
-                            value={
-                              oilTypeOptions.find(
-                                (o) => o.value === field.value
-                              ) || null
-                            }
-                            placeholder='Select oil type'
-                            isClearable
-                            styles={isDark ? darkStyles : {}}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Additive Type Selection */}
-                  <FormField
-                    name='additiveType'
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Additive Type</FormLabel>
-                        <FormControl>
-                          <Select
-                            options={additiveTypeOptions}
-                            onChange={(option) => field.onChange(option?.value || '')}
-                            value={
-                              additiveTypeOptions.find(
-                                (a) => a.value === field.value
-                              ) || null
-                            }
-                            placeholder='Select additive type'
-                            isClearable
-                            styles={isDark ? darkStyles : {}}
-                          />
-                        </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -871,16 +883,16 @@ export default function ProductForm({
                 </div>
               </div>
 
-              {/* Additional Prices Section - Fully Responsive */}
+              {/* Additional Prices Section */}
               <div className='border-t pt-6'>
-                <div className='mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3'>
-                  <CardTitle className='text-lg'>Additional Prices</CardTitle>
+                <div className='mb-4 flex items-center justify-between'>
+                  <CardTitle className='text-lg'>Additional Prices (Optional)</CardTitle>
                   <Button
                     type='button'
                     variant='outline'
                     size='sm'
                     onClick={addAdditionalPrice}
-                    className='flex items-center gap-2 w-full sm:w-auto'
+                    className='flex items-center gap-2'
                   >
                     <Plus className='h-4 w-4' />
                     Add Price
@@ -891,10 +903,10 @@ export default function ProductForm({
                   {fields.map((field, index) => (
                     <div
                       key={field.id}
-                      className='rounded-lg border p-4 space-y-4'
+                      className='grid grid-cols-1 items-end gap-4 rounded-lg border p-4 md:grid-cols-12'
                     >
-                      {/* Label - Full width on mobile */}
-                      <div>
+                      {/* Label Input - 3 columns */}
+                      <div className='md:col-span-3'>
                         <FormField
                           control={form.control}
                           name={`additionalPrices.${index}.label`}
@@ -913,61 +925,36 @@ export default function ProductForm({
                         />
                       </div>
 
-                      {/* Price and isBox - Side by side on mobile */}
-                      <div className='grid grid-cols-2 gap-3'>
-                        <div>
-                          <FormField
-                            control={form.control}
-                            name={`additionalPrices.${index}.price`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Price</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type='number'
-                                    step='0.01'
-                                    min='0'
-                                    placeholder='0.00'
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(
-                                        parseFloat(e.target.value) || 0
-                                      )
-                                    }
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div>
-                          <FormField
-                            control={form.control}
-                            name={`additionalPrices.${index}.isBox`}
-                            render={({ field }) => (
-                              <FormItem className='flex flex-row items-center justify-between rounded-lg border p-3 h-full'>
-                                <div className='space-y-0.5'>
-                                  <FormLabel className='text-sm'>Type</FormLabel>
-                                  <div className='text-muted-foreground text-xs'>
-                                    {field.value ? 'Box' : 'Piece'}
-                                  </div>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
+                      {/* Price Input - 3 columns */}
+                      <div className='md:col-span-3'>
+                        <FormField
+                          control={form.control}
+                          name={`additionalPrices.${index}.price`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Price</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type='number'
+                                  step='0.01'
+                                  min='0'
+                                  placeholder='0.00'
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
 
-                      {/* Shop Select - Full width */}
-                      <div>
+                      {/* Shop Select - 4 columns */}
+                      <div className='md:col-span-4'>
                         <FormField
                           control={form.control}
                           name={`additionalPrices.${index}.shopId`}
@@ -995,8 +982,8 @@ export default function ProductForm({
                         />
                       </div>
 
-                      {/* Remove Button - Full width on mobile */}
-                      <div>
+                      {/* Remove Button - 2 columns */}
+                      <div className='md:col-span-2'>
                         <Button
                           type='button'
                           variant='destructive'
@@ -1005,8 +992,7 @@ export default function ProductForm({
                           disabled={fields.length <= 1}
                           className='w-full'
                         >
-                          <Trash2 className='h-4 w-4 mr-2' />
-                          Remove
+                          <Trash2 className='h-4 w-4' />
                         </Button>
                       </div>
                     </div>
@@ -1031,6 +1017,21 @@ export default function ProductForm({
           </Form>
         </CardContent>
       </Card>
+      <Modal
+        title='Add Unit of Measure'
+        description='Create a new unit of measure'
+        isOpen={isUnitModalOpen}
+        onClose={() => {
+          setIsUnitModalOpen(false);
+          refetchUnits();
+        }}
+        size='md'
+      >
+        <UnitOfMeasureForm
+          initialData={null}
+          closeModal={() => setIsUnitModalOpen(false)}
+        />
+      </Modal>
     </>
   );
 }

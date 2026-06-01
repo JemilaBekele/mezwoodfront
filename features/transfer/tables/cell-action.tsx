@@ -68,7 +68,7 @@ export const TransferCellAction: React.FC<TransferCellActionProps> = ({
         <DropdownMenuContent align='end'>
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           {data.status !== 'COMPLETED' && (
-            <PermissionGuard fallback="hide"
+            <PermissionGuard
               requiredPermission={PERMISSIONS.TRANSFER.UPDATE.name}
             >
               <DropdownMenuItem
@@ -87,7 +87,7 @@ export const TransferCellAction: React.FC<TransferCellActionProps> = ({
             <Edit className='mr-2 h-4 w-4' /> View
           </DropdownMenuItem>
           {data.status !== 'COMPLETED' && (
-            <PermissionGuard fallback="hide"
+            <PermissionGuard
               requiredPermission={PERMISSIONS.TRANSFER.DELETE.name}
             >
               <DropdownMenuItem onClick={() => setOpen(true)}>

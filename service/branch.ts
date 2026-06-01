@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { axiosInstance } from "./axiosIntance";
-import { IBranch } from "@/models/Branch";
-import { GetParams } from "./roleService";
+import { IBranch } from '@/models/Branch';
+import { GetParams } from './roleService';
 
 // Get all branches
 interface BranchesResponse {
@@ -12,12 +12,12 @@ interface BranchesResponse {
 
 export const getAllbranches = async ({
   page = 1,
-  limit = 10,
+  limit = 10
 }: GetParams = {}) => {
   try {
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString(),
+      limit: limit.toString()
     });
 
     const url = `branches?${query}`;
@@ -28,7 +28,7 @@ export const getAllbranches = async ({
     return {
       branches: branches,
       totalCount: response.data.count ?? branches.length,
-      success: response.data.success,
+      success: response.data.success
     };
   } catch (error) {
     throw error;
@@ -36,6 +36,7 @@ export const getAllbranches = async ({
 };
 export const getBranches = async () => {
   try {
+   
     const response = await axiosInstance.get(`/branches`);
     return response.data.branches as IBranch[];
   } catch (error) {
@@ -44,7 +45,7 @@ export const getBranches = async () => {
 };
 
 // Get a branch by ID
-export const getBranchById = async (id: string) => {
+export const getBranchById = async (id: string, ) => {
   try {
     const response = await axiosInstance.get(`/branches/${id}`);
     return response.data.branch as IBranch;
@@ -54,11 +55,16 @@ export const getBranchById = async (id: string) => {
 };
 
 // Create a branch
-export const createBranch = async (data: any | FormData) => {
+export const createBranch = async (
+  data: any | FormData,
+  
+) => {
   try {
+   
+
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.post(`/branches`, data, config);
@@ -72,11 +78,14 @@ export const createBranch = async (data: any | FormData) => {
 export const updateBranch = async (
   id: string,
   data: Partial<IBranch> | FormData,
+  
 ) => {
   try {
+   
+
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.put(`/branches/${id}`, data, config);
@@ -87,8 +96,9 @@ export const updateBranch = async (
 };
 
 // Delete a branch
-export const deleteBranch = async (id: string) => {
+export const deleteBranch = async (id: string, ) => {
   try {
+   
     const response = await axiosInstance.delete(`/branches/${id}`);
     return response.data;
   } catch (error) {

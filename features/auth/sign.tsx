@@ -190,19 +190,19 @@ export default function SignInViewPage() {
     </svg>
   </div>
 
-  <div>
-    <h2 className="login-brand__name">BuildTrack</h2>
-    <p className="login-brand__tagline">
-      Construction Management System
-    </p>
-  </div>
+<div>
+  <h2 className="login-brand__name">ikiz Curtain</h2>
+  <p className="login-brand__tagline">
+    Curtain Management System
+  </p>
+</div>
 </div>
 
 {/* Quote */}
 <div className="login-hero__quote">
   <blockquote>
-    &ldquo;Manage projects, teams, materials, and construction progress
-    efficiently in one platform.&rdquo;
+    &ldquo;Manage curtain orders, fabrics, measurements, installations,
+    and customer projects with elegance and efficiency.&rdquo;
   </blockquote>
 </div>
 
@@ -349,7 +349,7 @@ export default function SignInViewPage() {
         </div>
 
         <p className="login-copyright">
-          © {new Date().getFullYear()} Car Stock Management. All rights reserved.
+          © {new Date().getFullYear()} ikiz curtain Management. All rights reserved.
         </p>
       </div>
 
@@ -358,114 +358,179 @@ export default function SignInViewPage() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
         /* ── Theme Tokens ─────────────────────────── */
-        :root {
-  --login-bg: #f5f8ff;
-  --login-panel-bg: linear-gradient(145deg, #eef4ff 0%, #f5f8ff 50%, #edf3ff 100%);
-  --login-card-bg: linear-gradient(160deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%);
-  --login-card-border: rgba(0, 0, 0, 0.08);
-  --login-card-shadow: 0 0 0 1px rgba(59,130,246,0.06), 0 20px 60px rgba(0,0,0,0.08), 0 0 80px rgba(59,130,246,0.03);
-  --login-title: #1a1a2e;
-  --login-subtitle: rgba(0, 0, 0, 0.45);
-  --login-label: rgba(0, 0, 0, 0.55);
-  --login-accent: #2563eb;
-  --login-input-bg: rgba(0, 0, 0, 0.03);
-  --login-input-border: rgba(0, 0, 0, 0.1);
-  --login-input-text: #1a1a2e;
-  --login-input-placeholder: rgba(0, 0, 0, 0.3);
-  --login-input-focus-bg: rgba(37, 99, 235, 0.04);
-  --login-input-focus-border: rgba(37, 99, 235, 0.45);
-  --login-input-focus-ring: rgba(37, 99, 235, 0.1);
-  --login-input-focus-glow: rgba(37, 99, 235, 0.06);
-  --login-icon: rgba(0, 0, 0, 0.3);
-  --login-icon-active: rgba(37, 99, 235, 0.75);
-  --login-toggle: rgba(0, 0, 0, 0.3);
-  --login-toggle-hover: rgba(37, 99, 235, 0.8);
-  --login-checkbox-text: rgba(0, 0, 0, 0.5);
-  --login-checkbox-border: rgba(0, 0, 0, 0.18);
-  --login-checkbox-check-bg: #0a0a0f;
-  --login-forgot: #2563eb;
-  --login-btn-bg: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  --login-btn-text: #ffffff;
-  --login-btn-hover-shadow: 0 8px 24px rgba(37,99,235,0.25), 0 0 60px rgba(37,99,235,0.08);
-  --login-btn-disabled-bg: rgba(0, 0, 0, 0.06);
-  --login-btn-disabled-text: rgba(0, 0, 0, 0.3);
-  --login-error-bg: rgba(239, 68, 68, 0.06);
-  --login-error-border: rgba(239, 68, 68, 0.15);
+       :root {
+  --login-bg: #f8f5ef;
+  --login-panel-bg: linear-gradient(145deg, #f6f1e7 0%, #f8f5ef 50%, #efe7d7 100%);
+  --login-card-bg: linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(255,248,235,0.85) 100%);
+  --login-card-border: rgba(180, 140, 60, 0.18);
+
+  --login-card-shadow:
+    0 0 0 1px rgba(212,175,55,0.08),
+    0 20px 60px rgba(0,0,0,0.08),
+    0 0 80px rgba(212,175,55,0.06);
+
+  --login-title: #2d2416;
+  --login-subtitle: rgba(60, 45, 20, 0.55);
+  --login-label: rgba(60, 45, 20, 0.7);
+
+  --login-accent: #d4af37;
+
+  --login-input-bg: rgba(212,175,55,0.05);
+  --login-input-border: rgba(180,140,60,0.18);
+
+  --login-input-text: #2d2416;
+  --login-input-placeholder: rgba(60,45,20,0.35);
+
+  --login-input-focus-bg: rgba(212,175,55,0.08);
+  --login-input-focus-border: rgba(212,175,55,0.55);
+  --login-input-focus-ring: rgba(212,175,55,0.12);
+  --login-input-focus-glow: rgba(212,175,55,0.12);
+
+  --login-icon: rgba(90,70,30,0.45);
+  --login-icon-active: #d4af37;
+
+  --login-toggle: rgba(90,70,30,0.4);
+  --login-toggle-hover: #d4af37;
+
+  --login-checkbox-text: rgba(60,45,20,0.55);
+  --login-checkbox-border: rgba(180,140,60,0.28);
+  --login-checkbox-check-bg: #ffffff;
+
+  --login-forgot: #b8891f;
+
+  --login-btn-bg: linear-gradient(135deg, #f4d06f 0%, #c89b2c 100%);
+  --login-btn-text: #2d2416;
+
+  --login-btn-hover-shadow:
+    0 8px 24px rgba(212,175,55,0.35),
+    0 0 60px rgba(212,175,55,0.15);
+
+  --login-btn-disabled-bg: rgba(0,0,0,0.06);
+  --login-btn-disabled-text: rgba(0,0,0,0.3);
+
+  --login-error-bg: rgba(239,68,68,0.06);
+  --login-error-border: rgba(239,68,68,0.15);
   --login-error-text: #dc2626;
-  --login-secure: rgba(0, 0, 0, 0.3);
-  --login-secure-icon: rgba(22, 163, 74, 0.7);
-  --login-copyright: rgba(0, 0, 0, 0.25);
-  --login-particle: rgba(37, 99, 235, 0.4);
-  --login-hero-overlay-a: rgba(245, 248, 255, 0.8);
-  --login-hero-overlay-b: rgba(245, 248, 255, 0.5);
-  --login-hero-overlay-c: rgba(245, 248, 255, 0.3);
-  --login-hero-vignette-radial: rgba(37, 99, 235, 0.06);
-  --login-hero-vignette-edge: rgba(245, 248, 255, 0.85);
-  --login-brand-icon: #2563eb;
-  --login-brand-name: #1a1a2e;
-  --login-brand-tagline: rgba(0, 0, 0, 0.45);
-  --login-quote: rgba(0, 0, 0, 0.7);
-  --login-quote-border: rgba(37, 99, 235, 0.45);
-  --login-stat-value: #2563eb;
-  --login-stat-label: rgba(0, 0, 0, 0.4);
-  --login-stat-divider: rgba(0, 0, 0, 0.08);
-  --login-stats-border: rgba(0, 0, 0, 0.06);
-  --login-mobile-brand: #2563eb;
+
+  --login-secure: rgba(60,45,20,0.45);
+  --login-secure-icon: #d4af37;
+
+  --login-copyright: rgba(60,45,20,0.35);
+
+  --login-particle: rgba(212,175,55,0.55);
+
+  --login-hero-overlay-a: rgba(28,22,12,0.72);
+  --login-hero-overlay-b: rgba(28,22,12,0.48);
+  --login-hero-overlay-c: rgba(28,22,12,0.28);
+
+  --login-hero-vignette-radial: rgba(212,175,55,0.12);
+  --login-hero-vignette-edge: rgba(28,22,12,0.82);
+
+  --login-brand-icon: #d4af37;
+  --login-brand-name: #f8f5ef;
+  --login-brand-tagline: rgba(255,248,235,0.72);
+
+  --login-quote: rgba(255,248,235,0.92);
+  --login-quote-border: rgba(212,175,55,0.65);
+
+  --login-stat-value: #f4d06f;
+  --login-stat-label: rgba(255,248,235,0.6);
+  --login-stat-divider: rgba(255,248,235,0.12);
+  --login-stats-border: rgba(255,248,235,0.08);
+
+  --login-mobile-brand: #c89b2c;
 }
 
 .dark {
-  --login-bg: #020617;
-  --login-panel-bg: linear-gradient(145deg, #020617 0%, #020617 50%, #020617 100%);
-  --login-card-bg: linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
-  --login-card-border: rgba(255, 255, 255, 0.08);
-  --login-card-shadow: 0 0 0 1px rgba(59,130,246,0.05), 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(59,130,246,0.03);
-  --login-title: #ffffff;
-  --login-subtitle: rgba(255, 255, 255, 0.4);
-  --login-label: rgba(255, 255, 255, 0.55);
-  --login-accent: #3b82f6;
-  --login-input-bg: rgba(255, 255, 255, 0.04);
-  --login-input-border: rgba(255, 255, 255, 0.08);
+  --login-bg: #0f0b05;
+
+  --login-panel-bg:
+    linear-gradient(145deg, #0f0b05 0%, #151008 50%, #1d160b 100%);
+
+  --login-card-bg:
+    linear-gradient(160deg,
+      rgba(255,255,255,0.06) 0%,
+      rgba(212,175,55,0.04) 100%);
+
+  --login-card-border: rgba(212,175,55,0.15);
+
+  --login-card-shadow:
+    0 0 0 1px rgba(212,175,55,0.08),
+    0 20px 60px rgba(0,0,0,0.6),
+    0 0 80px rgba(212,175,55,0.08);
+
+  --login-title: #fff8e7;
+  --login-subtitle: rgba(255,248,231,0.55);
+  --login-label: rgba(255,248,231,0.7);
+
+  --login-accent: #d4af37;
+
+  --login-input-bg: rgba(255,255,255,0.03);
+  --login-input-border: rgba(212,175,55,0.12);
+
   --login-input-text: #ffffff;
-  --login-input-placeholder: rgba(255, 255, 255, 0.2);
-  --login-input-focus-bg: rgba(59, 130, 246, 0.04);
-  --login-input-focus-border: rgba(59, 130, 246, 0.4);
-  --login-input-focus-ring: rgba(59, 130, 246, 0.08);
-  --login-input-focus-glow: rgba(59, 130, 246, 0.05);
-  --login-icon: rgba(255, 255, 255, 0.25);
-  --login-icon-active: rgba(59, 130, 246, 0.7);
-  --login-toggle: rgba(255, 255, 255, 0.3);
-  --login-toggle-hover: rgba(59, 130, 246, 0.8);
-  --login-checkbox-text: rgba(255, 255, 255, 0.45);
-  --login-checkbox-border: rgba(255, 255, 255, 0.15);
-  --login-checkbox-check-bg: #020617;
-  --login-forgot: #3b82f6;
-  --login-btn-bg: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  --login-btn-text: #ffffff;
-  --login-btn-hover-shadow: 0 8px 24px rgba(59,130,246,0.3), 0 0 60px rgba(59,130,246,0.1);
-  --login-btn-disabled-bg: rgba(255, 255, 255, 0.08);
-  --login-btn-disabled-text: rgba(255, 255, 255, 0.35);
-  --login-error-bg: rgba(239, 68, 68, 0.08);
-  --login-error-border: rgba(239, 68, 68, 0.2);
+  --login-input-placeholder: rgba(255,255,255,0.22);
+
+  --login-input-focus-bg: rgba(212,175,55,0.05);
+  --login-input-focus-border: rgba(212,175,55,0.4);
+  --login-input-focus-ring: rgba(212,175,55,0.08);
+  --login-input-focus-glow: rgba(212,175,55,0.08);
+
+  --login-icon: rgba(255,248,231,0.3);
+  --login-icon-active: #f4d06f;
+
+  --login-toggle: rgba(255,255,255,0.35);
+  --login-toggle-hover: #f4d06f;
+
+  --login-checkbox-text: rgba(255,248,231,0.55);
+  --login-checkbox-border: rgba(212,175,55,0.22);
+  --login-checkbox-check-bg: #0f0b05;
+
+  --login-forgot: #f4d06f;
+
+  --login-btn-bg:
+    linear-gradient(135deg, #f4d06f 0%, #b8891f 100%);
+
+  --login-btn-text: #1a1408;
+
+  --login-btn-hover-shadow:
+    0 8px 24px rgba(212,175,55,0.3),
+    0 0 60px rgba(212,175,55,0.15);
+
+  --login-btn-disabled-bg: rgba(255,255,255,0.08);
+  --login-btn-disabled-text: rgba(255,255,255,0.35);
+
+  --login-error-bg: rgba(239,68,68,0.08);
+  --login-error-border: rgba(239,68,68,0.2);
   --login-error-text: #f87171;
-  --login-secure: rgba(255, 255, 255, 0.25);
-  --login-secure-icon: rgba(74, 222, 128, 0.6);
-  --login-copyright: rgba(255, 255, 255, 0.2);
-  --login-particle: rgba(59, 130, 246, 0.6);
-  --login-hero-overlay-a: rgba(2, 6, 23, 0.85);
-  --login-hero-overlay-b: rgba(2, 6, 23, 0.55);
-  --login-hero-overlay-c: rgba(2, 6, 23, 0.35);
-  --login-hero-vignette-radial: rgba(59, 130, 246, 0.08);
-  --login-hero-vignette-edge: rgba(2, 6, 23, 0.9);
-  --login-brand-icon: #3b82f6;
-  --login-brand-name: #ffffff;
-  --login-brand-tagline: rgba(255, 255, 255, 0.45);
-  --login-quote: rgba(255, 255, 255, 0.85);
-  --login-quote-border: rgba(59, 130, 246, 0.5);
-  --login-stat-value: #3b82f6;
-  --login-stat-label: rgba(255, 255, 255, 0.4);
-  --login-stat-divider: rgba(255, 255, 255, 0.1);
-  --login-stats-border: rgba(255, 255, 255, 0.08);
-  --login-mobile-brand: #3b82f6;
+
+  --login-secure: rgba(255,248,231,0.4);
+  --login-secure-icon: #f4d06f;
+
+  --login-copyright: rgba(255,248,231,0.28);
+
+  --login-particle: rgba(212,175,55,0.65);
+
+  --login-hero-overlay-a: rgba(0,0,0,0.72);
+  --login-hero-overlay-b: rgba(15,11,5,0.58);
+  --login-hero-overlay-c: rgba(15,11,5,0.35);
+
+  --login-hero-vignette-radial: rgba(212,175,55,0.1);
+  --login-hero-vignette-edge: rgba(0,0,0,0.88);
+
+  --login-brand-icon: #f4d06f;
+  --login-brand-name: #fff8e7;
+  --login-brand-tagline: rgba(255,248,231,0.68);
+
+  --login-quote: rgba(255,248,231,0.92);
+  --login-quote-border: rgba(212,175,55,0.55);
+
+  --login-stat-value: #f4d06f;
+  --login-stat-label: rgba(255,248,231,0.55);
+  --login-stat-divider: rgba(255,248,231,0.12);
+  --login-stats-border: rgba(255,248,231,0.08);
+
+  --login-mobile-brand: #f4d06f;
 }
         .login-root {
           display: flex;
@@ -679,7 +744,7 @@ export default function SignInViewPage() {
         }
         @media (max-width: 1023px) {
           .login-form-panel::before {
-            content: 'Car Stock'; display: block; position: absolute; top: 32px; left: 50%;
+            content: 'ikiz curtain'; display: block; position: absolute; top: 32px; left: 50%;
             transform: translateX(-50%); font-size: 20px; font-weight: 600;
             color: var(--login-mobile-brand); letter-spacing: 0.5px; font-family: 'Inter', sans-serif;
           }

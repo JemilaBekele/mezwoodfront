@@ -5,6 +5,7 @@ import { DataTableColumnHeader } from '@/components/ui/table/data-table-column-h
 import { PurchaseCellAction } from './cell-action';
 import { IPurchase, PaymentStatus } from '@/models/purchase';
 import { Badge } from '@/components/ui/badge';
+import { useRouter } from 'next/navigation';
 
 export const purchaseColumns: ColumnDef<IPurchase>[] = [
   {
@@ -12,11 +13,20 @@ export const purchaseColumns: ColumnDef<IPurchase>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Invoice No' />
     ),
-    cell: ({ cell }) => (
-      <div className='font-medium'>
-        {cell.getValue<IPurchase['invoiceNo']>()}
+    cell: ({ cell, row }) => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const router = useRouter();
+    const invoiceNo = cell.getValue<IPurchase['invoiceNo']>();
+    
+    return (
+      <div 
+        className='font-medium cursor-pointer hover:text-primary hover:underline'
+        onClick={() => router.push(`/dashboard/purchase/view?id=${row.original.id}`)}
+      >
+        {invoiceNo}
       </div>
-    ),
+    );
+  },
     enableColumnFilter: true
   },
   {

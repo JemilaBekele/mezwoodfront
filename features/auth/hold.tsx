@@ -160,7 +160,7 @@ export default function SignInViewPage() {
               </svg>
             </div>
             <div>
-              <h2 className="login-brand__name">Car Stock</h2>
+              <h2 className="login-brand__name">ikiz curtain</h2>
               <p className="login-brand__tagline">Inventory Management System</p>
             </div>
           </div>
@@ -314,7 +314,7 @@ export default function SignInViewPage() {
         </div>
 
         <p className="login-copyright">
-          © {new Date().getFullYear()} Car Stock Management. All rights reserved.
+          © {new Date().getFullYear()} ikiz curtain Management. All rights reserved.
         </p>
       </div>
 
@@ -644,7 +644,7 @@ export default function SignInViewPage() {
         }
         @media (max-width: 1023px) {
           .login-form-panel::before {
-            content: 'Car Stock'; display: block; position: absolute; top: 32px; left: 50%;
+            content: 'ikiz curtain'; display: block; position: absolute; top: 32px; left: 50%;
             transform: translateX(-50%); font-size: 20px; font-weight: 600;
             color: var(--login-mobile-brand); letter-spacing: 0.5px; font-family: 'Inter', sans-serif;
           }

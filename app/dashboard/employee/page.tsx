@@ -30,31 +30,30 @@ export default async function EmployeePage(props: pageProps) {
   // const key = serialize({ ...searchParams });
 
   return (
-    <PermissionGuard requiredPermission={PERMISSIONS.EMPLOYEE.VIEW_ALL.name}>
-      <PageContainer scrollable={false}>
-        <div className='flex flex-1 flex-col space-y-4'>
-          <div className='flex items-start justify-between'>
-            <Heading title='Employee' description='Manage Employee ' />
-            <PermissionGuard requiredPermission={PERMISSIONS.EMPLOYEE.CREATE.name}>
-              <Link
-                href='/dashboard/employee/new'
-                className={cn(buttonVariants(), 'text-xs md:text-sm')}
-              >
-                <IconPlus className='mr-2 h-4 w-4' /> Add New
-              </Link>
-            </PermissionGuard>
-          </div>
-          <Separator />
-          <UserTableAction />
-          <Suspense
-            fallback={
-              <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
-            }
-          >
-            <EmployeeListingPage />
-          </Suspense>
+    <PageContainer scrollable={false}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+          <Heading title='Employee' description='Manage Employee ' />
+          <PermissionGuard requiredPermission={PERMISSIONS.Employee.VIEW.name}>
+            <Link
+              href='/dashboard/employee/new'
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+              <IconPlus className='mr-2 h-4 w-4' /> Add New
+            </Link>{' '}
+          </PermissionGuard>
         </div>
-      </PageContainer>
-    </PermissionGuard>
+        <Separator />
+        <UserTableAction />
+        <Suspense
+          // key={key}
+          fallback={
+            <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
+          }
+        >
+          <EmployeeListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
   );
 }

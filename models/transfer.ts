@@ -2,18 +2,22 @@ import { IEmployee } from './employee';
 import { IProduct } from './Product';
 import { IShop } from './shop';
 import { IStore } from './store';
+import { IUnitOfMeasure } from './UnitOfMeasure';
 
 // Types
 export interface ITransferItem {
   id: string;
   transferId: string;
   productId: string;
-  batchId: string;
-  isBox: boolean; // ✅ Box or Piece
-  quantity: number;
-  unitOfMeasureId: string; // foreign key
-  
-  product: IProduct;
+    product: IProduct;
+
+  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
+  height?: number;
+  width?: number;
+
+  // can work piece-based items
+  quantity: number;  unitOfMeasureId: string; // foreign key
+  unitOfMeasure?: IUnitOfMeasure;
 }
 
 export enum TransferEntityType {
@@ -30,6 +34,8 @@ export enum TransferStatus {
 export interface ITransfer {
   id: string;
   reference?: string;
+  shortCode?: string;
+  
   sourceType: TransferEntityType;
   sourceStoreId?: string;
   sourceShopId?: string;

@@ -130,6 +130,7 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
   const handleStatusUpdate = async (action: 'complete' | 'cancel') => {
     if (!id) return;
 
+    // Double-check access for completion
     if (action === 'complete' && !hasDestinationAccess) {
       toast.error('You do not have access to complete this transfer');
       return;
@@ -164,6 +165,7 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
   };
 
   const openCompleteModal = () => {
+    // Check access before opening modal
     if (!hasDestinationAccess) {
       toast.error('You do not have access to the destination shop/store');
       return;
@@ -175,7 +177,19 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
     setIsCancelModalOpen(true);
   };
 
-  if (!hydrated || loading || !userProfile) {
+  // Helper function to format product display with color
+  const formatProductDisplay = (item: ITransferItem): string => {
+    const productName = item.product?.name || 'Unknown Product';
+    const colourName = item.product?.colour?.name;
+    
+    if (colourName) {
+      return `${productName} - ${colourName}`;
+    }
+    return productName;
+  };
+
+  // Show loading if still fetching user profile
+  if (loading || !userProfile) {
     return (
       <div className='flex h-screen items-center justify-center'>
         <Loader2 className='mr-2 h-8 w-8 animate-spin' />
@@ -196,6 +210,7 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
   const totalQuantity =
     transfer.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
 
+  // Check if transfer is completed or cancelled
   const isImmutable =
     transfer.status === TransferStatus.COMPLETED ||
     transfer.status === TransferStatus.CANCELLED;
@@ -227,7 +242,7 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
         variant='destructive'
       />
 
-      {/* Transfer Status Update Section */}
+      {/* Transfer Status Update Section - Only show if not completed or cancelled */}
       {!isImmutable && (
         <Card className='shadow-lg'>
           <CardHeader>
@@ -238,13 +253,16 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
           <CardContent>
             <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-center'>
               <div className='flex w-full gap-2 sm:w-auto'>
+                {/* Complete Transfer Button - Conditionally shown based on destination access */}
                 {hasDestinationAccess ? (
-                  <PermissionGuard fallback="hide"
+                  <PermissionGuard
                     requiredPermission={PERMISSIONS.TRANSFER.COMPLETE.name}
                   >
                     <Button
                       onClick={openCompleteModal}
-                      disabled={updating || transfer.status === TransferStatus.COMPLETED}
+                      disabled={
+                        updating || transfer.status === TransferStatus.COMPLETED
+                      }
                       className='w-full sm:w-auto'
                     >
                       {updating ? (
@@ -261,6 +279,7 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
                     </Button>
                   </PermissionGuard>
                 ) : (
+                  // Show disabled button with tooltip or alternative message
                   <div className='relative group'>
                     <Button
                       disabled
@@ -275,13 +294,16 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
                   </div>
                 )}
 
-                <PermissionGuard fallback="hide"
+                {/* Cancel Transfer Button - Always visible if user has permission */}
+                <PermissionGuard
                   requiredPermission={PERMISSIONS.TRANSFER.CANCEL.name}
                 >
                   <Button
                     variant='destructive'
                     onClick={openCancelModal}
-                    disabled={updating || transfer.status === TransferStatus.CANCELLED}
+                    disabled={
+                      updating || transfer.status === TransferStatus.CANCELLED
+                    }
                     className='w-full sm:w-auto'
                   >
                     {updating ? (
@@ -441,99 +463,53 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
             </div>
           </div>
 
-          {/* Transfer Items Table Section - Updated for isBox */}
-          {transfer.items?.length > 0 && (
-            <div className='space-y-4'>
-              <h3 className='text-lg font-semibold'>Transfer Items</h3>
-              
-              {/* Desktop Table */}
-              <div className='hidden md:block'>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead>Quantity</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transfer.items.map((item: ITransferItem) => (
-                      <TableRow key={item.id}>
-                        <TableCell className='font-medium'>
-                          {item.product?.name || 'Unknown Product'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={item.isBox ? 'default' : 'secondary'} className='text-xs'>
-                            {item.isBox ? (
-                              <>
-                                <Box className='mr-1 h-3 w-3' />
-                                Box
-                              </>
-                            ) : (
-                              <>
-                                <PackageOpen className='mr-1 h-3 w-3' />
-                                Piece
-                              </>
-                            )}
-                          </Badge>
-                        </TableCell>
-                                   <TableCell className='whitespace-nowrap text-xs md:text-sm'>
-                                     <div className='text-sm text-muted-foreground'>
-                                       {item.product.unitOfMeasure?.symbol || ''}
-                                     </div>
-                                   </TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Mobile Cards */}
-              <div className='md:hidden space-y-3'>
-                {transfer.items.map((item: ITransferItem) => (
-                  <div 
-                    key={item.id} 
-                    className='bg-white border rounded-lg p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700'
-                  >
-                    <div className='space-y-3'>
-                      <div>
-                        <p className='text-sm font-medium text-gray-500'>Product</p>
-                        <p className='font-medium'>{item.product?.name || 'Unknown Product'}</p>
-                      </div>
-                      <div className='grid grid-cols-2 gap-3'>
-                        <div>
-                          <p className='text-sm font-medium text-gray-500'>Type</p>
-                          <Badge variant={item.isBox ? 'default' : 'secondary'} className='text-xs mt-1'>
-                            {item.isBox ? (
-                              <>
-                                <Box className='mr-1 h-3 w-3' />
-                                Box
-                              </>
-                            ) : (
-                              <>
-                                <PackageOpen className='mr-1 h-3 w-3' />
-                                Piece
-                              </>
-                            )}
-                          </Badge>
-                        </div>
-                        <div>
-                          <p className='text-sm font-medium text-gray-500'>Quantity</p>
-                          <p>{item.quantity}</p>
-                        </div>
-                        <div>
-                          <p className='text-sm font-medium text-gray-500'>Unit</p>
-                                       {item.product.unitOfMeasure?.symbol || ''}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Transfer Items Table Section */}
+        {transfer.items?.length > 0 && (
+  <div className='space-y-4'>
+    <h3 className='text-lg font-semibold'>Transfer Items</h3>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Product</TableHead>
+          <TableHead>Dimensions</TableHead>
+          <TableHead>Unit</TableHead>
+          <TableHead className='text-right'>Quantity</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {transfer.items.map((item: ITransferItem) => {
+          const area = item.height && item.width 
+            ? (item.height * item.width * item.quantity).toFixed(2)
+            : null;
+          
+          return (
+            <TableRow key={item.id}>
+              <TableCell className='font-medium'>
+                {formatProductDisplay(item)}
+              </TableCell>
+              <TableCell>
+                {item.height && item.width ? (
+                  <span className='inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'>
+                    {item.height} × {item.width}
+                  </span>
+                ) : (
+                  <span className='text-muted-foreground text-sm'>—</span>
+                )}
+              </TableCell>
+           
+              <TableCell>
+                {item.unitOfMeasure?.name || 'Unknown Unit'}
+              </TableCell>
+              <TableCell className='text-right font-medium'>
+                {item.quantity}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  </div>
+)}
         </CardContent>
       </Card>
     </div>

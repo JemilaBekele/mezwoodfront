@@ -26,6 +26,16 @@ export const unitOfMeasureColumns: ColumnDef<IUnitOfMeasure>[] = [
     enableColumnFilter: true
   },
   {
+    accessorKey: 'base',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Base Unit' />
+    ),
+    cell: ({ cell }) => (
+      <div>{cell.getValue<IUnitOfMeasure['base']>() ? 'Yes' : 'No'}</div>
+    ),
+    enableColumnFilter: true
+  },
+  {
     accessorKey: 'createdAt',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Created At' />

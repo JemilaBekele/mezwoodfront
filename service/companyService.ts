@@ -1,9 +1,10 @@
 import { axiosInstance } from "./axiosIntance";
-import { ICompany } from "@/models/employee";
+import { ICompany } from '@/models/employee';
 
 // Get all companies
 export const getCompanies = async () => {
   try {
+    
     const response = await axiosInstance.get(`/companies`);
     return response.data.companies as ICompany[];
   } catch (error) {
@@ -23,12 +24,17 @@ export const getCompanyById = async (id: string) => {
 
 // Create a company
 // Create a company
-export const createCompany = async (data: ICompany | FormData) => {
+export const createCompany = async (
+  data: ICompany | FormData,
+  
+) => {
   try {
+    
+
     // Check if data is FormData
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.post(`/companies`, data, config);
@@ -42,12 +48,15 @@ export const createCompany = async (data: ICompany | FormData) => {
 export const updateCompany = async (
   id: string,
   data: Partial<ICompany> | FormData,
+  
 ) => {
   try {
+    
+
     // Check if data is FormData
     const config =
       data instanceof FormData
-        ? { headers: { "Content-Type": "multipart/form-data" } }
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
         : {};
 
     const response = await axiosInstance.put(`/companies/${id}`, data, config);
@@ -58,8 +67,9 @@ export const updateCompany = async (
 };
 
 // Delete a company
-export const deleteCompany = async (id: string) => {
+export const deleteCompany = async (id: string, ) => {
   try {
+    
     const response = await axiosInstance.delete(`/companies/${id}`);
     return response.data;
   } catch (error) {
