@@ -222,37 +222,45 @@ export default function CurtainMeasurementForm({
   };
 
   // Helper to calculate curtain size based on the rules
-  const calculateCurtainSize = useCallback((width: number, height: number, size: 'NORMAL' | 'TWO_POINT_FIVE' | 'THREE' = 'NORMAL'): number => {
-    if (height < 3) {
-      return width * 3;
+const calculateCurtainSize = useCallback((width: number, height: number, size: 'NORMAL' | 'TWO_POINT_FIVE' | 'THREE' = 'NORMAL'): number => {
+  if (height < 3) {
+    return width * 3;
+  }
+  
+  // Get all heights from the table and sort them
+  const availableHeights = Object.keys(curtainMultiplierTable)
+    .map(Number)
+    .sort((a, b) => a - b);
+  
+  // Find the closest height that is >= to the given height
+  // But we need to find the exact match or the next lower height
+  let selectedHeight = 3;
+  
+  for (let i = 0; i < availableHeights.length; i++) {
+    const h = availableHeights[i];
+    if (height >= h) {
+      selectedHeight = h;
+    } else {
+      break;
     }
-    
-    const availableHeights = Object.keys(curtainMultiplierTable)
-      .map(Number)
-      .sort((a, b) => a - b);
-    
-    let selectedHeight = 3;
-    
-    for (const h of availableHeights) {
-      if (height >= h) {
-        selectedHeight = h;
-      } else {
-        break;
-      }
-    }
-    
-    let multiplier = 3;
-    
-    if (size === 'NORMAL') {
-      multiplier = 3;
-    } else if (size === 'TWO_POINT_FIVE') {
-      multiplier = curtainMultiplierTable[selectedHeight]?.TWO_POINT_FIVE || 3;
-    } else if (size === 'THREE') {
-      multiplier = curtainMultiplierTable[selectedHeight]?.THREE || 3.25;
-    }
-    
-    return width * multiplier;
-  }, [curtainMultiplierTable]);
+  }
+  
+  // For exact matches, use the exact height from the table
+  // For values between table entries, use the lower bound
+  let multiplier = 3;
+  
+  if (size === 'NORMAL') {
+    multiplier = 3;
+  } else if (size === 'TWO_POINT_FIVE') {
+    multiplier = curtainMultiplierTable[selectedHeight]?.TWO_POINT_FIVE || 3;
+  } else if (size === 'THREE') {
+    multiplier = curtainMultiplierTable[selectedHeight]?.THREE || 3.25;
+  }
+  
+  console.log(`Height: ${height}, Selected Height: ${selectedHeight}, Size: ${size}, Multiplier: ${multiplier}, Result: ${width * multiplier}`);
+  
+  return width * multiplier;
+}, [curtainMultiplierTable]);
 
   // Calculate final price based on formula
   const calculateFinalPrice = useCallback((measurement: any) => {
@@ -421,28 +429,29 @@ export default function CurtainMeasurementForm({
   const watchMeasurements = form.watch('measurements');
 
   // Update calculations when measurements change
-  useEffect(() => {
-    watchMeasurements.forEach((measurement, index) => {
-      if (measurement.width && measurement.height) {
-        const calculated = calculateFinalPrice(measurement);
-        
-        form.setValue(`measurements.${index}.curtainSize`, calculated.curtainSize);
-        if (measurement.includeThickCurtain) {
-          form.setValue(`measurements.${index}.thickMeter`, calculated.thickMeter);
-        }
-        if (measurement.includeThinCurtain) {
-          form.setValue(`measurements.${index}.thinMeter`, calculated.thinMeter);
-        }
-        if (measurement.includeCurtainPole) {
-          form.setValue(`measurements.${index}.curtainPoleQuantity`, calculated.curtainPoleQuantity);
-        }
-        if (measurement.includeWorkers) {
-          form.setValue(`measurements.${index}.totalWorkerMeter`, calculated.totalWorkerMeter);
-        }
-        form.setValue(`measurements.${index}.price`, calculated.finalPrice);
+  // Update calculations when measurements change
+useEffect(() => {
+  watchMeasurements.forEach((measurement, index) => {
+    if (measurement.width && measurement.height) {
+      const calculated = calculateFinalPrice(measurement);
+      
+      form.setValue(`measurements.${index}.curtainSize`, calculated.curtainSize);
+      if (measurement.includeThickCurtain) {
+        form.setValue(`measurements.${index}.thickMeter`, calculated.thickMeter);
       }
-    });
-  }, [watchMeasurements, calculateFinalPrice, form]);
+      if (measurement.includeThinCurtain) {
+        form.setValue(`measurements.${index}.thinMeter`, calculated.thinMeter);
+      }
+      if (measurement.includeCurtainPole) {
+        form.setValue(`measurements.${index}.curtainPoleQuantity`, calculated.curtainPoleQuantity);
+      }
+      if (measurement.includeWorkers) {
+        form.setValue(`measurements.${index}.totalWorkerMeter`, calculated.totalWorkerMeter);
+      }
+      form.setValue(`measurements.${index}.price`, calculated.finalPrice);
+    }
+  });
+}, [watchMeasurements, calculateFinalPrice, form]);
 
   // Fetch shops and employees on component mount
   useEffect(() => {
