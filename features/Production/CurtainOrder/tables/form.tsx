@@ -224,7 +224,9 @@ export default function CurtainMeasurementForm({
   // Helper to calculate curtain size based on the rules
 const calculateCurtainSize = useCallback((width: number, height: number, size: 'NORMAL' | 'TWO_POINT_FIVE' | 'THREE' = 'NORMAL'): number => {
   if (height < 2.90) {
-    return width * 3;
+    const result = width * 3;
+    // Round to 2 decimal places
+    return Math.round(result * 100) / 100;
   }
   
   // Get all heights from the table and sort them
@@ -257,9 +259,13 @@ const calculateCurtainSize = useCallback((width: number, height: number, size: '
     multiplier = curtainMultiplierTable[selectedHeight]?.THREE || 3.25;
   }
   
-  console.log(`Height: ${height}, Selected Height: ${selectedHeight}, Size: ${size}, Multiplier: ${multiplier}, Result: ${width * multiplier}`);
+  const result = width * multiplier;
+  // Round to 2 decimal places
+  const roundedResult = Math.round(result * 100) / 100;
   
-  return width * multiplier;
+  console.log(`Height: ${height}, Selected Height: ${selectedHeight}, Size: ${size}, Multiplier: ${multiplier}, Result: ${result}, Rounded: ${roundedResult}`);
+  
+  return roundedResult;
 }, [curtainMultiplierTable]);
 
   // Calculate final price based on formula

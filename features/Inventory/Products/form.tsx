@@ -482,7 +482,6 @@ export default function ProductForm({
                   />
                   
                   {/* Curtain-specific fields - only show if curtain category */}
-                  {isCurtainCategory && (
                     <>
                       <FormField
                         name='fabricName'
@@ -622,7 +621,7 @@ export default function ProductForm({
                         </RadioGroup>
                       </div>
                     </>
-                  )}
+                  
                   
                   <FormField
                     name='description'
