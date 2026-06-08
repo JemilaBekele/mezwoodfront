@@ -28,7 +28,8 @@ import { IProduct } from '@/models/Product';
 import { getStores } from '@/service/store';
 import {
   getProducts,
-  getUnitOfMeasuresByProductId
+  getUnitOfMeasuresByProductId,
+  getProductById
 } from '@/service/Product';
 import { createPurchase, updatePurchase } from '@/service/purchase';
 import { ISupplier } from '@/models/supplier';
@@ -39,7 +40,6 @@ import { Modal } from '@/components/ui/modal';
 import CreateSupplierModal from './suppliyer';
 import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
 import { format } from 'date-fns';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
 // TypeScript interfaces for form values
@@ -82,7 +82,8 @@ export default function PurchaseForm({
   const [isMounted, setIsMounted] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [loadingUOM, setLoadingUOM] = useState<{ [key: string]: boolean }>({});
-  const [itemTypes, setItemTypes] = useState<{ [key: number]: 'quantity' | 'dimension' }>({});
+  const [productDetails, setProductDetails] = useState<{ [key: string]: IProduct }>({});
+  const [loadingProductDetails, setLoadingProductDetails] = useState<{ [key: string]: boolean }>({});
   const router = useRouter();
 
   const form = useForm<FormValues>({
@@ -109,20 +110,26 @@ export default function PurchaseForm({
     }
   });
 
-  // Initialize item types from initial data
-  useEffect(() => {
-    if (initialData?.items) {
-      const types: { [key: number]: 'quantity' | 'dimension' } = {};
-      initialData.items.forEach((item, index) => {
-        if (item.height && item.width) {
-          types[index] = 'dimension';
-        } else {
-          types[index] = 'quantity';
-        }
-      });
-      setItemTypes(types);
+  // Function to check if product requires dimensions
+  const requiresDimensions = (product: IProduct | null | undefined): boolean => {
+    if (!product) return false;
+    return !!(product.thickCurtain || product.thinCurtain || product.poleCurtain);
+  };
+
+  // Fetch product details when product is selected
+  const fetchProductDetails = useCallback(async (productId: string) => {
+    if (!productId || productDetails[productId]) return;
+    
+    setLoadingProductDetails(prev => ({ ...prev, [productId]: true }));
+    try {
+      const product = await getProductById(productId);
+      setProductDetails(prev => ({ ...prev, [productId]: product }));
+    } catch (error) {
+      console.error('Failed to fetch product details:', error);
+    } finally {
+      setLoadingProductDetails(prev => ({ ...prev, [productId]: false }));
     }
-  }, [initialData]);
+  }, [productDetails]);
 
   // Calculate totals
   const items = form.watch('items');
@@ -215,6 +222,19 @@ export default function PurchaseForm({
     fetchUnitsOfMeasure
   ]);
 
+  // Fetch product details when product is selected
+  useEffect(() => {
+    items.forEach((item) => {
+      if (
+        item.productId &&
+        !productDetails[item.productId] &&
+        !loadingProductDetails[item.productId]
+      ) {
+        fetchProductDetails(item.productId);
+      }
+    });
+  }, [items, productDetails, loadingProductDetails, fetchProductDetails]);
+
   // Check if a product is already selected
   const isProductSelected = (productId: string, currentIndex: number): boolean => {
     return items.some((item, idx) => idx !== currentIndex && item.productId === productId);
@@ -301,7 +321,8 @@ export default function PurchaseForm({
     }
 
     data.items.forEach((item, index) => {
-      const itemType = itemTypes[index] || 'quantity';
+      const product = productDetails[item.productId];
+      const requiresDim = requiresDimensions(product);
 
       if (!item.productId || item.productId.trim() === '') {
         form.setError(`items.${index}.productId` as any, {
@@ -319,8 +340,14 @@ export default function PurchaseForm({
         isValid = false;
       }
 
-      // Quantity validation - only if quantity is provided
-      if (item.quantity !== undefined && (item.quantity < 0 || isNaN(item.quantity))) {
+      // Quantity validation
+      if (item.quantity === undefined || item.quantity === null || isNaN(item.quantity)) {
+        form.setError(`items.${index}.quantity` as any, {
+          type: 'manual',
+          message: 'Quantity is required'
+        });
+        isValid = false;
+      } else if (item.quantity < 0) {
         form.setError(`items.${index}.quantity` as any, {
           type: 'manual',
           message: 'Quantity must be 0 or greater'
@@ -328,25 +355,32 @@ export default function PurchaseForm({
         isValid = false;
       }
 
-      if (itemType === 'dimension') {
+      // FORCE height and width validation for products that require dimensions
+      if (requiresDim) {
         if (!item.height || item.height <= 0 || isNaN(item.height)) {
           form.setError(`items.${index}.height` as any, {
             type: 'manual',
-            message: 'Height must be greater than 0'
+            message: 'Height is required and must be greater than 0'
           });
           isValid = false;
         }
         if (!item.width || item.width <= 0 || isNaN(item.width)) {
           form.setError(`items.${index}.width` as any, {
             type: 'manual',
-            message: 'Width must be greater than 0'
+            message: 'Width is required and must be greater than 0'
           });
           isValid = false;
         }
       }
 
-      // Unit price validation - only if unit price is provided
-      if (item.unitPrice !== undefined && (item.unitPrice < 0 || isNaN(item.unitPrice))) {
+      // Unit price validation
+      if (item.unitPrice === undefined || item.unitPrice === null || isNaN(item.unitPrice)) {
+        form.setError(`items.${index}.unitPrice` as any, {
+          type: 'manual',
+          message: 'Unit price is required'
+        });
+        isValid = false;
+      } else if (item.unitPrice < 0) {
         form.setError(`items.${index}.unitPrice` as any, {
           type: 'manual',
           message: 'Unit price must be 0 or greater'
@@ -370,16 +404,19 @@ export default function PurchaseForm({
       const payload = {
         ...data,
         items: data.items.map((item, index) => {
-          const itemType = itemTypes[index] || 'quantity';
+          const product = productDetails[item.productId];
+          const requiresDim = requiresDimensions(product);
+          
           const baseItem = {
             productId: item.productId,
             unitOfMeasureId: item.unitOfMeasureId,
-            quantity: item.quantity !== undefined ? Number(item.quantity) : 0,
-            unitPrice: item.unitPrice !== undefined ? Number(item.unitPrice) : 0,
-            totalPrice: (item.quantity || 0) * (item.unitPrice || 0)
+            quantity: Number(item.quantity),
+            unitPrice: Number(item.unitPrice),
+            totalPrice: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
           };
 
-          if (itemType === 'dimension') {
+          // ALWAYS include dimensions for products that require them
+          if (requiresDim) {
             return {
               ...baseItem,
               height: Number(item.height),
@@ -460,20 +497,17 @@ export default function PurchaseForm({
     })
   };
 
-  // Function to delete item (always allowed)
+  // Function to delete item
   const deleteItem = (index: number, field: any) => {
     const newItems = [...field.value];
     newItems.splice(index, 1);
     field.onChange(newItems);
-    
-    // Update item types
-    const newTypes = { ...itemTypes };
-    delete newTypes[index];
-    const reindexedTypes: { [key: number]: 'quantity' | 'dimension' } = {};
-    Object.values(newTypes).forEach((type, i) => {
-      reindexedTypes[i] = type;
-    });
-    setItemTypes(reindexedTypes);
+  };
+
+  // Get if product requires dimensions
+  const productRequiresDimensions = (productId: string): boolean => {
+    const product = productDetails[productId];
+    return requiresDimensions(product);
   };
 
   if (!isMounted) {
@@ -617,137 +651,120 @@ export default function PurchaseForm({
                         <div className='hidden lg:grid lg:grid-cols-8 xl:grid-cols-9 gap-4 text-sm font-semibold'>
                           <div>Product</div>
                           <div>Unit</div>
-                          <div>Type</div>
                           <div>Qty</div>
-                          <div>Height</div>
-                          <div>Width</div>
+                          <div>Height *</div>
+                          <div>Width *</div>
                           <div>Price</div>
                           <div>Total</div>
                           <div>Action</div>
                         </div>
 
-                        {field.value.map((item, index) => (
-                          <div
-                            key={index}
-                            className='border rounded-lg p-4 lg:p-0 lg:border-none space-y-4 lg:space-y-0'
-                          >
-                            {/* Mobile view - stacked layout */}
-                            <div className='lg:hidden space-y-3'>
-                              <div className='flex justify-between items-start'>
-                                <Label className='font-semibold'>Product</Label>
-                                <Button
-                                  type='button'
-                                  variant='destructive'
-                                  size='sm'
-                                  onClick={() => deleteItem(index, field)}
-                                >
-                                  <IconTrash size={16} />
-                                </Button>
-                              </div>
-                              
-                              <div>
-                                <Label className='text-sm'>Product</Label>
-                                <Select
-                                  instanceId={`product-select-mobile-${index}`}
-                                  options={getAvailableProducts(index).map((product) => ({
-                                    value: product.id.toString(),
-                                    label: product.name
-                                  }))}
-                                  onChange={(newValue) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].productId = newValue?.value || '';
-                                    newItems[index].unitOfMeasureId = '';
-                                    field.onChange(newItems);
-                                    if (newValue?.value) {
-                                      fetchUnitsOfMeasure(newValue.value);
-                                    }
-                                  }}
-                                  value={products
-                                    .map((p) => ({
-                                      value: p.id.toString(),
-                                      label: p.name
-                                    }))
-                                    .find((p) => p.value === item.productId)}
-                                  placeholder='Search product'
-                                  isSearchable
-                                  isOptionDisabled={(option) => isProductSelected(option.value, index)}
-                                  styles={isDark ? darkStyles : {}}
-                                />
-                              </div>
-
-                              <div>
-                                <Label className='text-sm'>Unit</Label>
-                                <Select
-                                  instanceId={`uom-select-mobile-${index}`}
-                                  options={
-                                    Array.isArray(unitsOfMeasure[item.productId])
-                                      ? unitsOfMeasure[item.productId].map(
-                                          (uom) => ({
-                                            value: uom.id.toString(),
-                                            label: uom.name
-                                          })
-                                        )
-                                      : []
-                                  }
-                                  onChange={(newValue) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].unitOfMeasureId = newValue?.value || '';
-                                    field.onChange(newItems);
-                                  }}
-                                  value={
-                                    Array.isArray(unitsOfMeasure[item.productId])
-                                      ? unitsOfMeasure[item.productId]
-                                          .map((uom) => ({
-                                            value: uom.id.toString(),
-                                            label: uom.name
-                                          }))
-                                          ?.find(
-                                            (u) => u.value === item.unitOfMeasureId
-                                          )
-                                      : undefined
-                                  }
-                                  placeholder={
-                                    loadingUOM[item.productId]
-                                      ? 'Loading...'
-                                      : 'Select unit'
-                                  }
-                                  isSearchable
-                                  isDisabled={
-                                    !item.productId ||
-                                    loadingUOM[item.productId] ||
-                                    (Array.isArray(unitsOfMeasure[item.productId]) &&
-                                      unitsOfMeasure[item.productId].length === 1)
-                                  }
-                                  isLoading={loadingUOM[item.productId]}
-                                  styles={isDark ? darkStyles : {}}
-                                />
-                              </div>
-
-                              <div className='flex items-center space-x-2'>
-                                <Checkbox
-                                  id={`dimension-mobile-${index}`}
-                                  checked={itemTypes[index] === 'dimension'}
-                                  onCheckedChange={(checked) => {
-                                    setItemTypes(prev => ({
-                                      ...prev,
-                                      [index]: checked ? 'dimension' : 'quantity'
-                                    }));
-                                    if (!checked) {
+                        {field.value.map((item, index) => {
+                          const requiresDim = productRequiresDimensions(item.productId);
+                          const isLoadingProduct = item.productId && loadingProductDetails[item.productId];
+                          
+                          return (
+                            <div
+                              key={index}
+                              className='border rounded-lg p-4 lg:p-0 lg:border-none space-y-4 lg:space-y-0'
+                            >
+                              {/* Mobile view - stacked layout */}
+                              <div className='lg:hidden space-y-3'>
+                                <div className='flex justify-between items-start'>
+                                  <Label className='font-semibold'>Product</Label>
+                                  <Button
+                                    type='button'
+                                    variant='destructive'
+                                    size='sm'
+                                    onClick={() => deleteItem(index, field)}
+                                  >
+                                    <IconTrash size={16} />
+                                  </Button>
+                                </div>
+                                
+                                <div>
+                                  <Label className='text-sm'>Product *</Label>
+                                  <Select
+                                    instanceId={`product-select-mobile-${index}`}
+                                    options={getAvailableProducts(index).map((product) => ({
+                                      value: product.id.toString(),
+                                      label: product.name
+                                    }))}
+                                    onChange={(newValue) => {
                                       const newItems = [...field.value];
+                                      newItems[index].productId = newValue?.value || '';
+                                      newItems[index].unitOfMeasureId = '';
                                       newItems[index].height = undefined;
                                       newItems[index].width = undefined;
                                       field.onChange(newItems);
-                                    }
-                                  }}
-                                />
-                                <Label htmlFor={`dimension-mobile-${index}`}>
-                                  Use Dimensions
-                                </Label>
-                              </div>
+                                      if (newValue?.value) {
+                                        fetchUnitsOfMeasure(newValue.value);
+                                        fetchProductDetails(newValue.value);
+                                      }
+                                    }}
+                                    value={products
+                                      .map((p) => ({
+                                        value: p.id.toString(),
+                                        label: p.name
+                                      }))
+                                      .find((p) => p.value === item.productId)}
+                                    placeholder='Search product'
+                                    isSearchable
+                                    isOptionDisabled={(option) => isProductSelected(option.value, index)}
+                                    styles={isDark ? darkStyles : {}}
+                                  />
+                                </div>
 
-                              <div className='grid grid-cols-2 gap-3'>
                                 <div>
-                                  <Label className='text-sm'>Quantity</Label>
+                                  <Label className='text-sm'>Unit *</Label>
+                                  <Select
+                                    instanceId={`uom-select-mobile-${index}`}
+                                    options={
+                                      Array.isArray(unitsOfMeasure[item.productId])
+                                        ? unitsOfMeasure[item.productId].map(
+                                            (uom) => ({
+                                              value: uom.id.toString(),
+                                              label: uom.name
+                                            })
+                                          )
+                                        : []
+                                    }
+                                    onChange={(newValue) => {
+                                      const newItems = [...field.value];
+                                      newItems[index].unitOfMeasureId = newValue?.value || '';
+                                      field.onChange(newItems);
+                                    }}
+                                    value={
+                                      Array.isArray(unitsOfMeasure[item.productId])
+                                        ? unitsOfMeasure[item.productId]
+                                            .map((uom) => ({
+                                              value: uom.id.toString(),
+                                              label: uom.name
+                                            }))
+                                            ?.find(
+                                              (u) => u.value === item.unitOfMeasureId
+                                            )
+                                        : undefined
+                                    }
+                                    placeholder={
+                                      loadingUOM[item.productId]
+                                        ? 'Loading...'
+                                        : 'Select unit'
+                                    }
+                                    isSearchable
+                                    isDisabled={
+                                      !item.productId ||
+                                      loadingUOM[item.productId] ||
+                                      (Array.isArray(unitsOfMeasure[item.productId]) &&
+                                        unitsOfMeasure[item.productId].length === 1)
+                                    }
+                                    isLoading={loadingUOM[item.productId]}
+                                    styles={isDark ? darkStyles : {}}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Label className='text-sm'>Quantity *</Label>
                                   <Input
                                     type='number'
                                     placeholder='Qty'
@@ -768,8 +785,45 @@ export default function PurchaseForm({
                                     }}
                                   />
                                 </div>
+
+                                {/* Height and Width - Required for curtain products */}
+                                {requiresDim && !isLoadingProduct && (
+                                  <>
+                                    <div>
+                                      <Label className='text-sm'>Height *</Label>
+                                      <Input
+                                        type='number'
+                                        min={0}
+                                        placeholder='Height (required)'
+                                        value={item.height || ''}
+                                        onChange={(e) => {
+                                          const newItems = [...field.value];
+                                          const height = Number(e.target.value);
+                                          newItems[index].height = isNaN(height) ? undefined : height;
+                                          field.onChange(newItems);
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className='text-sm'>Width *</Label>
+                                      <Input
+                                        type='number'
+                                        min={0}
+                                        placeholder='Width (required)'
+                                        value={item.width || ''}
+                                        onChange={(e) => {
+                                          const newItems = [...field.value];
+                                          const width = Number(e.target.value);
+                                          newItems[index].width = isNaN(width) ? undefined : width;
+                                          field.onChange(newItems);
+                                        }}
+                                      />
+                                    </div>
+                                  </>
+                                )}
+
                                 <div>
-                                  <Label className='text-sm'>Unit Price</Label>
+                                  <Label className='text-sm'>Unit Price *</Label>
                                   <Input
                                     type='number'
                                     placeholder='Price'
@@ -790,251 +844,195 @@ export default function PurchaseForm({
                                     }}
                                   />
                                 </div>
-                              </div>
 
-                              {itemTypes[index] === 'dimension' && (
-                                <div className='grid grid-cols-2 gap-3'>
-                                  <div>
-                                    <Label className='text-sm'>Height</Label>
-                                    <Input
-                                      type='number'
-                                      min={0}
-                                      placeholder='Height'
-                                      value={item.height || ''}
-                                      onChange={(e) => {
-                                        const newItems = [...field.value];
-                                        const height = Number(e.target.value);
-                                        newItems[index].height = isNaN(height) ? undefined : height;
-                                        field.onChange(newItems);
-                                      }}
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label className='text-sm'>Width</Label>
-                                    <Input
-                                      type='number'
-                                      min={0}
-                                      placeholder='Width'
-                                      value={item.width || ''}
-                                      onChange={(e) => {
-                                        const newItems = [...field.value];
-                                        const width = Number(e.target.value);
-                                        newItems[index].width = isNaN(width) ? undefined : width;
-                                        field.onChange(newItems);
-                                      }}
-                                    />
-                                  </div>
+                                <div className='flex justify-between items-center pt-2 border-t'>
+                                  <Label className='font-semibold'>Total</Label>
+                                  <span className='text-lg font-bold text-green-600'>
+                                    {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
+                                  </span>
                                 </div>
-                              )}
-
-                              <div className='flex justify-between items-center pt-2 border-t'>
-                                <Label className='font-semibold'>Total</Label>
-                                <span className='text-lg font-bold text-green-600'>
-                                  {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Desktop view - grid layout */}
-                            <div className='hidden lg:grid lg:grid-cols-8 xl:grid-cols-9 items-center gap-4'>
-                              <div>
-                                <Select
-                                  instanceId={`product-select-${index}`}
-                                  options={getAvailableProducts(index).map((product) => ({
-                                    value: product.id.toString(),
-                                    label: product.name
-                                  }))}
-                                  onChange={(newValue) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].productId = newValue?.value || '';
-                                    newItems[index].unitOfMeasureId = '';
-                                    field.onChange(newItems);
-                                    if (newValue?.value) {
-                                      fetchUnitsOfMeasure(newValue.value);
-                                    }
-                                  }}
-                                  value={products
-                                    .map((p) => ({
-                                      value: p.id.toString(),
-                                      label: p.name
-                                    }))
-                                    .find((p) => p.value === item.productId)}
-                                  placeholder='Search product'
-                                  isSearchable
-                                  isOptionDisabled={(option) => isProductSelected(option.value, index)}
-                                  styles={isDark ? darkStyles : {}}
-                                />
                               </div>
 
-                              <div>
-                                <Select
-                                  instanceId={`uom-select-${index}`}
-                                  options={
-                                    Array.isArray(unitsOfMeasure[item.productId])
-                                      ? unitsOfMeasure[item.productId].map(
-                                          (uom) => ({
-                                            value: uom.id.toString(),
-                                            label: uom.name
-                                          })
-                                        )
-                                      : []
-                                  }
-                                  onChange={(newValue) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].unitOfMeasureId = newValue?.value || '';
-                                    field.onChange(newItems);
-                                  }}
-                                  value={
-                                    Array.isArray(unitsOfMeasure[item.productId])
-                                      ? unitsOfMeasure[item.productId]
-                                          .map((uom) => ({
-                                            value: uom.id.toString(),
-                                            label: uom.name
-                                          }))
-                                          ?.find(
-                                            (u) => u.value === item.unitOfMeasureId
-                                          )
-                                      : undefined
-                                  }
-                                  placeholder={
-                                    loadingUOM[item.productId]
-                                      ? 'Loading units...'
-                                      : 'Select unit'
-                                  }
-                                  isSearchable
-                                  isDisabled={
-                                    !item.productId ||
-                                    loadingUOM[item.productId] ||
-                                    (Array.isArray(unitsOfMeasure[item.productId]) &&
-                                      unitsOfMeasure[item.productId].length === 1)
-                                  }
-                                  isLoading={loadingUOM[item.productId]}
-                                  styles={isDark ? darkStyles : {}}
-                                  noOptionsMessage={() => 'No units available'}
-                                />
-                              </div>
-
-                              <div>
-                                <div className='flex items-center space-x-2'>
-                                  <Checkbox
-                                    id={`dimension-${index}`}
-                                    checked={itemTypes[index] === 'dimension'}
-                                    onCheckedChange={(checked) => {
-                                      setItemTypes(prev => ({
-                                        ...prev,
-                                        [index]: checked ? 'dimension' : 'quantity'
-                                      }));
-                                      if (!checked) {
-                                        const newItems = [...field.value];
-                                        newItems[index].height = undefined;
-                                        newItems[index].width = undefined;
-                                        field.onChange(newItems);
+                              {/* Desktop view - grid layout */}
+                              <div className='hidden lg:grid lg:grid-cols-8 xl:grid-cols-8 items-center gap-4'>
+                                <div>
+                                  <Select
+                                    instanceId={`product-select-${index}`}
+                                    options={getAvailableProducts(index).map((product) => ({
+                                      value: product.id.toString(),
+                                      label: product.name
+                                    }))}
+                                    onChange={(newValue) => {
+                                      const newItems = [...field.value];
+                                      newItems[index].productId = newValue?.value || '';
+                                      newItems[index].unitOfMeasureId = '';
+                                      newItems[index].height = undefined;
+                                      newItems[index].width = undefined;
+                                      field.onChange(newItems);
+                                      if (newValue?.value) {
+                                        fetchUnitsOfMeasure(newValue.value);
+                                        fetchProductDetails(newValue.value);
                                       }
                                     }}
+                                    value={products
+                                      .map((p) => ({
+                                        value: p.id.toString(),
+                                        label: p.name
+                                      }))
+                                      .find((p) => p.value === item.productId)}
+                                    placeholder='Search product'
+                                    isSearchable
+                                    isOptionDisabled={(option) => isProductSelected(option.value, index)}
+                                    styles={isDark ? darkStyles : {}}
                                   />
-                                  <Label htmlFor={`dimension-${index}`}>
-                                    Dim
-                                  </Label>
+                                </div>
+
+                                <div>
+                                  <Select
+                                    instanceId={`uom-select-${index}`}
+                                    options={
+                                      Array.isArray(unitsOfMeasure[item.productId])
+                                        ? unitsOfMeasure[item.productId].map(
+                                            (uom) => ({
+                                              value: uom.id.toString(),
+                                              label: uom.name
+                                            })
+                                          )
+                                        : []
+                                    }
+                                    onChange={(newValue) => {
+                                      const newItems = [...field.value];
+                                      newItems[index].unitOfMeasureId = newValue?.value || '';
+                                      field.onChange(newItems);
+                                    }}
+                                    value={
+                                      Array.isArray(unitsOfMeasure[item.productId])
+                                        ? unitsOfMeasure[item.productId]
+                                            .map((uom) => ({
+                                              value: uom.id.toString(),
+                                              label: uom.name
+                                            }))
+                                            ?.find(
+                                              (u) => u.value === item.unitOfMeasureId
+                                            )
+                                        : undefined
+                                    }
+                                    placeholder={
+                                      loadingUOM[item.productId]
+                                        ? 'Loading units...'
+                                        : 'Select unit'
+                                    }
+                                    isSearchable
+                                    isDisabled={
+                                      !item.productId ||
+                                      loadingUOM[item.productId] ||
+                                      (Array.isArray(unitsOfMeasure[item.productId]) &&
+                                        unitsOfMeasure[item.productId].length === 1)
+                                    }
+                                    isLoading={loadingUOM[item.productId]}
+                                    styles={isDark ? darkStyles : {}}
+                                    noOptionsMessage={() => 'No units available'}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Input
+                                    type='number'
+                                    placeholder='Qty'
+                                    value={item.quantity === undefined ? '' : item.quantity}
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const value = e.target.value;
+                                      const quantity = value === '' ? undefined : Number(value);
+                                      if (quantity !== undefined && !isNaN(quantity) && quantity >= 0) {
+                                        newItems[index].quantity = quantity;
+                                        newItems[index].totalPrice = (quantity || 0) * (newItems[index].unitPrice || 0);
+                                      } else if (value === '') {
+                                        newItems[index].quantity = undefined;
+                                        newItems[index].totalPrice = 0;
+                                      }
+                                      field.onChange(newItems);
+                                      updateItemTotal(index);
+                                    }}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Input
+                                    type='number'
+                                    min={0}
+                                    placeholder='Height *'
+                                    value={item.height || ''}
+                                    required={requiresDim}
+                                    className={requiresDim ? 'border-red-300 focus:border-red-500' : ''}
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const height = Number(e.target.value);
+                                      newItems[index].height = isNaN(height) ? undefined : height;
+                                      field.onChange(newItems);
+                                    }}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Input
+                                    type='number'
+                                    min={0}
+                                    placeholder='Width *'
+                                    value={item.width || ''}
+                                    required={requiresDim}
+                                    className={requiresDim ? 'border-red-300 focus:border-red-500' : ''}
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const width = Number(e.target.value);
+                                      newItems[index].width = isNaN(width) ? undefined : width;
+                                      field.onChange(newItems);
+                                    }}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Input
+                                    type='number'
+                                    placeholder='Price'
+                                    value={item.unitPrice === undefined ? '' : item.unitPrice}
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const value = e.target.value;
+                                      const unitPrice = value === '' ? undefined : Number(value);
+                                      if (unitPrice !== undefined && !isNaN(unitPrice) && unitPrice >= 0) {
+                                        newItems[index].unitPrice = unitPrice;
+                                        newItems[index].totalPrice = (newItems[index].quantity || 0) * unitPrice;
+                                      } else if (value === '') {
+                                        newItems[index].unitPrice = undefined;
+                                        newItems[index].totalPrice = 0;
+                                      }
+                                      field.onChange(newItems);
+                                      updateItemTotal(index);
+                                    }}
+                                  />
+                                </div>
+
+                                <div className='flex items-center justify-center'>
+                                  <span className='text-sm font-medium'>
+                                    {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <Button
+                                    type='button'
+                                    variant='destructive'
+                                    size='sm'
+                                    onClick={() => deleteItem(index, field)}
+                                  >
+                                    <IconTrash size={16} />
+                                  </Button>
                                 </div>
                               </div>
-
-                              <div>
-                                <Input
-                                  type='number'
-                                  placeholder='Qty'
-                                  value={item.quantity === undefined ? '' : item.quantity}
-                                  onChange={(e) => {
-                                    const newItems = [...field.value];
-                                    const value = e.target.value;
-                                    const quantity = value === '' ? undefined : Number(value);
-                                    if (quantity !== undefined && !isNaN(quantity) && quantity >= 0) {
-                                      newItems[index].quantity = quantity;
-                                      newItems[index].totalPrice = (quantity || 0) * (newItems[index].unitPrice || 0);
-                                    } else if (value === '') {
-                                      newItems[index].quantity = undefined;
-                                      newItems[index].totalPrice = 0;
-                                    }
-                                    field.onChange(newItems);
-                                    updateItemTotal(index);
-                                  }}
-                                />
-                              </div>
-
-                              <div>
-                                <Input
-                                  type='number'
-                                  min={0}
-                                  placeholder='Height'
-                                  value={item.height || ''}
-                                  disabled={itemTypes[index] !== 'dimension'}
-                                  className={itemTypes[index] !== 'dimension' ? 'opacity-50' : ''}
-                                  onChange={(e) => {
-                                    const newItems = [...field.value];
-                                    const height = Number(e.target.value);
-                                    newItems[index].height = isNaN(height) ? undefined : height;
-                                    field.onChange(newItems);
-                                  }}
-                                />
-                              </div>
-
-                              <div>
-                                <Input
-                                  type='number'
-                                  min={0}
-                                  placeholder='Width'
-                                  value={item.width || ''}
-                                  disabled={itemTypes[index] !== 'dimension'}
-                                  className={itemTypes[index] !== 'dimension' ? 'opacity-50' : ''}
-                                  onChange={(e) => {
-                                    const newItems = [...field.value];
-                                    const width = Number(e.target.value);
-                                    newItems[index].width = isNaN(width) ? undefined : width;
-                                    field.onChange(newItems);
-                                  }}
-                                />
-                              </div>
-
-                              <div>
-                                <Input
-                                  type='number'
-                                  placeholder='Price'
-                                  value={item.unitPrice === undefined ? '' : item.unitPrice}
-                                  onChange={(e) => {
-                                    const newItems = [...field.value];
-                                    const value = e.target.value;
-                                    const unitPrice = value === '' ? undefined : Number(value);
-                                    if (unitPrice !== undefined && !isNaN(unitPrice) && unitPrice >= 0) {
-                                      newItems[index].unitPrice = unitPrice;
-                                      newItems[index].totalPrice = (newItems[index].quantity || 0) * unitPrice;
-                                    } else if (value === '') {
-                                      newItems[index].unitPrice = undefined;
-                                      newItems[index].totalPrice = 0;
-                                    }
-                                    field.onChange(newItems);
-                                    updateItemTotal(index);
-                                  }}
-                                />
-                              </div>
-
-                              <div className='flex items-center justify-center'>
-                                <span className='text-sm font-medium'>
-                                  {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
-                                </span>
-                              </div>
-
-                              <div>
-                                <Button
-                                  type='button'
-                                  variant='destructive'
-                                  size='sm'
-                                  onClick={() => deleteItem(index, field)}
-                                >
-                                  <IconTrash size={16} />
-                                </Button>
-                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
 
                         {/* Summary Row - Responsive */}
                         <div className='border-t pt-4 mt-4'>

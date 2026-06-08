@@ -172,7 +172,7 @@ export default function CurtainMeasurementForm({
   >(() => ({
     3: { TWO_POINT_FIVE: 3, THREE: 3.25 },
     3.25: { TWO_POINT_FIVE: 3.25, THREE: 3.5 },
-    3.5: { TWO_POINT_FIVE: 3.75, THREE: 3.75 },
+    3.5: { TWO_POINT_FIVE: 3.5, THREE: 3.75 },
     3.75: { TWO_POINT_FIVE: 4, THREE: 4.25 },
     4: { TWO_POINT_FIVE: 4.25, THREE: 4.5 },
     4.25: { TWO_POINT_FIVE: 4.5, THREE: 4.75 },
@@ -223,7 +223,7 @@ export default function CurtainMeasurementForm({
 
   // Helper to calculate curtain size based on the rules
 const calculateCurtainSize = useCallback((width: number, height: number, size: 'NORMAL' | 'TWO_POINT_FIVE' | 'THREE' = 'NORMAL'): number => {
-  if (height < 3) {
+  if (height < 2.90) {
     return width * 3;
   }
   
@@ -287,7 +287,7 @@ const calculateCurtainSize = useCallback((width: number, height: number, size: '
     
     if (measurement.includeCurtainPole) {
       const curtainPoleQuantity = (measurement.includeThickCurtain ? width : 0) + (measurement.includeThinCurtain ? width : 0);
-      poleTotal = curtainPoleQuantity * (measurement.curtainPolePrice || 0);
+      poleTotal =curtainPoleQuantity * (measurement.curtainPolePrice || 0);
     }
     
     if (measurement.includeCurtainPulls || measurement.includeCurtainBrackets) {
@@ -365,7 +365,7 @@ const calculateCurtainSize = useCallback((width: number, height: number, size: '
           includeWorkers: !!(m.thickWorkerId || m.thinWorkerId),
           thickWorkerId: m.thickWorkerId || undefined,
           thinWorkerId: m.thinWorkerId || undefined,
-          workerPrice: m.workerPrice || 250,
+          workerPrice: m.workerPrice || 300,
           totalWorkerMeter: m.totalWorkerMeter || calculated.totalWorkerMeter,
           
           price: m.price || calculated.finalPrice,
@@ -416,7 +416,7 @@ const calculateCurtainSize = useCallback((width: number, height: number, size: '
         includeWorkers: false,
         thickWorkerId: undefined,
         thinWorkerId: undefined,
-        workerPrice: 250,
+        workerPrice: 300,
         totalWorkerMeter: 0,
         
         price: undefined,
@@ -714,7 +714,7 @@ useEffect(() => {
         includeWorkers: false,
         thickWorkerId: undefined,
         thinWorkerId: undefined,
-        workerPrice: 250,
+        workerPrice: 300,
         totalWorkerMeter: 0,
         
         price: undefined,
@@ -2236,7 +2236,7 @@ useEffect(() => {
                                     min="0"
                                     step="0.01"
                                     placeholder='0.00'
-                                    value={field.value ?? 250}
+                                    value={field.value ?? 300}
                                     onChange={(e) =>
                                       field.onChange(e.target.value === '' ? undefined : Number(e.target.value))
                                     }

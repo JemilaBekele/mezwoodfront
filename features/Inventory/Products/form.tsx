@@ -42,9 +42,7 @@ interface ProductFormValues {
   fabricName?: string;
   thickCurtain?: boolean;
   thinCurtain?: boolean;
-
-  
-    pullsCurtain?: boolean;
+  pullsCurtain?: boolean;
   poleCurtain?: boolean;
   bracketsCurtain?: boolean;
   shatterVertical?: boolean;
@@ -106,6 +104,7 @@ export default function ProductForm({
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isCurtainCategory, setIsCurtainCategory] = useState(false);
+  const [showAdditionalPrices, setShowAdditionalPrices] = useState(false);
 
   // Use data directly from props
   const shops = initialShops;
@@ -121,17 +120,11 @@ export default function ProductForm({
       // Curtain-specific fields
       fabricName: initialData?.fabricName || '',
       thickCurtain: initialData?.thickCurtain || false,
-
       thinCurtain: initialData?.thinCurtain || false,
-
-      
-            pullsCurtain: initialData?.pullsCurtain || false,
-
-                  poleCurtain: initialData?.poleCurtain || false,
-
-                        bracketsCurtain: initialData?.bracketsCurtain || false,
-
-                        shatterVertical: initialData?.shatterVertical || false,
+      pullsCurtain: initialData?.pullsCurtain || false,
+      poleCurtain: initialData?.poleCurtain || false,
+      bracketsCurtain: initialData?.bracketsCurtain || false,
+      shatterVertical: initialData?.shatterVertical || false,
 
       // Relationships
       categoryId: initialData?.categoryId || '',
@@ -149,15 +142,12 @@ export default function ProductForm({
       // Status
       isActive: initialData?.isActive ?? true,
       
-      // Additional prices
+      // Additional prices - start empty array
       additionalPrices: initialData?.additionalPrices?.map((price, index) => ({
         label: price.label || `Label ${index + 1}`,
         price: price.price,
         shopId: price.shopId || ''
-      })) || [
-        { label: 'Label 1', price: 0, shopId: '' },
-        { label: 'Label 2', price: 0, shopId: '' }
-      ]
+      })) || []
     }),
     [initialData]
   );
@@ -170,6 +160,13 @@ export default function ProductForm({
     control: form.control,
     name: 'additionalPrices'
   });
+
+  // Check if there are existing additional prices to show the section
+  useEffect(() => {
+    if (defaultValues.additionalPrices && defaultValues.additionalPrices.length > 0) {
+      setShowAdditionalPrices(true);
+    }
+  }, [defaultValues.additionalPrices]);
 
   // Check if selected category is a curtain category
   useEffect(() => {
@@ -221,7 +218,7 @@ export default function ProductForm({
 
   const shopOptions: SelectOption[] = useMemo(
     () => [
-      { value: '', label: '' },
+      { value: '', label: 'No Shop (Global Price)' },
       ...(shops || []).map((shop) => ({
         value: shop.id,
         label: shop.name
@@ -287,85 +284,84 @@ export default function ProductForm({
     }
   };
 
-const onSubmit = async (data: ProductFormValues) => {
-  try {
-    const formData = new FormData();
+  const onSubmit = async (data: ProductFormValues) => {
+    try {
+      const formData = new FormData();
 
-    // Process boolean values
-    const processedData = {
-      ...data,
-      isActive: Boolean(data.isActive),
-      thickCurtain: data.thickCurtain ? Boolean(data.thickCurtain) : false,
-      thinCurtain: data.thinCurtain ? Boolean(data.thinCurtain) : false,
-      pullsCurtain: data.pullsCurtain ? Boolean(data.pullsCurtain) : false,
-      poleCurtain: data.poleCurtain ? Boolean(data.poleCurtain) : false,
-      bracketsCurtain: data.bracketsCurtain ? Boolean(data.bracketsCurtain) : false,
-      shatterVertical: data.shatterVertical ? Boolean(data.shatterVertical) : false,
-      pricePerMeter: Boolean(data.pricePerMeter),
-      colourId: data.colourId || null,
-      warningQuantity: data.warningQuantity || 0
-    };
+      // Process boolean values
+      const processedData = {
+        ...data,
+        isActive: Boolean(data.isActive),
+        thickCurtain: data.thickCurtain ? Boolean(data.thickCurtain) : false,
+        thinCurtain: data.thinCurtain ? Boolean(data.thinCurtain) : false,
+        pullsCurtain: data.pullsCurtain ? Boolean(data.pullsCurtain) : false,
+        poleCurtain: data.poleCurtain ? Boolean(data.poleCurtain) : false,
+        bracketsCurtain: data.bracketsCurtain ? Boolean(data.bracketsCurtain) : false,
+        shatterVertical: data.shatterVertical ? Boolean(data.shatterVertical) : false,
+        pricePerMeter: Boolean(data.pricePerMeter),
+        colourId: data.colourId || null,
+        warningQuantity: data.warningQuantity || 0
+      };
 
-    const { additionalPrices, ...formValues } = processedData;
+      const { additionalPrices, ...formValues } = processedData;
 
-    // Filter out additional prices where price is zero or falsy (0, null, undefined, empty string)
-    const filteredAdditionalPrices = additionalPrices.filter(price => {
-      // Check if price exists and is not zero
-      // This handles: 0, "0", null, undefined, empty string
-      const priceValue = parseFloat(price.price as any);
-      return !isNaN(priceValue) && priceValue !== 0;
-    });
+      // Filter out additional prices where price is zero or falsy (0, null, undefined, empty string)
+      const filteredAdditionalPrices = additionalPrices.filter(price => {
+        // Check if price exists and is not zero
+        const priceValue = parseFloat(price.price as any);
+        return !isNaN(priceValue) && priceValue !== 0;
+      });
 
-    // Append main product data
-    Object.entries(formValues).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (typeof value === 'boolean') {
-          formData.append(key, value.toString());
-        } else if (typeof value === 'number') {
-          formData.append(key, value.toString());
-        } else {
-          formData.append(key, value.toString());
+      // Append main product data
+      Object.entries(formValues).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (typeof value === 'boolean') {
+            formData.append(key, value.toString());
+          } else if (typeof value === 'number') {
+            formData.append(key, value.toString());
+          } else {
+            formData.append(key, value.toString());
+          }
         }
+      });
+
+      // Append filtered additional prices (skip zero price entries)
+      filteredAdditionalPrices.forEach((price, index) => {
+        formData.append(`additionalPrices[${index}][label]`, price.label);
+        formData.append(
+          `additionalPrices[${index}][price]`,
+          price.price.toString()
+        );
+        if (price.shopId) {
+          formData.append(`additionalPrices[${index}][shopId]`, price.shopId);
+        }
+      });
+
+      const imageInput = document.getElementById('image') as HTMLInputElement;
+      if (imageInput?.files?.[0]) {
+        formData.append('image', imageInput.files[0]);
       }
-    });
 
-    // Append filtered additional prices (skip zero price entries)
-    filteredAdditionalPrices.forEach((price, index) => {
-      formData.append(`additionalPrices[${index}][label]`, price.label);
-      formData.append(
-        `additionalPrices[${index}][price]`,
-        price.price.toString()
-      );
-      if (price.shopId) {
-        formData.append(`additionalPrices[${index}][shopId]`, price.shopId);
+      setIsUploading(true);
+
+      if (initialData?.id) {
+        await updateProduct(initialData.id, formData);
+        toast.success('Product updated successfully');
+        router.push(`/dashboard/Products`);
+      } else {
+        const createdProduct = await createProduct(formData);
+        toast.success('Product created successfully');
+        router.push(
+          `/dashboard/Products/ProductBatch?id=${createdProduct.product.id}`
+        );
       }
-    });
-
-    const imageInput = document.getElementById('image') as HTMLInputElement;
-    if (imageInput?.files?.[0]) {
-      formData.append('image', imageInput.files[0]);
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error?.message || 'Error saving product');
+    } finally {
+      setIsUploading(false);
     }
-
-    setIsUploading(true);
-
-    if (initialData?.id) {
-      await updateProduct(initialData.id, formData);
-      toast.success('Product updated successfully');
-      router.push(`/dashboard/Products`);
-    } else {
-      const createdProduct = await createProduct(formData);
-      toast.success('Product created successfully');
-      router.push(
-        `/dashboard/Products/ProductBatch?id=${createdProduct.product.id}`
-      );
-    }
-    router.refresh();
-  } catch (error: any) {
-    toast.error(error?.message || 'Error saving product');
-  } finally {
-    setIsUploading(false);
-  }
-};
+  };
 
   const [isDark, setIsDark] = useState(false);
 
@@ -418,10 +414,32 @@ const onSubmit = async (data: ProductFormValues) => {
   const addAdditionalPrice = () => {
     const newIndex = fields.length + 1;
     append({
-      label: `Label ${newIndex}`,
+      label: `Price ${newIndex}`,
       price: 0,
       shopId: ''
     });
+  };
+
+  const toggleAdditionalPrices = () => {
+    if (!showAdditionalPrices) {
+      setShowAdditionalPrices(true);
+      if (fields.length === 0) {
+        append({ label: 'Price 1', price: 0, shopId: '' });
+      }
+    } else {
+      setShowAdditionalPrices(false);
+      // Remove all additional prices when hiding
+      while (fields.length > 0) {
+        remove(0);
+      }
+    }
+  };
+
+  const removeAllAdditionalPrices = () => {
+    while (fields.length > 0) {
+      remove(0);
+    }
+    toast.success('All additional prices removed');
   };
 
   return (
@@ -464,6 +482,7 @@ const onSubmit = async (data: ProductFormValues) => {
                   />
                   
                   {/* Curtain-specific fields - only show if curtain category */}
+                  {isCurtainCategory && (
                     <>
                       <FormField
                         name='fabricName'
@@ -482,137 +501,128 @@ const onSubmit = async (data: ProductFormValues) => {
                         )}
                       />
                       
-    <div className='flex flex-col gap-4 rounded-lg border p-4'>
-  <div className='flex items-center gap-2'>
-    <Ruler className='h-4 w-4' />
-    <FormLabel>Curtain Type (Optional)</FormLabel>
-  </div>
+                      <div className='flex flex-col gap-4 rounded-lg border p-4'>
+                        <div className='flex items-center gap-2'>
+                          <Ruler className='h-4 w-4' />
+                          <FormLabel>Curtain Type (Optional)</FormLabel>
+                        </div>
 
-  <RadioGroup
-    value={(() => {
-      // Determine which curtain type is currently selected
-      if (form.watch('thickCurtain')) return 'thick';
-      if (form.watch('thinCurtain')) return 'thin';
-      if (form.watch('pullsCurtain')) return 'belt';
-      if (form.watch('poleCurtain')) return 'rod';
-      if (form.watch('bracketsCurtain')) return 'holder';
-      if (form.watch('shatterVertical')) return 'shutter';
-      return '';
-    })()}
-    onValueChange={(value) => {
-      // Clear all curtain type fields
-      form.setValue('thickCurtain', false);
-      form.setValue('thinCurtain', false);
-      form.setValue('pullsCurtain', false);
-      form.setValue('poleCurtain', false);
-      form.setValue('bracketsCurtain', false);
-      form.setValue('shatterVertical', false);
-      
-      // Set the selected one
-      switch (value) {
-        case 'thick':
-          form.setValue('thickCurtain', true);
-          break;
-        case 'thin':
-          form.setValue('thinCurtain', true);
-          break;
-        case 'belt':
-          form.setValue('pullsCurtain', true);
-          break;
-        case 'rod':
-          form.setValue('poleCurtain', true);
-          break;
-        case 'holder':
-          form.setValue('bracketsCurtain', true);
-          break;
-        case 'shutter':
-          form.setValue('shatterVertical', true);
-          break;
-      }
-    }}
-    className='grid grid-cols-2 gap-4'
-  >
-    {/* Thick Curtain */}
-    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
-      <FormControl>
-        <RadioGroupItem value='thick' />
-      </FormControl>
-      <div className='space-y-1 leading-none'>
-        <FormLabel>Thick Curtain</FormLabel>
-        <div className='text-muted-foreground text-sm'>
-          Heavy, insulated curtains
-        </div>
-      </div>
-    </FormItem>
+                        <RadioGroup
+                          value={(() => {
+                            if (form.watch('thickCurtain')) return 'thick';
+                            if (form.watch('thinCurtain')) return 'thin';
+                            if (form.watch('pullsCurtain')) return 'belt';
+                            if (form.watch('poleCurtain')) return 'rod';
+                            if (form.watch('bracketsCurtain')) return 'holder';
+                            if (form.watch('shatterVertical')) return 'shutter';
+                            return '';
+                          })()}
+                          onValueChange={(value) => {
+                            form.setValue('thickCurtain', false);
+                            form.setValue('thinCurtain', false);
+                            form.setValue('pullsCurtain', false);
+                            form.setValue('poleCurtain', false);
+                            form.setValue('bracketsCurtain', false);
+                            form.setValue('shatterVertical', false);
+                            
+                            switch (value) {
+                              case 'thick':
+                                form.setValue('thickCurtain', true);
+                                break;
+                              case 'thin':
+                                form.setValue('thinCurtain', true);
+                                break;
+                              case 'belt':
+                                form.setValue('pullsCurtain', true);
+                                break;
+                              case 'rod':
+                                form.setValue('poleCurtain', true);
+                                break;
+                              case 'holder':
+                                form.setValue('bracketsCurtain', true);
+                                break;
+                              case 'shutter':
+                                form.setValue('shatterVertical', true);
+                                break;
+                            }
+                          }}
+                          className='grid grid-cols-2 gap-4'
+                        >
+                          <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+                            <FormControl>
+                              <RadioGroupItem value='thick' />
+                            </FormControl>
+                            <div className='space-y-1 leading-none'>
+                              <FormLabel>Thick Curtain</FormLabel>
+                              <div className='text-muted-foreground text-sm'>
+                                Heavy, insulated curtains
+                              </div>
+                            </div>
+                          </FormItem>
 
-    {/* Thin Curtain */}
-    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
-      <FormControl>
-        <RadioGroupItem value='thin' />
-      </FormControl>
-      <div className='space-y-1 leading-none'>
-        <FormLabel>Thin Curtain</FormLabel>
-        <div className='text-muted-foreground text-sm'>
-          Light, sheer curtains
-        </div>
-      </div>
-    </FormItem>
+                          <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+                            <FormControl>
+                              <RadioGroupItem value='thin' />
+                            </FormControl>
+                            <div className='space-y-1 leading-none'>
+                              <FormLabel>Thin Curtain</FormLabel>
+                              <div className='text-muted-foreground text-sm'>
+                                Light, sheer curtains
+                              </div>
+                            </div>
+                          </FormItem>
 
-    {/* Belt Curtain */}
-    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
-      <FormControl>
-        <RadioGroupItem value='belt' />
-      </FormControl>
-      <div className='space-y-1 leading-none'>
-        <FormLabel>Belt Curtain</FormLabel>
-        <div className='text-muted-foreground text-sm'>
-          Curtain operated using a belt-driven mechanism
-        </div>
-      </div>
-    </FormItem>
+                          <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+                            <FormControl>
+                              <RadioGroupItem value='belt' />
+                            </FormControl>
+                            <div className='space-y-1 leading-none'>
+                              <FormLabel>Belt Curtain</FormLabel>
+                              <div className='text-muted-foreground text-sm'>
+                                Curtain operated using a belt-driven mechanism
+                              </div>
+                            </div>
+                          </FormItem>
 
-    {/* Curtain Rod */}
-    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
-      <FormControl>
-        <RadioGroupItem value='rod' />
-      </FormControl>
-      <div className='space-y-1 leading-none'>
-        <FormLabel>Curtain Rod</FormLabel>
-        <div className='text-muted-foreground text-sm'>
-          Curtain mounted on a rod system
-        </div>
-      </div>
-    </FormItem>
+                          <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+                            <FormControl>
+                              <RadioGroupItem value='rod' />
+                            </FormControl>
+                            <div className='space-y-1 leading-none'>
+                              <FormLabel>Curtain Rod</FormLabel>
+                              <div className='text-muted-foreground text-sm'>
+                                Curtain mounted on a rod system
+                              </div>
+                            </div>
+                          </FormItem>
 
-    {/* Holder Curtain */}
-    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
-      <FormControl>
-        <RadioGroupItem value='holder' />
-      </FormControl>
-      <div className='space-y-1 leading-none'>
-        <FormLabel>Holder Curtain</FormLabel>
-        <div className='text-muted-foreground text-sm'>
-          Curtain supported using holders
-        </div>
-      </div>
-    </FormItem>
+                          <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+                            <FormControl>
+                              <RadioGroupItem value='holder' />
+                            </FormControl>
+                            <div className='space-y-1 leading-none'>
+                              <FormLabel>Holder Curtain</FormLabel>
+                              <div className='text-muted-foreground text-sm'>
+                                Curtain supported using holders
+                              </div>
+                            </div>
+                          </FormItem>
 
-    {/* Shutter or Vertical */}
-    <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
-      <FormControl>
-        <RadioGroupItem value='shutter' />
-      </FormControl>
-      <div className='space-y-1 leading-none'>
-        <FormLabel>Shutter or Vertical</FormLabel>
-        <div className='text-muted-foreground text-sm'>
-          Vertical or shutter-style curtain system
-        </div>
-      </div>
-    </FormItem>
-  </RadioGroup>
-</div>
+                          <FormItem className='flex flex-row items-start space-x-3 space-y-0'>
+                            <FormControl>
+                              <RadioGroupItem value='shutter' />
+                            </FormControl>
+                            <div className='space-y-1 leading-none'>
+                              <FormLabel>Shutter or Vertical</FormLabel>
+                              <div className='text-muted-foreground text-sm'>
+                                Vertical or shutter-style curtain system
+                              </div>
+                            </div>
+                          </FormItem>
+                        </RadioGroup>
+                      </div>
                     </>
-                  
+                  )}
                   
                   <FormField
                     name='description'
@@ -711,9 +721,6 @@ const onSubmit = async (data: ProductFormValues) => {
                     )}
                   />
                   
-               
-              
-                  
                   <FormField
                     name='unitOfMeasureId'
                     control={form.control}
@@ -787,7 +794,7 @@ const onSubmit = async (data: ProductFormValues) => {
                                 ? colourOptions.find(
                                     (c) => c.value === field.value
                                   ) || null
-                                : colourOptions[0] // "None" option
+                                : colourOptions[0]
                             }
                             placeholder='Select a colour'
                             styles={isDark ? darkStyles : {}}
@@ -798,7 +805,7 @@ const onSubmit = async (data: ProductFormValues) => {
                     )}
                   />
                   
-                  {/* Price Per Meter Switch - show for all products, not just curtains */}
+                  {/* Price Per Meter Switch */}
                   <FormField
                     control={form.control}
                     name='pricePerMeter'
@@ -883,121 +890,151 @@ const onSubmit = async (data: ProductFormValues) => {
                 </div>
               </div>
 
-              {/* Additional Prices Section */}
+              {/* Additional Prices Section - Hidden by default */}
               <div className='border-t pt-6'>
-                <div className='mb-4 flex items-center justify-between'>
-                  <CardTitle className='text-lg'>Additional Prices (Optional)</CardTitle>
+                <div className='flex gap-2 mb-4'>
                   <Button
                     type='button'
                     variant='outline'
-                    size='sm'
-                    onClick={addAdditionalPrice}
-                    className='flex items-center gap-2'
+                    onClick={toggleAdditionalPrices}
                   >
-                    <Plus className='h-4 w-4' />
-                    Add Price
+                    {showAdditionalPrices ? 'Hide Additional Prices' : 'Show Additional Prices'}
                   </Button>
-                </div>
-
-                <div className='space-y-4'>
-                  {fields.map((field, index) => (
-                    <div
-                      key={field.id}
-                      className='grid grid-cols-1 items-end gap-4 rounded-lg border p-4 md:grid-cols-12'
+                  
+                  {showAdditionalPrices && fields.length > 0 && (
+                    <Button
+                      type='button'
+                      variant='destructive'
+                      onClick={removeAllAdditionalPrices}
                     >
-                      {/* Label Input - 3 columns */}
-                      <div className='md:col-span-3'>
-                        <FormField
-                          control={form.control}
-                          name={`additionalPrices.${index}.label`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Label</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder={`Label ${index + 1}`}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      {/* Price Input - 3 columns */}
-                      <div className='md:col-span-3'>
-                        <FormField
-                          control={form.control}
-                          name={`additionalPrices.${index}.price`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Price</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type='number'
-                                  step='0.01'
-                                  min='0'
-                                  placeholder='0.00'
-                                  {...field}
-                                  onChange={(e) =>
-                                    field.onChange(
-                                      parseFloat(e.target.value) || 0
-                                    )
-                                  }
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      {/* Shop Select - 4 columns */}
-                      <div className='md:col-span-4'>
-                        <FormField
-                          control={form.control}
-                          name={`additionalPrices.${index}.shopId`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Shop (Optional)</FormLabel>
-                              <FormControl>
-                                <Select
-                                  options={shopOptions}
-                                  value={
-                                    shopOptions.find(
-                                      (option) => option.value === field.value
-                                    ) || shopOptions[0]
-                                  }
-                                  onChange={(selectedOption) => {
-                                    field.onChange(selectedOption?.value || '');
-                                  }}
-                                  placeholder='Select shop...'
-                                  styles={isDark ? darkStyles : {}}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      {/* Remove Button - 2 columns */}
-                      <div className='md:col-span-2'>
-                        <Button
-                          type='button'
-                          variant='destructive'
-                          size='sm'
-                          onClick={() => remove(index)}
-                          disabled={fields.length <= 1}
-                          className='w-full'
-                        >
-                          <Trash2 className='h-4 w-4' />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                      <Trash2 className='h-4 w-4 mr-2' />
+                      Remove All
+                    </Button>
+                  )}
                 </div>
+
+                {showAdditionalPrices && (
+                  <>
+                    <div className='mb-4 flex items-center justify-between'>
+                      <CardTitle className='text-lg'>Additional Prices</CardTitle>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={addAdditionalPrice}
+                        className='flex items-center gap-2'
+                      >
+                        <Plus className='h-4 w-4' />
+                        Add Price
+                      </Button>
+                    </div>
+
+                    {fields.length === 0 ? (
+                      <div className='text-center py-8 text-muted-foreground'>
+                        No additional prices added. Click &quot;Add Price&quot; to create one.
+                      </div>
+                    ) : (
+                      <div className='space-y-4'>
+                        {fields.map((field, index) => (
+                          <div
+                            key={field.id}
+                            className='grid grid-cols-1 items-end gap-4 rounded-lg border p-4 md:grid-cols-12'
+                          >
+                            {/* Label Input */}
+                            <div className='md:col-span-3'>
+                              <FormField
+                                control={form.control}
+                                name={`additionalPrices.${index}.label`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Price Label</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder='e.g., Wholesale, Retail, Member'
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            {/* Price Input */}
+                            <div className='md:col-span-3'>
+                              <FormField
+                                control={form.control}
+                                name={`additionalPrices.${index}.price`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Price Amount</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type='number'
+                                        step='0.01'
+                                        min='0'
+                                        placeholder='0.00'
+                                        {...field}
+                                        onChange={(e) =>
+                                          field.onChange(
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            {/* Shop Select */}
+                            <div className='md:col-span-4'>
+                              <FormField
+                                control={form.control}
+                                name={`additionalPrices.${index}.shopId`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Shop (Optional)</FormLabel>
+                                    <FormControl>
+                                      <Select
+                                        options={shopOptions}
+                                        value={
+                                          shopOptions.find(
+                                            (option) => option.value === field.value
+                                          ) || shopOptions[0]
+                                        }
+                                        onChange={(selectedOption) => {
+                                          field.onChange(selectedOption?.value || '');
+                                        }}
+                                        placeholder='Select shop...'
+                                        styles={isDark ? darkStyles : {}}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            {/* Remove Button */}
+                            <div className='md:col-span-2'>
+                              <Button
+                                type='button'
+                                variant='destructive'
+                                size='sm'
+                                onClick={() => remove(index)}
+                                className='w-full'
+                              >
+                                <Trash2 className='h-4 w-4' />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               <div className='flex justify-end'>

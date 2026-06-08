@@ -4,6 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { IStore } from '@/models/store';
 import { getStores } from '@/service/store';
+import { getProductById } from '@/service/Product'; // Import the getProductById function
+import { IProduct } from '@/models/Product'; // Import IProduct interface
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,15 +42,23 @@ const ProductStockForm: React.FC<ProductStockFormProps> = ({ productId }) => {
     {
       storeId: '',
       notes: '',
-      quantity: undefined // Changed from 0 to undefined
+      quantity: undefined
     }
   ]);
 
   const [stores, setStores] = useState<IStore[]>([]);
+  const [product, setProduct] = useState<IProduct | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Check if product should show height and width fields
+  const shouldShowDimensions = () => {
+    if (!product) return false;
+    return !!(product.thickCurtain || product.thinCurtain || product.poleCurtain);
+  };
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -65,6 +75,25 @@ const ProductStockForm: React.FC<ProductStockFormProps> = ({ productId }) => {
     fetchStores();
   }, []);
 
+  // Fetch product data
+  useEffect(() => {
+    const fetchProduct = async () => {
+      setIsLoadingProduct(true);
+      try {
+        const productData = await getProductById(productId);
+        setProduct(productData);
+      } catch {
+        setError('Failed to load product information');
+      } finally {
+        setIsLoadingProduct(false);
+      }
+    };
+    
+    if (productId) {
+      fetchProduct();
+    }
+  }, [productId]);
+
   const handleStockChange = (index: number, field: string, value: any) => {
     setStocks(prev =>
       prev.map((stock, i) =>
@@ -76,7 +105,7 @@ const ProductStockForm: React.FC<ProductStockFormProps> = ({ productId }) => {
   const addStock = () => {
     setStocks(prev => [
       ...prev,
-      { storeId: '', notes: '', quantity: undefined } // Changed from 0 to undefined
+      { storeId: '', notes: '', quantity: undefined }
     ]);
   };
 
@@ -101,7 +130,7 @@ const ProductStockForm: React.FC<ProductStockFormProps> = ({ productId }) => {
       const hasStore = stock.storeId && stock.storeId.trim() !== '';
       const hasQuantity = stock.quantity !== undefined && 
                           stock.quantity !== null && 
-                          stock.quantity !== 0 && // Exclude zero quantity
+                          stock.quantity !== 0 &&
                           !isNaN(stock.quantity) &&
                           stock.quantity.toString().trim() !== '';
       
@@ -140,6 +169,12 @@ const ProductStockForm: React.FC<ProductStockFormProps> = ({ productId }) => {
     return <div>Loading stores...</div>;
   }
 
+  if (isLoadingProduct) {
+    return <div>Loading product information...</div>;
+  }
+
+  const showDimensions = shouldShowDimensions();
+
   return (
     <Card className='mx-auto w-full'>
       <CardHeader>
@@ -162,6 +197,15 @@ const ProductStockForm: React.FC<ProductStockFormProps> = ({ productId }) => {
           <Alert className='border-green-200 bg-green-50'>
             <AlertDescription className='text-green-800'>
               {success}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Optional: Show a note about dimensions */}
+        {product && !showDimensions && (
+          <Alert className='mb-4 bg-blue-50 border-blue-200'>
+            <AlertDescription className='text-blue-800 text-sm'>
+              Note: Height and width are not required for this product type.
             </AlertDescription>
           </Alert>
         )}
@@ -210,30 +254,34 @@ const ProductStockForm: React.FC<ProductStockFormProps> = ({ productId }) => {
                 </Select>
               </div>
 
-              {/* HEIGHT & WIDTH (optional) */}
-              <div className='grid grid-cols-2 gap-4'>
-                <div>
-                  <Label>Height</Label>
-                  <Input
-                    type='number'
-                    value={stock.height || ''}
-                    onChange={e =>
-                      handleStockChange(i, 'height', e.target.value ? Number(e.target.value) : undefined)
-                    }
-                  />
-                </div>
+              {/* HEIGHT & WIDTH - Only show for curtain products */}
+              {showDimensions && (
+                <div className='grid grid-cols-2 gap-4'>
+                  <div>
+                    <Label>Height (cm)</Label>
+                    <Input
+                      type='number'
+                      value={stock.height || ''}
+                      onChange={e =>
+                        handleStockChange(i, 'height', e.target.value ? Number(e.target.value) : undefined)
+                      }
+                      placeholder='Enter height'
+                    />
+                  </div>
 
-                <div>
-                  <Label>Width</Label>
-                  <Input
-                    type='number'
-                    value={stock.width || ''}
-                    onChange={e =>
-                      handleStockChange(i, 'width', e.target.value ? Number(e.target.value) : undefined)
-                    }
-                  />
+                  <div>
+                    <Label>Width (cm)</Label>
+                    <Input
+                      type='number'
+                      value={stock.width || ''}
+                      onChange={e =>
+                        handleStockChange(i, 'width', e.target.value ? Number(e.target.value) : undefined)
+                      }
+                      placeholder='Enter width'
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* QUANTITY */}
               <div>

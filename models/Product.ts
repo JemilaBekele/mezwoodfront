@@ -22,8 +22,9 @@ export interface IProduct {
   fabricName?: string;
   thickCurtain?: boolean;
   thinCurtain?: boolean;
+    poleCurtain?: boolean;
+
   pullsCurtain?: boolean;
-  poleCurtain?: boolean;
   bracketsCurtain?: boolean;
   shatterVertical?: boolean;
 
