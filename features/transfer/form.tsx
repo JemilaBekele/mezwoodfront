@@ -23,31 +23,28 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { getStores, getStoresall } from '@/service/store';
-import { getShops, getShopsall } from '@/service/shop';
-import { createTransfer, updateTransfer } from '@/service/transfer';
+import { createTransfer, getProducts, updateTransfer } from '@/service/transfer';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconTrash } from '@tabler/icons-react';
 import { ITransfer, TransferEntityType } from '@/models/transfer';
-import { getAvailableProductsBySource } from '@/service/productBatchService';
-import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
-import { Label } from '@/components/ui/label';
+import { getStoresAll } from '@/service/store';
+import { getShowroomsAll } from '@/service/showroom';
 
 interface FormData {
   reference?: string;
   sourceType: TransferEntityType;
   sourceStoreId?: string;
-  sourceShopId?: string;
+  sourceShowroomId?: string;
   destinationType: TransferEntityType;
   destStoreId?: string;
-  destShopId?: string;
+  destShowroomId?: string;
   notes?: string;
+  productType: 'items' | 'materials'; // New field
   items: Array<{
     productId: string;
-    quantity?: number;
-    height?: number;
-    width?: number;
-    variantId?: string;
+    quantity: number;
+    // For materials, we don't need batch
+    batchId?: string;
   }>;
 }
 
@@ -56,49 +53,27 @@ interface TransferFormProps {
   isEdit?: boolean;
 }
 
-interface StoreStockItem {
+interface AvailableProduct {
   id: string;
-  storeId: string;
-  productId: string;
-  quantity: number;
-  status: string;
-  unitOfMeasureId: string;
-  createdAt: string;
-  updatedAt: string;
-  store: {
-    id: string;
-    name: string;
-    branchId: string;
-  };
-  product: {
-    id: string;
-    productCode: string;
-    name: string;
-    generic: string | null;
-    description: string | null;
-    sellPrice: number | null;
-    imageUrl: string;
-    isActive: boolean;
-    warningQuantity: number;
-    category: any;
-    colour: {
-      id: string;
-      name: string;
-    } | null;
-    unitOfMeasure: IUnitOfMeasure;
-  };
-  unitOfMeasure: IUnitOfMeasure;
-  availableQuantity: number;
-  conversionFactor: number;
-  variants?: Array<{
-    id: string;
-    height: number;
-    width: number;
-    quantity: number;
-    area: number;
-  }>;
-  stockType: 'dimension' | 'quantity';
-  hasVariants: boolean;
+  name: string;
+  color?: string;
+  size?: string;
+  price?: number;
+  imageUrl?: string;
+  stockQuantity: number;
+  stockStatus?: string;
+  // For items
+  category?: string;
+  type?: string;
+  // For materials
+  materialType?: string;
+  unitOfMeasure?: string;
+  plainMDF?: boolean;
+  laminatedMDF?: boolean;
+  wood?: boolean;
+  metal?: boolean;
+  accessory?: boolean;
+  other?: boolean;
 }
 
 export default function TransferForm({
@@ -107,14 +82,13 @@ export default function TransferForm({
 }: TransferFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [shops, setShops] = useState<any[]>([]);
-  const [disstores, setDisstores] = useState<any[]>([]);
-  const [disshops, setDisshops] = useState<any[]>([]);
-  const [storeStockItems, setStoreStockItems] = useState<StoreStockItem[]>([]);
+  const [showrooms, setShowrooms] = useState<any[]>([]);
+  const [destStores, setDestStores] = useState<any[]>([]);
+  const [destShowrooms, setDestShowrooms] = useState<any[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<AvailableProduct[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingStoresShops, setLoadingStoresShops] = useState(true);
-  const [initialSyncDone, setInitialSyncDone] = useState(false);
   
   const hasFetchedProductsRef = useRef(false);
   const lastSourceRef = useRef<string>('');
@@ -126,104 +100,49 @@ export default function TransferForm({
       reference: initialData?.reference || '',
       sourceType: initialData?.sourceType || TransferEntityType.STORE,
       sourceStoreId: initialData?.sourceStoreId || '',
-      sourceShopId: initialData?.sourceShopId || '',
+      sourceShowroomId: initialData?.sourceShowroomId || '',
       destinationType: initialData?.destinationType || TransferEntityType.STORE,
       destStoreId: initialData?.destStoreId || '',
-      destShopId: initialData?.destShopId || '',
+      destShowroomId: initialData?.destShowroomId || '',
       notes: initialData?.notes || '',
-      items: initialData?.items?.map((item: any) => ({
-        productId: item.productId.toString(),
-        quantity: item.quantity ? Number(item.quantity) : undefined,
-        height: item.height,
-        width: item.width,
-        variantId: item.variantId
-      })) || [{ productId: '', quantity: undefined }]
+      productType: 'items', // Default to items
+      items: initialData?.items?.map((item) => ({
+        productId: item.ismaterial ? item.materialId! : item.itemId!,
+        quantity: Number(item.quantity),
+        batchId: undefined // Materials don't use batches
+      })) || [{ productId: '', quantity: 1 }]
     }
   });
 
   const sourceType = form.watch('sourceType');
   const sourceStoreId = form.watch('sourceStoreId');
-  const sourceShopId = form.watch('sourceShopId');
+  const sourceShowroomId = form.watch('sourceShowroomId');
   const destinationType = form.watch('destinationType');
-  const items = form.watch('items');
+  const productType = form.watch('productType');
 
-  const currentSource = `${sourceType}-${sourceType === TransferEntityType.STORE ? sourceStoreId : sourceShopId}`;
-
-  // Check if a product is already selected
-  const isProductSelected = (productId: string, currentIndex: number): boolean => {
-    return items.some((item, idx) => idx !== currentIndex && item.productId === productId);
-  };
-
-  // Get available products (excluding already selected ones)
-  const getAvailableProducts = (currentIndex: number) => {
-    const selectedProductIds = items
-      .filter((_, idx) => idx !== currentIndex)
-      .map(item => item.productId)
-      .filter(id => id);
-    
-    return storeStockItems.filter(stockItem => !selectedProductIds.includes(stockItem.product.id.toString()));
-  };
-
-  const getUniqueProducts = (): StoreStockItem[] => {
-    const seenProductIds = new Set<string>();
-    return storeStockItems.filter((item) => {
-      if (!seenProductIds.has(item.product.id)) {
-        seenProductIds.add(item.product.id);
-        return true;
-      }
-      return false;
-    });
-  };
-
-  const getUnitOfMeasureForProduct = (productId: string): IUnitOfMeasure | null => {
-    const productItem = storeStockItems.find(item => item.product.id === productId);
-    return productItem?.product.unitOfMeasure || productItem?.unitOfMeasure || null;
-  };
-
-  const getVariantsForProduct = (productId: string): StoreStockItem['variants'] => {
-    const productItem = storeStockItems.find(item => item.product.id === productId);
-    return productItem?.variants || [];
-  };
-
-  const productHasVariants = (productId: string): boolean => {
-    const productItem = storeStockItems.find(item => item.product.id === productId);
-    return productItem?.hasVariants || false;
-  };
-
-  const formatProductLabel = (product: any): string => {
-    const productName = product.name || 'Unknown Product';
-    const colourName = product.colour?.name;
-    
-    if (colourName) {
-      return `${productName} - ${colourName}`;
-    }
-    return productName;
-  };
-
-  const formatVariantLabel = (variant: any): string => {
-    return `${variant.height} x ${variant.width}`;
-  };
+  const currentSource = `${sourceType}-${productType}-${sourceType === TransferEntityType.STORE ? sourceStoreId : sourceShowroomId}`;
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Fetch stores and showrooms
   useEffect(() => {
     const fetchData = async () => {
       setLoadingStoresShops(true);
       try {
-        const [storesData, shopsData, disstoresData, disshopsData] = await Promise.all([
-          getStores(),
-          getShops(),
-          getShopsall(),
-          getStoresall(),
+        const [storesData, showroomsData, destStoresData, destShowroomsData] = await Promise.all([
+          getStoresAll(),
+          getShowroomsAll(), // Assuming getShops returns showrooms
+          getStoresAll(),
+          getShowroomsAll(),
         ]);
         setStores(storesData);
-        setShops(shopsData);
-        setDisshops(disstoresData);
-        setDisstores(disshopsData);
-      } catch  {
-        toast.error('Failed to load stores or shops');
+        setShowrooms(showroomsData);
+        setDestStores(destStoresData);
+        setDestShowrooms(destShowroomsData);
+      } catch {
+        toast.error('Failed to load stores or showrooms');
       } finally {
         setLoadingStoresShops(false);
       }
@@ -231,40 +150,55 @@ export default function TransferForm({
     fetchData();
   }, []);
 
+  // Fetch products from source based on product type
   const fetchProductsFromSource = useCallback(async () => {
+    // Don't fetch if no source is selected
     if (
       (sourceType === TransferEntityType.STORE && !sourceStoreId) ||
-      (sourceType === TransferEntityType.SHOP && !sourceShopId)
+      (sourceType === TransferEntityType.SHOWROOM && !sourceShowroomId)
     ) {
-      setStoreStockItems([]);
+      setAvailableProducts([]);
       hasFetchedProductsRef.current = false;
       lastSourceRef.current = '';
-      setInitialSyncDone(false);
       return;
     }
 
+    // Skip if we've already fetched for this source
     if (currentSource === lastSourceRef.current && hasFetchedProductsRef.current) {
       return;
     }
+
+    console.log(`Fetching ${productType} for source: ${currentSource}`);
     
     setLoadingProducts(true);
     hasFetchedProductsRef.current = true;
     lastSourceRef.current = currentSource;
 
     try {
-      const sourceId = sourceType === TransferEntityType.STORE ? sourceStoreId : sourceShopId;
+      const sourceId = sourceType === TransferEntityType.STORE ? sourceStoreId : sourceShowroomId;
       if (!sourceId) return;
 
-      const storeStockData = await getAvailableProductsBySource(sourceType, sourceId);
-      setStoreStockItems(storeStockData);
-    } catch {
+      const source = sourceType === TransferEntityType.STORE ? 'store' : 'showroom';
+      
+      const response = await getProducts({
+        type: productType,
+        source: source,
+        id: sourceId!
+      });
+
+      // Extract products from response
+      const products = response.products || response.data || response;
+      setAvailableProducts(products);
+    } catch (error) {
+      console.error('Failed to load products:', error);
       toast.error('Failed to load products from source');
-      setStoreStockItems([]);
+      setAvailableProducts([]);
     } finally {
       setLoadingProducts(false);
     }
-  }, [currentSource, sourceType, sourceStoreId, sourceShopId]);
+  }, [currentSource, sourceType, sourceStoreId, sourceShowroomId, productType]);
 
+  // Debounced fetch effect
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       fetchProductsFromSource();
@@ -274,65 +208,6 @@ export default function TransferForm({
       clearTimeout(timeoutId);
     };
   }, [fetchProductsFromSource]);
-
-  useEffect(() => {
-    if (isEdit && storeStockItems.length > 0 && items.length > 0 && !initialSyncDone) {
-      const updatedItems = items.map((item) => {
-        if (!item.productId) return item;
-
-        const stockItem = storeStockItems.find(
-          (stock) => stock.product.id.toString() === item.productId
-        );
-
-        if (stockItem?.hasVariants && item.height && item.width) {
-          const matchingVariant = stockItem.variants?.find(
-            (v) => 
-              Math.abs(v.height - (item.height || 0)) < 0.01 && 
-              Math.abs(v.width - (item.width || 0)) < 0.01
-          );
-
-          if (matchingVariant && (!item.variantId || item.variantId !== matchingVariant.id)) {
-            return {
-              ...item,
-              variantId: matchingVariant.id
-            };
-          }
-        }
-        
-        return item;
-      });
-
-      const hasChanges = updatedItems.some((item, index) => 
-        item.variantId !== items[index].variantId
-      );
-
-      if (hasChanges) {
-        form.setValue('items', updatedItems);
-      }
-      
-      setInitialSyncDone(true);
-    }
-  }, [isEdit, storeStockItems, items, form, initialSyncDone]);
-
-  const handleProductChange = (index: number, productId: string) => {
-    const newItems = [...items];
-    newItems[index].productId = productId;
-    newItems[index].quantity = undefined;
-    newItems[index].height = undefined;
-    newItems[index].width = undefined;
-    newItems[index].variantId = undefined;
-    form.setValue('items', newItems);
-  };
-
-  const handleVariantChange = (index: number, variant: any) => {
-    const newItems = [...items];
-    newItems[index].height = variant.height;
-    newItems[index].width = variant.width;
-    newItems[index].variantId = variant.id;
-    newItems[index].quantity = undefined;
-    form.setValue('items', newItems);
-    form.trigger(`items.${index}.quantity`);
-  };
 
   const [isDark, setIsDark] = useState(false);
 
@@ -364,9 +239,7 @@ export default function TransferForm({
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isFocused ? '#374151' : '#1f2937',
-      color: '#f9fafb',
-      cursor: state.isDisabled ? 'not-allowed' : 'default',
-      opacity: state.isDisabled ? 0.5 : 1
+      color: '#f9fafb'
     }),
     singleValue: (base: any) => ({
       ...base,
@@ -385,96 +258,76 @@ export default function TransferForm({
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
     try {
+      // Validate source
       if (data.sourceType === TransferEntityType.STORE && !data.sourceStoreId) {
         toast.error('Source store is required');
         setIsLoading(false);
         return;
       }
 
-      if (data.sourceType === TransferEntityType.SHOP && !data.sourceShopId) {
-        toast.error('Source shop is required');
+      if (data.sourceType === TransferEntityType.SHOWROOM && !data.sourceShowroomId) {
+        toast.error('Source showroom is required');
         setIsLoading(false);
         return;
       }
 
+      // Validate destination
       if (data.destinationType === TransferEntityType.STORE && !data.destStoreId) {
         toast.error('Destination store is required');
         setIsLoading(false);
         return;
       }
 
-      if (data.destinationType === TransferEntityType.SHOP && !data.destShopId) {
-        toast.error('Destination shop is required');
+      if (data.destinationType === TransferEntityType.SHOWROOM && !data.destShowroomId) {
+        toast.error('Destination showroom is required');
         setIsLoading(false);
         return;
       }
 
+      // Check if source and destination are the same
       if (
         (data.sourceType === TransferEntityType.STORE && 
          data.destinationType === TransferEntityType.STORE && 
          data.sourceStoreId === data.destStoreId) ||
-        (data.sourceType === TransferEntityType.SHOP && 
-         data.destinationType === TransferEntityType.SHOP && 
-         data.sourceShopId === data.destShopId)
+        (data.sourceType === TransferEntityType.SHOWROOM && 
+         data.destinationType === TransferEntityType.SHOWROOM && 
+         data.sourceShowroomId === data.destShowroomId)
       ) {
         toast.error('Source and destination cannot be the same');
         setIsLoading(false);
         return;
       }
 
-      const validItems = data.items.filter((item) => {
-        if (!item.productId) return false;
-        if (!item.quantity || item.quantity <= 0) return false;
-        const hasVariants = productHasVariants(item.productId);
-        if (hasVariants && (!item.height || !item.width || !item.variantId)) {
-          return false;
-        }
-        return true;
-      });
-
+      // Filter out incomplete items
+      const validItems = data.items.filter(
+        (item) => item.productId && item.quantity > 0
+      );
+      
       if (validItems.length === 0) {
         toast.error('Please add at least one valid item');
         setIsLoading(false);
         return;
       }
 
-      for (const item of validItems) {
-        const productItem = storeStockItems.find(
-          stock => stock.product.id === item.productId
-        );
-        
-        if (productItem?.hasVariants && item.variantId) {
-          const variant = productItem.variants?.find(v => v.id === item.variantId);
-          if (variant && item.quantity && item.quantity > variant.quantity) {
-            toast.error(`Insufficient stock for variant ${item.height}x${item.width}. Available: ${variant.quantity}`);
-            setIsLoading(false);
-            return;
-          }
-        } else if (productItem && !productItem.hasVariants) {
-          if (item.quantity && item.quantity > (productItem.quantity || 0)) {
-            toast.error(`Insufficient stock for product ${productItem.product.name}. Available: ${productItem.quantity}`);
-            setIsLoading(false);
-            return;
-          }
-        }
-      }
+      // Transform items based on product type
+      const transformedItems = validItems.map((item) => ({
+        [data.productType === 'items' ? 'itemId' : 'materialId']: item.productId,
+        quantity: Number(item.quantity),
+        ismaterial: data.productType === 'materials'
+      }));
 
       const cleanedPayload = {
         ...data,
         reference: data.reference?.trim() || undefined,
         notes: data.notes?.trim() || undefined,
         sourceStoreId: data.sourceStoreId || undefined,
-        sourceShopId: data.sourceShopId || undefined,
+        sourceShowroomId: data.sourceShowroomId || undefined,
         destStoreId: data.destStoreId || undefined,
-        destShopId: data.destShopId || undefined,
-        items: validItems.map((item) => ({
-          productId: item.productId.toString(),
-          quantity: Number(item.quantity),
-          ...(item.height && { height: Number(item.height) }),
-          ...(item.width && { width: Number(item.width) }),
-          ...(item.variantId && { variantId: item.variantId })
-        }))
+        destShowroomId: data.destShowroomId || undefined,
+        items: transformedItems
       };
+
+      delete (cleanedPayload as any).productType; // Remove productType from payload
 
       if (isEdit && initialData?.id) {
         await updateTransfer(initialData.id, cleanedPayload);
@@ -496,13 +349,7 @@ export default function TransferForm({
     }
   };
 
-  const deleteItem = (index: number, field: any) => {
-    const newItems = [...field.value];
-    newItems.splice(index, 1);
-    field.onChange(newItems);
-  };
-
-  if (!isMounted) {
+  if (!isMounted || loadingStoresShops) {
     return (
       <Card className='mx-auto w-full'>
         <CardHeader>
@@ -515,26 +362,6 @@ export default function TransferForm({
             <div className='text-center'>
               <div className='border-primary mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-b-2'></div>
               <div>Loading form...</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (loadingStoresShops) {
-    return (
-      <Card className='mx-auto w-full'>
-        <CardHeader>
-          <CardTitle className='text-left text-2xl font-bold'>
-            {isEdit ? 'Edit Transfer' : 'Create Transfer'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className='flex items-center justify-center py-8'>
-            <div className='text-center'>
-              <div className='border-primary mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-b-2'></div>
-              <div>Loading stores and shops...</div>
             </div>
           </div>
         </CardContent>
@@ -572,33 +399,65 @@ export default function TransferForm({
               <div></div>
             </div>
 
+            {/* Product Type Selection - First Step */}
+            <div className='rounded-lg border p-4'>
+              <h3 className='mb-4 text-lg font-semibold'>Step 1: Select Product Type</h3>
+              <FormField
+                control={form.control}
+                name='productType'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>What do you want to transfer?</FormLabel>
+                    <ShadcnSelect
+                      value={field.value}
+                      onValueChange={(value: 'items' | 'materials') => {
+                        field.onChange(value);
+                        // Clear items when product type changes
+                        form.setValue('items', [{ productId: '', quantity: 1 }]);
+                        setAvailableProducts([]);
+                        hasFetchedProductsRef.current = false;
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder='Select product type' />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value='items'>Items (Products)</SelectItem>
+                        <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
+                      </SelectContent>
+                    </ShadcnSelect>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Source and Destination Section */}
             <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-              <div className='space-y-4'>
-                <h3 className='text-lg font-semibold'>Source</h3>
+              {/* Source Column */}
+              <div className='space-y-4 rounded-lg border p-4'>
+                <h3 className='text-lg font-semibold'>Step 2: Source Location</h3>
 
                 <FormField
                   control={form.control}
                   name='sourceType'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel>
+                      <FormLabel>Source Type</FormLabel>
                       <ShadcnSelect
                         value={field.value}
                         onValueChange={(value: TransferEntityType) => {
                           field.onChange(value);
                           if (value === TransferEntityType.STORE) {
-                            form.setValue('sourceShopId', '');
+                            form.setValue('sourceShowroomId', '');
                           } else {
                             form.setValue('sourceStoreId', '');
                           }
-                          form.setValue('items', [
-                            {
-                              productId: '',
-                              quantity: undefined
-                            }
-                          ]);
-                          setStoreStockItems([]);
-                          setInitialSyncDone(false);
+                          form.setValue('items', [{ productId: '', quantity: 1 }]);
+                          setAvailableProducts([]);
+                          hasFetchedProductsRef.current = false;
                         }}
                       >
                         <FormControl>
@@ -610,8 +469,8 @@ export default function TransferForm({
                           <SelectItem value={TransferEntityType.STORE}>
                             Store
                           </SelectItem>
-                          <SelectItem value={TransferEntityType.SHOP}>
-                            Shop
+                          <SelectItem value={TransferEntityType.SHOWROOM}>
+                            Showroom
                           </SelectItem>
                         </SelectContent>
                       </ShadcnSelect>
@@ -631,14 +490,9 @@ export default function TransferForm({
                           value={field.value}
                           onValueChange={(value) => {
                             field.onChange(value);
-                            form.setValue('items', [
-                              {
-                                productId: '',
-                                quantity: undefined
-                              }
-                            ]);
-                            setStoreStockItems([]);
-                            setInitialSyncDone(false);
+                            form.setValue('items', [{ productId: '', quantity: 1 }]);
+                            setAvailableProducts([]);
+                            hasFetchedProductsRef.current = false;
                           }}
                         >
                           <FormControl>
@@ -648,10 +502,7 @@ export default function TransferForm({
                           </FormControl>
                           <SelectContent>
                             {stores.map((store) => (
-                              <SelectItem
-                                key={store.id}
-                                value={store.id.toString()}
-                              >
+                              <SelectItem key={store.id} value={store.id.toString()}>
                                 {store.name}
                               </SelectItem>
                             ))}
@@ -663,39 +514,31 @@ export default function TransferForm({
                   />
                 )}
 
-                {sourceType === TransferEntityType.SHOP && (
+                {sourceType === TransferEntityType.SHOWROOM && (
                   <FormField
                     control={form.control}
-                    name='sourceShopId'
+                    name='sourceShowroomId'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Shop</FormLabel>
+                        <FormLabel>Showroom</FormLabel>
                         <ShadcnSelect
                           value={field.value}
                           onValueChange={(value) => {
                             field.onChange(value);
-                            form.setValue('items', [
-                              {
-                                productId: '',
-                                quantity: undefined
-                              }
-                            ]);
-                            setStoreStockItems([]);
-                            setInitialSyncDone(false);
+                            form.setValue('items', [{ productId: '', quantity: 1 }]);
+                            setAvailableProducts([]);
+                            hasFetchedProductsRef.current = false;
                           }}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder='Select source shop' />
+                              <SelectValue placeholder='Select source showroom' />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {shops.map((shop) => (
-                              <SelectItem
-                                key={shop.id}
-                                value={shop.id.toString()}
-                              >
-                                {shop.name}
+                            {showrooms.map((showroom) => (
+                              <SelectItem key={showroom.id} value={showroom.id.toString()}>
+                                {showroom.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -707,21 +550,22 @@ export default function TransferForm({
                 )}
               </div>
 
-              <div className='space-y-4'>
-                <h3 className='text-lg font-semibold'>Destination</h3>
+              {/* Destination Column */}
+              <div className='space-y-4 rounded-lg border p-4'>
+                <h3 className='text-lg font-semibold'>Step 3: Destination Location</h3>
 
                 <FormField
                   control={form.control}
                   name='destinationType'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel>
+                      <FormLabel>Destination Type</FormLabel>
                       <ShadcnSelect
                         value={field.value}
                         onValueChange={(value: TransferEntityType) => {
                           field.onChange(value);
                           if (value === TransferEntityType.STORE) {
-                            form.setValue('destShopId', '');
+                            form.setValue('destShowroomId', '');
                           } else {
                             form.setValue('destStoreId', '');
                           }
@@ -736,8 +580,8 @@ export default function TransferForm({
                           <SelectItem value={TransferEntityType.STORE}>
                             Store
                           </SelectItem>
-                          <SelectItem value={TransferEntityType.SHOP}>
-                            Shop
+                          <SelectItem value={TransferEntityType.SHOWROOM}>
+                            Showroom
                           </SelectItem>
                         </SelectContent>
                       </ShadcnSelect>
@@ -753,21 +597,15 @@ export default function TransferForm({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Store</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
+                        <ShadcnSelect value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder='Select destination store' />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {disstores.map((store) => (
-                              <SelectItem
-                                key={store.id}
-                                value={store.id.toString()}
-                              >
+                            {destStores.map((store) => (
+                              <SelectItem key={store.id} value={store.id.toString()}>
                                 {store.name}
                               </SelectItem>
                             ))}
@@ -779,29 +617,23 @@ export default function TransferForm({
                   />
                 )}
 
-                {destinationType === TransferEntityType.SHOP && (
+                {destinationType === TransferEntityType.SHOWROOM && (
                   <FormField
                     control={form.control}
-                    name='destShopId'
+                    name='destShowroomId'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Shop</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
+                        <FormLabel>Showroom</FormLabel>
+                        <ShadcnSelect value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder='Select destination shop' />
+                              <SelectValue placeholder='Select destination showroom' />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {disshops.map((shop) => (
-                              <SelectItem
-                                key={shop.id}
-                                value={shop.id.toString()}
-                              >
-                                {shop.name}
+                            {destShowrooms.map((showroom) => (
+                              <SelectItem key={showroom.id} value={showroom.id.toString()}>
+                                {showroom.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -814,248 +646,94 @@ export default function TransferForm({
               </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name='items'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Items</FormLabel>
-                  <FormControl>
-                    <div className='space-y-4'>
-                      {/* Desktop header - hidden on mobile */}
-                      <div className='hidden lg:grid lg:grid-cols-6 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
-                        <div>Product</div>
-                        <div>Variant</div>
-                        <div>Quantity</div>
-                        <div>Available</div>
-                        <div>Unit</div>
-                        <div>Action</div>
-                      </div>
+            {/* Items Selection - Step 4 */}
+            <div className='rounded-lg border p-4'>
+              <h3 className='mb-4 text-lg font-semibold'>Step 4: Select Products to Transfer</h3>
+              <FormField
+                control={form.control}
+                name='items'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className='space-y-4'>
+                        <div className='grid grid-cols-6 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
+                          <div className='col-span-3'>Product</div>
+                          <div>Quantity</div>
+                          <div>Available Stock</div>
+                          <div>Action</div>
+                        </div>
 
-                      {field.value.map((item, index) => {
-                        const storeStockItem = storeStockItems.find(
-                          (stock) => stock.product.id.toString() === item.productId
-                        );
-
-                        const hasVariants = storeStockItem?.hasVariants || false;
-                        const variants = storeStockItem?.variants || [];
-                        
-                        let availableQuantity = 0;
-                        if (hasVariants && item.variantId) {
-                          const selectedVariant = variants.find(v => v.id === item.variantId);
-                          availableQuantity = selectedVariant?.quantity || 0;
-                        } else if (!hasVariants) {
-                          availableQuantity = storeStockItem?.quantity || 0;
-                        }
-                        
-                        const productUnitOfMeasure = getUnitOfMeasureForProduct(item.productId);
-
-                        const availableProducts = getAvailableProducts(index);
-                        const productOptions = availableProducts.map((storeStockItem) => ({
-                          value: storeStockItem.product.id.toString(),
-                          label: formatProductLabel(storeStockItem.product),
-                          data: storeStockItem
-                        }));
-
-                        const variantOptions = variants.map((variant) => ({
-                          value: variant.id,
-                          label: formatVariantLabel(variant),
-                          data: variant
-                        }));
-
-                        let selectedVariantValue = null;
-                        if (item.variantId) {
-                          selectedVariantValue = variantOptions.find(
-                            (v) => v.value === item.variantId
+                        {field.value.map((item, index) => {
+                          const selectedProduct = availableProducts.find(
+                            (p) => p.id === item.productId
                           );
-                        } else if (item.height && item.width && !item.variantId) {
-                          selectedVariantValue = variantOptions.find(
-                            (v) => 
-                              Math.abs(v.data.height - (item.height || 0)) < 0.01 && 
-                              Math.abs(v.data.width - (item.width || 0)) < 0.01
-                          );
-                        }
 
-                        return (
-                          <div
-                            key={index}
-                            className='border rounded-lg p-4 lg:p-0 lg:border-none space-y-4 lg:space-y-0'
-                          >
-                            {/* Mobile View */}
-                            <div className='lg:hidden space-y-3'>
-                              <div className='flex justify-between items-start'>
-                                <Label className='font-semibold'>Item {index + 1}</Label>
-                                <Button
-                                  type='button'
-                                  variant='destructive'
-                                  size='sm'
-                                  onClick={() => deleteItem(index, field)}
-                                  disabled={field.value.length <= 1}
-                                >
-                                  <IconTrash size={16} />
-                                </Button>
-                              </div>
+                          const productOptions = availableProducts.map((product) => ({
+                            value: product.id,
+                            label: `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`,
+                            data: product
+                          }));
 
-                              <div>
-                                <Label className='text-sm'>Product</Label>
-                                <Select
-                                  instanceId={`product-select-mobile-${index}`}
-                                  options={productOptions}
-                                  onChange={(newValue: any) => {
-                                    handleProductChange(index, newValue?.value || '');
-                                  }}
-                                  value={
-                                    productOptions.find(
-                                      (p) => p.value === item.productId
-                                    ) || null
-                                  }
-                                  placeholder='Search product'
-                                  isSearchable
-                                  isDisabled={loadingProducts}
-                                  isLoading={loadingProducts}
-                                  isOptionDisabled={(option) => isProductSelected(option.value, index)}
-                                  styles={isDark ? darkStyles : {}}
-                                />
-                              </div>
-
-                              {hasVariants && (
-                                <div>
-                                  <Label className='text-sm'>Variant</Label>
-                                  <Select
-                                    instanceId={`variant-select-mobile-${index}`}
-                                    options={variantOptions}
-                                    onChange={(newValue: any) => {
-                                      handleVariantChange(index, newValue?.data);
-                                    }}
-                                    value={selectedVariantValue}
-                                    placeholder='Select dimensions'
-                                    isSearchable
-                                    isDisabled={loadingProducts || !item.productId}
-                                    isLoading={loadingProducts}
-                                    styles={isDark ? darkStyles : {}}
-                                  />
-                                </div>
-                              )}
-
-                              <div>
-                                <Label className='text-sm'>Quantity</Label>
-                                <Input
-                                  type='number'
-                                  placeholder='Qty'
-                                  value={item.quantity === undefined ? '' : item.quantity}
-                                  min={1}
-                                  max={Math.floor(availableQuantity)}
-                                  onChange={(e) => {
-                                    const newItems = [...field.value];
-                                    const value = e.target.value;
-                                    const quantity = value === '' ? undefined : Number(value);
-                                    
-                                    if (quantity !== undefined && !isNaN(quantity) && quantity >= 1) {
-                                      const maxQuantity = Math.floor(availableQuantity);
-                                      newItems[index].quantity = Math.min(quantity, maxQuantity);
-                                    } else if (value === '') {
-                                      newItems[index].quantity = undefined;
-                                    }
-                                    field.onChange(newItems);
-                                  }}
-                                  disabled={loadingProducts || (hasVariants && !item.variantId)}
-                                />
-                              </div>
-
-                              <div className='flex justify-between items-center'>
-                                <Label className='text-sm'>Available</Label>
-                                <span className='text-sm font-medium'>
-                                  {loadingProducts ? (
-                                    <div className='h-3 w-3 animate-spin rounded-full border-b-2 border-gray-400'></div>
-                                  ) : availableQuantity > 0 ? (
-                                    `${Math.floor(availableQuantity)} available`
-                                  ) : hasVariants && item.productId && !item.variantId ? (
-                                    'Select variant'
-                                  ) : (
-                                    'Out of stock'
-                                  )}
-                                </span>
-                              </div>
-
-                              <div className='flex justify-between items-center'>
-                                <Label className='text-sm'>Unit</Label>
-                                <span className='text-sm text-muted-foreground'>
-                                  {productUnitOfMeasure ? productUnitOfMeasure.name : 'Select product'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Desktop View */}
-                            <div className='hidden lg:grid lg:grid-cols-6 items-center gap-4'>
-                              <div>
+                          return (
+                            <div key={index} className='grid grid-cols-6 items-center gap-4'>
+                              <div className='col-span-3'>
                                 <Select
                                   instanceId={`product-select-${index}`}
                                   options={productOptions}
                                   onChange={(newValue: any) => {
-                                    handleProductChange(index, newValue?.value || '');
+                                    const newItems = [...field.value];
+                                    newItems[index].productId = newValue?.value || '';
+                                    newItems[index].quantity = 1;
+                                    field.onChange(newItems);
                                   }}
                                   value={
                                     productOptions.find(
                                       (p) => p.value === item.productId
                                     ) || null
                                   }
-                                  placeholder='Search product'
+                                  placeholder={loadingProducts ? "Loading products..." : "Search product"}
                                   isSearchable
-                                  isDisabled={loadingProducts}
+                                  isDisabled={loadingProducts || availableProducts.length === 0}
                                   isLoading={loadingProducts}
-                                  isOptionDisabled={(option) => isProductSelected(option.value, index)}
                                   styles={isDark ? darkStyles : {}}
                                 />
-                              </div>
-
-                              <div>
-                                {hasVariants ? (
-                                  <Select
-                                    instanceId={`variant-select-${index}`}
-                                    options={variantOptions}
-                                    onChange={(newValue: any) => {
-                                      handleVariantChange(index, newValue?.data);
-                                    }}
-                                    value={selectedVariantValue}
-                                    placeholder='Select dimensions'
-                                    isSearchable
-                                    isDisabled={loadingProducts || !item.productId}
-                                    isLoading={loadingProducts}
-                                    styles={isDark ? darkStyles : {}}
-                                  />
-                                ) : (
-                                  <div className='text-muted-foreground text-sm'>
-                                    {item.productId ? 'Standard item' : 'Select product'}
+                                {selectedProduct && (
+                                  <div className='mt-1 text-xs text-gray-500'>
+                                    {productType === 'items' ? (
+                                      <>
+                                        {selectedProduct.category && `Category: ${selectedProduct.category}`}
+                                        {selectedProduct.type && ` | Type: ${selectedProduct.type}`}
+                                      </>
+                                    ) : (
+                                      <>
+                                        {selectedProduct.materialType && `Type: ${selectedProduct.materialType}`}
+                                        {selectedProduct.unitOfMeasure && ` | Unit: ${selectedProduct.unitOfMeasure}`}
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
 
                               <div>
-                            <Input
-    type='number'
-    placeholder='Qty'
-    value={item.quantity === undefined ? '' : item.quantity}
-    min={1}
-    max={Math.floor(availableQuantity)}
-    onChange={(e) => {
-      const newItems = [...field.value];
-      const value = e.target.value;
-      const quantity = value === '' ? undefined : Number(value);
-      
-      if (quantity !== undefined && !isNaN(quantity) && quantity >= 1) {
-        const maxQuantity = Math.floor(availableQuantity);
-        newItems[index].quantity = Math.min(quantity, maxQuantity);
-      } else if (value === '') {
-        newItems[index].quantity = undefined;
-      }
-      field.onChange(newItems);
-    }}
-    disabled={loadingProducts || (hasVariants && !item.variantId)}
-    className={!item.quantity && item.productId && (!hasVariants || (hasVariants && item.variantId)) ? 'border-red-500 focus-visible:ring-red-500' : ''}
-  />
-  {(!item.quantity && item.productId && (!hasVariants || (hasVariants && item.variantId))) && (
-    <p className='text-sm text-red-500 mt-1'>Quantity is required</p>
-  )}
+                                <Input
+                                  type='number'
+                                  placeholder='Qty'
+                                  value={item.quantity}
+                                  min={1}
+                                  max={selectedProduct?.stockQuantity || 0}
+                                  onChange={(e) => {
+                                    const newItems = [...field.value];
+                                    const quantity = Number(e.target.value);
+                                    const maxQuantity = selectedProduct?.stockQuantity || 0;
+
+                                    newItems[index].quantity = Math.min(
+                                      isNaN(quantity) ? 0 : quantity,
+                                      maxQuantity
+                                    );
+                                    field.onChange(newItems);
+                                  }}
+                                  disabled={!item.productId || loadingProducts}
+                                />
                               </div>
 
                               <div className='text-muted-foreground text-sm'>
@@ -1064,20 +742,12 @@ export default function TransferForm({
                                     <div className='h-3 w-3 animate-spin rounded-full border-b-2 border-gray-400'></div>
                                     <span>Loading...</span>
                                   </div>
-                                ) : availableQuantity > 0 ? (
-                                  `${Math.floor(availableQuantity)} available`
-                                ) : hasVariants && item.productId && !item.variantId ? (
-                                  'Select variant'
+                                ) : selectedProduct ? (
+                                  <span className={selectedProduct.stockQuantity > 0 ? 'text-green-600' : 'text-red-600'}>
+                                    {selectedProduct.stockQuantity} available
+                                  </span>
                                 ) : (
-                                  'Out of stock'
-                                )}
-                              </div>
-
-                              <div className='text-muted-foreground text-sm'>
-                                {productUnitOfMeasure ? (
-                                  productUnitOfMeasure.name
-                                ) : (
-                                  <span className='text-gray-400'>Select product</span>
+                                  'Select product'
                                 )}
                               </div>
 
@@ -1086,50 +756,57 @@ export default function TransferForm({
                                   type='button'
                                   variant='destructive'
                                   size='sm'
-                                  onClick={() => deleteItem(index, field)}
+                                  onClick={() => {
+                                    const newItems = [...field.value];
+                                    newItems.splice(index, 1);
+                                    field.onChange(newItems);
+                                  }}
                                   disabled={field.value.length <= 1}
                                 >
                                   <IconTrash size={16} />
                                 </Button>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
 
-                      <div className='flex justify-end'>
-                        <Button
-                          type='button'
-                          onClick={() => {
-                            field.onChange([
-                              ...field.value,
-                              {
-                                productId: '',
-                                quantity: undefined
-                              }
-                            ]);
-                          }}
-                          disabled={loadingProducts}
-                        >
-                          <IconPlus size={16} className='mr-2' />
-                          {loadingProducts ? 'Loading...' : 'Add Item'}
-                        </Button>
+                        <div className='flex justify-end'>
+                          <Button
+                            type='button'
+                            onClick={() => {
+                              field.onChange([
+                                ...field.value,
+                                { productId: '', quantity: 1 }
+                              ]);
+                            }}
+                            disabled={loadingProducts || availableProducts.length === 0}
+                          >
+                            Add Item
+                          </Button>
+                        </div>
+
+                        {availableProducts.length === 0 && !loadingProducts && (
+                          <div className='rounded-lg bg-yellow-50 p-4 text-center text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200'>
+                            <p>No products available at the selected source location.</p>
+                            <p className='text-sm mt-1'>Please check that you have selected the correct product type and source location.</p>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
               name='notes'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>Notes (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder='Enter notes (optional)' {...field} />
+                    <Input placeholder='Enter any additional notes' {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

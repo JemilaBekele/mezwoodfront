@@ -1,0 +1,70 @@
+import PageContainer from '@/components/layout/page-container';
+import { Heading } from '@/components/ui/heading';
+import { Separator } from '@/components/ui/separator';
+import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
+import UserTableAction from '@/features/Employee/components/employee-table-action';
+import { searchParamsCache } from '@/lib/searchparams';
+
+import { SearchParams } from 'nuqs/server';
+import { Suspense } from 'react';
+
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
+
+import CuttingProjectListingPage from '@/features/Stages/CUTTING/Project/listing';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '@/components/ui/button';
+import StageAllocationCalendar from '@/features/Project/StageAllocationCalendar';
+
+export const metadata = {
+  title: 'Dashboard: Project'
+};
+
+type pageProps = {
+  searchParams: Promise<SearchParams>;
+};
+
+export default async function PurchasePage(props: pageProps) {
+  const searchParams = await props.searchParams;
+  // Allow nested RSCs to access the search params (in a type-safe way)
+  searchParamsCache.parse(searchParams);
+
+  // This key is used for invoke suspense if any of the search params changed (used for filters).
+  // const key = serialize({ ...searchParams });
+
+  return (
+    <PageContainer scrollable={true}>
+      <div className='flex flex-1 flex-col space-y-4'>
+        <div className='flex items-start justify-between'>
+<Heading 
+  title="Cutting Work Stage" 
+  description="Manage Cutting work projects" 
+/>       
+               <PermissionGuard requiredPermission={PERMISSIONS.STAGE.VIEW_CUTTING_PROJECTS.name}>
+
+  <Link
+              href='/dashboard/Stage/cutting/finished'
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+              Finished Cutting Work Projects
+            </Link>                        </PermissionGuard>
+
+        </div>
+        <Separator />
+                <StageAllocationCalendar stage="CUTTING" />
+
+        <UserTableAction />
+
+        <Suspense
+          // key={key}
+          fallback={
+            <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
+          }
+        >
+          <CuttingProjectListingPage />
+        </Suspense>
+      </div>
+    </PageContainer>
+  );
+}

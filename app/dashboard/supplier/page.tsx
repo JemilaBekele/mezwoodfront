@@ -12,7 +12,7 @@ import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
+import UserTableAction from '@/features/Employee/components/employee-table-action';
 
 export const metadata = {
   title: 'Dashboard: Supplier'
@@ -53,7 +53,7 @@ export default async function SupplierPage({ searchParams }: PageProps) {
           }
         >
           {' '}
-          <ItemTableAction />
+        <UserTableAction />
           <SuppliersListingPage />
         </Suspense>
       </div>

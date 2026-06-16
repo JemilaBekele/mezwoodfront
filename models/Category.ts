@@ -1,5 +1,3 @@
-import { IProduct } from "./Product";
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface ICategory {
   id: string; // UUID string
@@ -15,7 +13,7 @@ export interface IColour {
   id: string; // UUID string
   name: string;
 
-  products?: IProduct[]; // Replace 'any' with IProduct[] if you have a Product model
+  products?: any[]; // Replace 'any' with IProduct[] if you have a Product model
 
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string

@@ -51,23 +51,23 @@ export default function UserTableAction() {
       </div>
 
       <div className='flex flex-col gap-4 sm:flex-row'>
-        <div className='flex flex-col gap-2'>
-          <Label htmlFor='startDate'>From</Label>
+        <div className='flex items-center gap-2'>
+          <Label htmlFor='startDate' className='text-sm text-muted-foreground whitespace-nowrap'>From</Label>
           <DatePicker
             selectedDate={filters.startDate ?? undefined}
             onSelect={handleStartDateChange}
             fromDate={new Date(2000, 0, 1)}
-            key={filters.startDate?.toISOString()} // Force re-render on date change
+            key={filters.startDate?.toISOString()}
           />
         </div>
 
-        <div className='flex flex-col gap-2'>
-          <Label htmlFor='endDate'>To</Label>
+        <div className='flex items-center gap-2'>
+          <Label htmlFor='endDate' className='text-sm text-muted-foreground whitespace-nowrap'>To</Label>
           <DatePicker
             selectedDate={filters.endDate ?? undefined}
             onSelect={handleEndDateChange}
             fromDate={filters.startDate ?? new Date(2000, 0, 1)}
-            key={filters.endDate?.toISOString()} // Force re-render on date change
+            key={filters.endDate?.toISOString()}
           />
         </div>
 

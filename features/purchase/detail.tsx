@@ -25,8 +25,7 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
-  Trash2,
-  Ruler
+  Trash2
 } from 'lucide-react';
 import { IPurchase, PaymentStatus, PurchaseItem } from '@/models/purchase';
 import {
@@ -58,6 +57,11 @@ import {
 import { deleteStockCorrection } from '@/service/StockCorrection';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle
+} from '@/components/ui/alert';
 
 type PurchaseViewProps = {
   id?: string;
@@ -74,6 +78,8 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<PaymentStatus>();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showStatusAlert, setShowStatusAlert] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<PaymentStatus | null>(null);
 
   useEffect(() => {
     const fetchPurchaseData = async () => {
@@ -86,7 +92,7 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
           // Fetch stock corrections for this purchase
           await fetchStockCorrections(id);
         }
-      } catch  {
+      } catch (error) {
         toast.error('Failed to fetch purchase details');
       } finally {
         setLoading(false);
@@ -101,21 +107,35 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
     try {
       const corrections = await getStockCorrectionsByPurchaseId(purchaseId);
       setStockCorrections(corrections);
-    } catch  {
+    } catch (error) {
       toast.error('Failed to load stock corrections');
     } finally {
       setLoadingCorrections(false);
     }
   };
 
-  const handleStatusUpdate = async () => {
-    if (!id || !selectedStatus || selectedStatus === purchase?.paymentStatus) {
+  const handleStatusChange = (value: PaymentStatus) => {
+    // If the selected status is the same as current, don't do anything
+    if (value === purchase?.paymentStatus) {
+      return;
+    }
+    
+    // Set the selected status and show confirmation dialog
+    setSelectedStatus(value);
+    setPendingStatus(value);
+    setShowStatusAlert(true);
+  };
+
+  const handleStatusUpdateConfirm = async () => {
+    if (!id || !pendingStatus || pendingStatus === purchase?.paymentStatus) {
+      setShowStatusAlert(false);
+      setPendingStatus(null);
       return;
     }
 
     setUpdating(true);
     try {
-      const updatedPurchase = await acceptPurchase(id, selectedStatus);
+      const updatedPurchase = await acceptPurchase(id, pendingStatus);
 
       // Preserve the existing items when updating the purchase
       setPurchase((prevPurchase) => ({
@@ -123,18 +143,34 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
         items: prevPurchase?.items || updatedPurchase.items || []
       }));
 
-      toast.success('Payment status updated successfully');
+      setSelectedStatus(pendingStatus);
+      toast.success(`Payment status updated to ${pendingStatus} successfully`);
 
       // If status was changed to APPROVED, trigger a refresh
-      if (selectedStatus === PaymentStatus.APPROVED) {
+      if (pendingStatus === PaymentStatus.APPROVED) {
         // Force a refresh of the data
         setRefreshTrigger((prev) => prev + 1);
       }
-    } catch  {
+    } catch (error) {
       toast.error('Failed to update payment status');
+      // Reset the selected status to the original if update fails
+      if (purchase) {
+        setSelectedStatus(purchase.paymentStatus);
+      }
     } finally {
       setUpdating(false);
+      setShowStatusAlert(false);
+      setPendingStatus(null);
     }
+  };
+
+  const handleStatusUpdateCancel = () => {
+    // Reset the selected status back to the original purchase status
+    if (purchase) {
+      setSelectedStatus(purchase.paymentStatus);
+    }
+    setShowStatusAlert(false);
+    setPendingStatus(null);
   };
 
   const handleDeleteStockCorrection = async (correctionId: string) => {
@@ -147,7 +183,7 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
       if (id) {
         await fetchStockCorrections(id);
       }
-    } catch  {
+    } catch (error) {
       toast.error('Failed to delete stock correction');
     } finally {
       setDeletingId(null);
@@ -158,6 +194,35 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
     if (id) {
       await fetchStockCorrections(id);
     }
+  };
+
+  const getStatusAlertMessage = () => {
+    if (!pendingStatus || !purchase) return { title: '', description: '' };
+    
+    const currentStatus = purchase.paymentStatus;
+    const newStatus = pendingStatus;
+    
+    if (newStatus === PaymentStatus.APPROVED) {
+      return {
+        title: 'Confirm Approval',
+        description: `Are you sure you want to approve this purchase? This will update inventory and ${currentStatus === PaymentStatus.PENDING ? 'process' : 'reprocess'} stock movements. This action cannot be undone.`
+      };
+    } else if (newStatus === PaymentStatus.REJECTED) {
+      return {
+        title: 'Confirm Rejection',
+        description: `Are you sure you want to reject this purchase? This will ${currentStatus === PaymentStatus.APPROVED ? 'reverse any inventory updates and' : ''} mark the purchase as rejected. This action cannot be undone.`
+      };
+    } else if (newStatus === PaymentStatus.PENDING) {
+      return {
+        title: 'Confirm Pending Status',
+        description: `Are you sure you want to change the status back to PENDING? This will ${currentStatus === PaymentStatus.APPROVED ? 'reverse inventory updates and' : ''} set the purchase back to pending.`
+      };
+    }
+    
+    return {
+      title: 'Confirm Status Change',
+      description: `Are you sure you want to change the payment status from ${currentStatus} to ${newStatus}?`
+    };
   };
 
   if (loading) {
@@ -183,76 +248,98 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
 
   const grandTotal = purchase.grandTotal || subtotal;
 
-  // Check if purchase is already paid
-  const isPaid = purchase.paymentStatus === PaymentStatus.APPROVED;
-
   return (
     <div className='container mx-auto space-y-6 p-4 md:p-8'>
-      {/* Payment Status Update Section - Only show if not paid */}
-      {!isPaid && (
-        <Card className='shadow-lg'>
-          <CardHeader>
-            <CardTitle className='text-xl font-bold'>
-              Update Payment Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-center'>
-              <PermissionGuard
-                requiredPermission={PERMISSIONS.PURCHASE.ACCEPT.name}
+      {/* Status Update Alert Dialog */}
+      <AlertDialog open={showStatusAlert} onOpenChange={setShowStatusAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{getStatusAlertMessage().title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {getStatusAlertMessage().description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleStatusUpdateCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleStatusUpdateConfirm}
+              className={
+                pendingStatus === PaymentStatus.REJECTED
+                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  : pendingStatus === PaymentStatus.APPROVED
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : ''
+              }
+            >
+              {updating ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  Updating...
+                </>
+              ) : (
+                `Confirm ${pendingStatus}`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Payment Status Update Section */}
+      <Card className='shadow-lg'>
+        <CardHeader>
+          <CardTitle className='text-xl font-bold'>
+            Update Payment Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-center'>
+            <PermissionGuard
+              requiredPermission={PERMISSIONS.PURCHASE.ACCEPT.name}
+            >
+              <Select
+                value={selectedStatus}
+                onValueChange={handleStatusChange}
+                disabled={updating}
               >
-                <Select
-                  value={selectedStatus}
-                  onValueChange={(value: PaymentStatus) =>
-                    setSelectedStatus(value)
-                  }
-                >
-                  <SelectTrigger className='w-full sm:w-50'>
-                    <SelectValue placeholder='Select status' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={PaymentStatus.APPROVED}>
-                      APPROVED
-                    </SelectItem>
-                    <SelectItem value={PaymentStatus.REJECTED}>
-                      REJECTED
-                    </SelectItem>
-                    <SelectItem value={PaymentStatus.PENDING}>
-                      PENDING
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <SelectTrigger className='w-full sm:w-50'>
+                  <SelectValue placeholder='Select status' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={PaymentStatus.APPROVED}>
+                    APPROVED
+                  </SelectItem>
+                  <SelectItem value={PaymentStatus.REJECTED}>
+                    REJECTED
+                  </SelectItem>
+                  <SelectItem value={PaymentStatus.PENDING}>
+                    PENDING
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
-                <Button
-                  onClick={handleStatusUpdate}
-                  disabled={
-                    updating ||
-                    !selectedStatus ||
-                    selectedStatus === purchase.paymentStatus
-                  }
-                  className='w-full sm:w-auto'
-                >
-                  {updating ? (
-                    <>
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Status'
-                  )}
-                </Button>
+              {updating && (
+                <div className='flex items-center gap-2'>
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                  <span className='text-sm text-muted-foreground'>
+                    Updating status...
+                  </span>
+                </div>
+              )}
 
-                {selectedStatus &&
-                  selectedStatus !== purchase.paymentStatus && (
-                    <Badge variant='outline' className='ml-2'>
-                      Changing from {purchase.paymentStatus} to {selectedStatus}
-                    </Badge>
-                  )}
-              </PermissionGuard>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              {selectedStatus &&
+                selectedStatus !== purchase.paymentStatus &&
+                !updating && (
+                  <Badge variant='outline' className='ml-2'>
+                    Changing from {purchase.paymentStatus} to {selectedStatus}
+                  </Badge>
+                )}
+            </PermissionGuard>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Purchase Details Card */}
       <Card className='shadow-lg'>
@@ -306,15 +393,6 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                     <p>
                       <span className='font-medium'>Supplier:</span>{' '}
                       {purchase.supplier.name ?? 'Unknown Supplier'}
-                    </p>
-                  </div>
-                )}
-                {purchase.store && (
-                  <div className='flex items-center gap-2'>
-                    <User className='text-muted-foreground h-4 w-4' />
-                    <p>
-                      <span className='font-medium'>Store:</span>{' '}
-                      {purchase.store.name ?? 'Unknown Store'}
                     </p>
                   </div>
                 )}
@@ -378,117 +456,61 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
           </div>
 
           {/* Purchased Items Table Section */}
-         {purchase.items?.length > 0 && (
-  <div className='space-y-4'>
-    <h3 className='text-lg font-semibold'>Purchased Items</h3>
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Product</TableHead>
-          <TableHead>Unit</TableHead>
-          <TableHead>Height</TableHead>
-          <TableHead>Width</TableHead>
-          <TableHead>Area</TableHead>
-          <TableHead>Quantity</TableHead>
-          <TableHead>Unit Price</TableHead>
-          <TableHead>Total Price</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {purchase.items.map((item: PurchaseItem) => {
-          const hasDimensions =
-            typeof item.height === 'number' &&
-            typeof item.width === 'number' &&
-            item.height > 0 &&
-            item.width > 0;
-          const area = hasDimensions
-            ? ((item.height ?? 0) * (item.width ?? 0) * item.quantity).toFixed(2)
-            : null;
-          
-          return (
-            <TableRow key={item.id || item.productId}>
-              <TableCell className='font-medium'>
-                <div className='flex flex-col'>
-                  <span>{item.product?.name || 'Unknown Product'}</span>
-                  {item.product?.colour?.name && (
-                    <span className='text-xs text-muted-foreground'>
-                      {item.product.colour.name}
-                    </span>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                {item.unitOfMeasure?.name || 'Unknown Unit'}
-              </TableCell>
-              <TableCell>
-                {hasDimensions ? (
-                  <span className='font-medium'>{item.height}</span>
-                ) : (
-                  <span className='text-muted-foreground text-sm'>—</span>
-                )}
-              </TableCell>
-              <TableCell>
-                {hasDimensions ? (
-                  <span className='font-medium'>{item.width}</span>
-                ) : (
-                  <span className='text-muted-foreground text-sm'>—</span>
-                )}
-              </TableCell>
-              <TableCell>
-                {area ? (
-                  <span className='font-medium'>{area} m²</span>
-                ) : (
-                  <span className='text-muted-foreground text-sm'>—</span>
-                )}
-              </TableCell>
-              <TableCell>
-                <span className='font-medium'>{item.quantity}</span>
-              </TableCell>
-              <TableCell>
-                <span className='font-medium'>
-                  {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'ETB'
-                  }).format(item.unitPrice || 0)}
-                </span>
-              </TableCell>
-              <TableCell>
-                <span className='font-medium text-green-600 dark:text-green-400'>
-                  {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'ETB'
-                  }).format(item.totalPrice || 0)}
-                </span>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  </div>
-)}
+          {purchase.items?.length > 0 && (
+            <div className='space-y-4'>
+              <h3 className='text-lg font-semibold'>Purchased Items</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Unit Price</TableHead>
+                    <TableHead>Total Price</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {purchase.items.map((item: PurchaseItem, index) => (
+                    <TableRow key={item.id || item.materialId || index}>
+                      <TableCell className='font-medium'>
+                        {item.material?.name || 'Unknown Material'}
+                      </TableCell>
+                      <TableCell>
+                        {item?.unitOfMeasure?.name || 'Unknown Unit'}
+                      </TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>{(item.unitPrice || 0).toFixed(2)}</TableCell>
+                      <TableCell>{(item.totalPrice || 0).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Stock Corrections Section
+      {/* Stock Corrections Section */}
       <Card className='shadow-lg'>
         <CardHeader className='flex flex-row items-center justify-between'>
-          <CardTitle className='flex items-center gap-2 text-xl font-bold'>
-            <AlertTriangle className='text-amber-500' />
-            Stock Corrections
-            {stockCorrections.length > 0 && (
-              <Badge variant='secondary' className='ml-2'>
-                {stockCorrections.length}
-              </Badge>
-            )}
-            <div className='mt-3'>
-              <Link href={`/dashboard/purchase/StockCorrection?id=${id}`}>
+          <div className='flex flex-col space-y-2'>
+            <CardTitle className='flex items-center gap-2 text-xl font-bold'>
+              <AlertTriangle className='text-amber-500' />
+              Stock Corrections
+              {stockCorrections.length > 0 && (
+                <Badge variant='secondary' className='ml-2'>
+                  {stockCorrections.length}
+                </Badge>
+              )}
+            </CardTitle>
+            <div>
+              <Link href={`/dashboard/purchase/StockCorrection/create?id=${id}`}>
                 <Button variant='outline' size='sm'>
                   Add Stock Correction
                 </Button>
               </Link>
             </div>
-          </CardTitle>
+          </div>
           <Button
             variant='outline'
             size='sm'
@@ -523,7 +545,7 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                     <div className='mb-4 flex items-start justify-between'>
                       <div>
                         <h4 className='font-semibold'>
-                          Stock Correction #{correction.id.slice(-6)}
+                          Stock Correction #{correction.shortCode || correction.id.slice(-6)}
                         </h4>
                         <div className='mt-2 flex flex-wrap gap-4'>
                           <Badge variant='outline' className='capitalize'>
@@ -563,16 +585,10 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                         </p>
                       </div>
                       <div>
-                        {correction.store && (
+                        {correction.purchase && (
                           <p className='text-muted-foreground text-sm'>
-                            <span className='font-medium'>Store:</span>{' '}
-                            {correction.store.name}
-                          </p>
-                        )}
-                        {correction.shop && (
-                          <p className='text-muted-foreground text-sm'>
-                            <span className='font-medium'>Shop:</span>{' '}
-                            {correction.shop.name}
+                            <span className='font-medium'>Purchase:</span>{' '}
+                            {correction.purchase.invoiceNo}
                           </p>
                         )}
                       </div>
@@ -588,7 +604,13 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                     )}
 
                     <div className='mb-4 flex gap-2'>
-                   
+                      <Link
+                        href={`/dashboard/purchase/StockCorrection/${correction.id}?purchaseId=${id}`}
+                      >
+                        <Button variant='outline' size='sm'>
+                          Edit Stock Correction
+                        </Button>
+                      </Link>
 
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -629,84 +651,43 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                       </AlertDialog>
                     </div>
 
-                   <div className='mt-4'>
-  <h5 className='mb-2 font-medium'>Correction Items:</h5>
-  <Table>
-    <TableHeader>
-      <TableRow>
-        <TableHead>Product</TableHead>
-        <TableHead>Dimensions</TableHead>
-        <TableHead>Quantity</TableHead>
-        <TableHead>Unit</TableHead>
-        <TableHead>Adjustment</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {correction.items &&
-        correction.items.map((item, index) => {
-          const hasDimensions = item.height && item.width && item.height > 0 && item.width > 0;
-          const isAddition = item.quantity > 0;
-          
-          return (
-            <TableRow key={index}>
-              <TableCell className='font-medium'>
-                {item.product?.name || 'Unknown Product'}
-                {item.product?.colour?.name && (
-                  <span className='text-muted-foreground ml-1 text-xs'>
-                    ({item.product.colour.name})
-                  </span>
-                )}
-              </TableCell>
-              
-              <TableCell>
-                {hasDimensions ? (
-                  <Badge variant="outline" className='bg-blue-50 dark:bg-blue-950'>
-                    <Ruler className='mr-1 h-3 w-3' />
-                    {item.height} x {item.width}
-                  </Badge>
-                ) : (
-                  <span className='text-muted-foreground text-xs'>-</span>
-                )}
-              </TableCell>
-              
-              <TableCell>
-                <span className={isAddition ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                  {item.quantity}
-                </span>
-              </TableCell>
-              
-              <TableCell>
-                {item.unitOfMeasure?.name || 'N/A'}
-                {item.unitOfMeasure?.symbol && (
-                  <span className='text-muted-foreground ml-1 text-xs'>
-                    ({item.unitOfMeasure.symbol})
-                  </span>
-                )}
-              </TableCell>
-              
-              <TableCell>
-                <Badge 
-                  variant={isAddition ? 'default' : 'destructive'}
-                  className='text-xs'
-                >
-                  {isAddition ? 'Addition' : 'Subtraction'}
-                </Badge>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-    </TableBody>
-    
-
-  </Table>
-</div>
+                    <div className='mt-4'>
+                      <h5 className='mb-2 font-medium'>Correction Items:</h5>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Material</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Unit</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {correction.items &&
+                            correction.items.map((item, index) => (
+                              <TableRow key={index}>
+                                <TableCell>
+                                  {item.material?.name || 'Unknown Material'}
+                                </TableCell>
+                                <TableCell>
+                                  <span className={item.quantity < 0 ? 'text-red-500 font-medium' : 'text-green-500 font-medium'}>
+                                    {item.quantity > 0 ? `+${item.quantity}` : item.quantity}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  {item.material?.unitOfMeasure?.name || 'N/A'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
           )}
         </CardContent>
-      </Card> */}
+      </Card>
     </div>
   );
 };

@@ -1,24 +1,27 @@
 import { searchParamsCache } from '@/lib/searchparams';
 import { DataTable } from '@/components/ui/table/data-table';
-import { storeColumns } from './tables/columns'; // Make sure you have columns defined for Shop
-import { getAllstore } from '@/service/store';
+import { storeColumns } from './tables/columns';
+import { getAllStores } from '@/service/store';
 
-type ShopListingPageProps = object;
+type StoreListingPageProps = object;
 
-export default async function StoreListingPage({}: ShopListingPageProps) {
+export default async function StoreListingPage({}: StoreListingPageProps) {
   const page = searchParamsCache.get('page') || 1;
   const search = searchParamsCache.get('q') || '';
   const limit = searchParamsCache.get('limit') || 10;
 
+  let paginatedData = [];
+  let totalCount = 0;
+
   try {
-    // Fetch shops from API
-    const { stores, totalCount } = await getAllstore({ page });
+    // Fetch stores from API
+    const { stores, totalCount: count } = await getAllStores({ page });
 
     // ─────────────────────────────────────────────
-    // Client‑side search filtering by name or branch/location
+    // Client-side search filtering
     // ─────────────────────────────────────────────
-    const filteredData = stores.filter((shop) =>
-      `${shop.name} `.toLowerCase().includes(search.toLowerCase())
+    const filteredData = stores.filter((store) =>
+      store.name.toLowerCase().includes(search.toLowerCase())
     );
 
     // ─────────────────────────────────────────────
@@ -26,17 +29,17 @@ export default async function StoreListingPage({}: ShopListingPageProps) {
     // ─────────────────────────────────────────────
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
-    const paginatedData = filteredData.slice(startIndex, endIndex);
-
-    return (
-      // eslint-disable-next-line react-hooks/error-boundaries
-      <DataTable
-        data={paginatedData}
-        totalItems={totalCount}
-        columns={storeColumns}
-      />
-    );
-  } catch  {
-    return <div>Error loading shops list.</div>;
+    paginatedData = filteredData.slice(startIndex, endIndex);
+    totalCount = count;
+  } catch {
+    return <div>Error loading stores list.</div>;
   }
+
+  return (
+    <DataTable
+      data={paginatedData}
+      totalItems={totalCount}
+      columns={storeColumns}
+    />
+  );
 }

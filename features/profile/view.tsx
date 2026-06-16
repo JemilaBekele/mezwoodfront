@@ -13,18 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Edit, Store, LogOut } from 'lucide-react';
+import { Eye, EyeOff, Edit, Store, LogOut, Building2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Imployee } from '@/models/employee';
 import { logout } from '@/service/authApi';
+import { IShowroom } from '@/models/showroom';
+import { IStore } from '@/models/store';
 
-interface Shop {
-  id: string;
-  name: string;
-  branch?: Branch;
-}
-
-interface Branch {
+interface showroom {
   id: string;
   name: string;
 }
@@ -32,7 +28,6 @@ interface Branch {
 interface Store {
   id: string;
   name: string;
-  branch?: Branch;
 }
 
 export default function ProfileViewPage() {
@@ -58,9 +53,6 @@ export default function ProfileViewPage() {
   const [phone, setPhone] = useState('');
   const [profileError, setProfileError] = useState('');
   const [updating, setUpdating] = useState(false);
-  
-  // Get store methods
-
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -167,6 +159,7 @@ export default function ProfileViewPage() {
 
     setUpdating(true);
     try {
+      // Remove password field from update data
       const updatedData = {
         name: name.trim(),
         email: email.trim(),
@@ -323,10 +316,9 @@ export default function ProfileViewPage() {
     );
   }
 
-  // Type-safe access to shops and stores
-  const shops = (profile.shops as Shop[] | undefined) || [];
-  const stores = (profile.stores as Store[] | undefined) || [];
-
+  // Get store and showroom data from profile
+  const store = profile.store as IStore | null;
+  const showroom = profile.showroom as IShowroom | null;
 
   return (
     <div className='min-h-screen bg-gray-50 p-6 dark:bg-gray-900'>
@@ -391,81 +383,48 @@ export default function ProfileViewPage() {
                 </div>
               )}
 
-              {shops.length > 0 && (
+              {/* Assigned Store Section */}
+              {store && (
                 <div className='md:col-span-2'>
-                  <strong className='font-medium text-gray-500 dark:text-gray-400'>
-                    Assigned Shops:
+                  <strong className='mb-2 flex items-center gap-2 font-medium text-gray-500 dark:text-gray-400'>
+                    <Store className='h-4 w-4' />
+                    Assigned Store:
                   </strong>
-                  <div className='mt-1'>
-                    {shops.map((shop) => (
-                      <p
-                        key={shop.id}
-                        className='text-gray-900 dark:text-gray-100'
-                      >
-                        {shop.name}
+                  <div className='mt-2'>
+                    <div className='rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900 dark:bg-green-900/20'>
+                      <p className='font-medium text-gray-900 dark:text-gray-100'>
+                        {store.name}
                       </p>
-                    ))}
+                   
+                    </div>
                   </div>
                 </div>
               )}
-              {shops.length > 0 && (
+
+              {/* Assigned Showroom Section */}
+              {showroom && (
                 <div className='md:col-span-2'>
                   <strong className='mb-2 flex items-center gap-2 font-medium text-gray-500 dark:text-gray-400'>
-                    <Store className='h-4 w-4' />
-                    Assigned Shops:
+                    <Building2 className='h-4 w-4' />
+                    Assigned Showroom:
                   </strong>
-                  <div className='mt-2 grid grid-cols-1 gap-2 md:grid-cols-2'>
-                    {shops.map((shop) => (
-                      <div
-                        key={shop.id}
-                        className='rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900 dark:bg-green-900/20'
-                      >
-                        <p className='font-medium text-gray-900 dark:text-gray-100'>
-                          {shop.name}
-                        </p>
-                        {shop.branch?.name && (
-                          <p className='mt-1 text-sm text-gray-600 dark:text-gray-400'>
-                            Branch: {shop.branch.name}
-                          </p>
-                        )}
+                  <div className='mt-2'>
+                    <div className='rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-900/20'>
+                      <p className='font-medium text-gray-900 dark:text-gray-100'>
+                        {showroom.name}
+                      </p>
+                      
+                  
+                      {store && (
                         <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                          Shop
+                          Belongs to Store: {store.name}
                         </p>
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
-              {/* Assigned Stores Section */}
-              {stores.length > 0 && (
-                <div className='md:col-span-2'>
-                  <strong className='mb-2 flex items-center gap-2 font-medium text-gray-500 dark:text-gray-400'>
-                    <Store className='h-4 w-4' />
-                    Assigned Stores:
-                  </strong>
-                  <div className='mt-2 grid grid-cols-1 gap-2 md:grid-cols-2'>
-                    {stores.map((store) => (
-                      <div
-                        key={store.id}
-                        className='rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900 dark:bg-green-900/20'
-                      >
-                        <p className='font-medium text-gray-900 dark:text-gray-100'>
-                          {store.name}
-                        </p>
-                        {store.branch?.name && (
-                          <p className='mt-1 text-sm text-gray-600 dark:text-gray-400'>
-                            Branch: {store.branch.name}
-                          </p>
-                        )}
-                        <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                          Store
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
+
               {profile.lastLoginAt && (
                 <div>
                   <strong className='font-medium text-gray-500 dark:text-gray-400'>
@@ -687,6 +646,12 @@ export default function ProfileViewPage() {
                 className='border-gray-300 focus:ring-1 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                 placeholder='Enter your phone number'
               />
+            </div>
+
+            <div className='rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20'>
+              <p className='text-sm text-blue-700 dark:text-blue-300'>
+                <strong>Note:</strong> Store and showroom assignments can only be changed by administrators.
+              </p>
             </div>
 
             {profileError && (

@@ -2,36 +2,13 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { DataTableColumnHeader } from '@/components/ui/table/data-table-column-header';
-import { CalendarDays, Hash } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 import { ITransfer } from '@/models/transfer';
 import { TransferCellAction } from './cell-action';
-import { useRouter } from 'next/navigation';
 
 // ✅ Transfer Table Columns
 // ✅ Transfer Table Columns
 export const transferColumns: ColumnDef<ITransfer>[] = [
- {
-    accessorKey: 'shortCode',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Short Code' />
-    ),
-    cell: ({ cell, row }) => {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const router = useRouter();
-      const shortCode = cell.getValue<ITransfer['shortCode']>();
-      
-      return (
-        <div 
-          className='flex items-center gap-1 cursor-pointer hover:text-primary hover:underline'
-          onClick={() => router.push(`/dashboard/Transfer/view?id=${row.original.id}`)}
-        >
-          <Hash className='h-3 w-3 text-gray-500' />
-          <span className='font-medium'>{shortCode ?? '-'}</span>
-        </div>
-      );
-    },
-    enableColumnFilter: true
-  },
   {
     accessorKey: 'reference',
     header: ({ column }) => (
@@ -54,7 +31,7 @@ export const transferColumns: ColumnDef<ITransfer>[] = [
           <div className='font-medium'>
             {data.sourceType === 'STORE'
               ? data.sourceStore?.name || '-'
-              : data.sourceShop?.name || '-'}
+              : data.sourceShowroom?.name || '-'}
           </div>
           <div className='text-muted-foreground text-xs'>
             {data.sourceType.charAt(0) + data.sourceType.slice(1).toLowerCase()}
@@ -76,7 +53,7 @@ export const transferColumns: ColumnDef<ITransfer>[] = [
           <div className='font-medium'>
             {data.destinationType === 'STORE'
               ? data.destStore?.name || '-'
-              : data.destShop?.name || '-'}
+              : data.destShowroom?.name || '-'}
           </div>
           <div className='text-muted-foreground text-xs'>
             {data.destinationType.charAt(0) +

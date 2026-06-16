@@ -10,8 +10,8 @@ export const normalizeAuthUser = (user: BackendAuthUser): AuthUser => ({
   roleType: user.roleType,
   role: typeof user.role === "string" ? user.role : user.role?.name || "",
   permissions: Array.isArray(user.permissions) ? user.permissions : [],
-  branch: user.branch || null,
-  shops: Array.isArray(user.shops) ? user.shops : [],
+ 
+  showroom: Array.isArray(user.showroom) ? user.showroom : [],
   stores: Array.isArray(user.stores) ? user.stores : [],
   lastLoginAt: user.lastLoginAt,
 });

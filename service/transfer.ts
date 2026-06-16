@@ -1,8 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { axiosInstance } from "./axiosIntance";
-
+import { IncomingMessage } from 'http';
 import { ITransfer } from '@/models/transfer';
-import { PaginationParams } from './store';
+import { axiosInstance } from './axiosIntance';
+
+/* ================= TYPES ================= */
+
+
+export interface GetTransferParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+}
 
 interface TransfersResponse {
   success: boolean;
@@ -10,38 +19,30 @@ interface TransfersResponse {
   transfers: ITransfer[];
 }
 
-// ✅ Get all transfers with pagination + filters transfers
+/* ================= GET ALL ================= */
+
 export const getAllTransfers = async ({
   page = 1,
   limit = 10,
-  startDate,
-  endDate
-}: PaginationParams = {}): Promise<{
-  data: ITransfer[];
-  totalCount: number;
-  success?: boolean;
-}> => {
+  status,
+  search
+}: GetTransferParams = {}) => {
   try {
-
     const query = new URLSearchParams({
       page: page.toString(),
-      limit: limit.toString()
+      limit: limit.toString(),
+      ...(status && { status }),
+      ...(search && { search })
     });
 
-    if (startDate) {
-      query.append('startDate', startDate);
-    }
-    if (endDate) {
-      query.append('endDate', endDate);
-    }
-
-    const url = `/transfers?${query}`;
-
-    const response = await axiosInstance.get<TransfersResponse>(url);
+    const response = await axiosInstance.get<TransfersResponse>(
+      `/transfers/getall`
+    );
+    const transfers = response.data.transfers;
 
     return {
-      data: response.data.transfers,
-      totalCount: response.data.count ?? response.data.transfers.length,
+      data: transfers,
+      totalCount: response.data.count ?? transfers.length,
       success: response.data.success
     };
   } catch (error) {
@@ -49,7 +50,8 @@ export const getAllTransfers = async ({
   }
 };
 
-// ✅ Get transfers (simple version)
+/* ================= SSR SAFE ================= */
+
 export const getTransfers = async () => {
   try {
     const response = await axiosInstance.get(`/transfers`);
@@ -59,17 +61,11 @@ export const getTransfers = async () => {
   }
 };
 
-// ✅ Get transfer by ID
-export const getTransferById = async (id: string, ) => {
-  try {
-    const response = await axiosInstance.get(`/transfers/${id}`);
-    return response.data.transfer as ITransfer;
-  } catch (error) {
-    throw error;
-  }
-};
+/* ================= GET BY ID ================= */
 
-export const getTransferId = async (id: string, ) => {
+export const getTransferById = async (
+  id: string,
+) => {
   try {
     const response = await axiosInstance.get(`/transfers/${id}`);
     return response.data.transfer as ITransfer;
@@ -77,40 +73,26 @@ export const getTransferId = async (id: string, ) => {
     throw error;
   }
 };
-// Get batches by transfer ID
-export const getTransferBatches = async (
-  transferId: string,
+export const getTransferId = async (
+  id: string,
   
 ) => {
   try {
-    const response = await axiosInstance.get(`transfers/batches/${transferId}`);
-    return response.data.batches; // array of batches
+    const response = await axiosInstance.get(`/transfers/${id}`);
+    return response.data.transfer as ITransfer;
   } catch (error) {
     throw error;
   }
 };
-export const bulkUpdateAdditionalPrices = async (
-  batchUpdates: any,
-  
-) => {
-  try {
-    const response = await axiosInstance.put(
-      '/transfers/batches/additional-prices',
-      batchUpdates
-    );
-    return response.data; // contains totalProcessed and updated batches
-  } catch (error) {
-    throw error;
-  }
-};
-// ✅ Get transfer by reference
-export const getTransferByReference = async (
-  reference: string,
+/* ================= GET BY SHORT CODE ================= */
+
+export const getTransferByShortCode = async (
+  shortCode: string,
   
 ) => {
   try {
     const response = await axiosInstance.get(
-      `/transfers/reference/${reference}`
+      `/transfers/shortcode/${shortCode}`
     );
     return response.data.transfer as ITransfer;
   } catch (error) {
@@ -118,61 +100,146 @@ export const getTransferByReference = async (
   }
 };
 
-// ✅ Create a transfer
-export const createTransfer = async (data: any, ) => {
+/* ================= GET ITEMS ================= */
+
+export const getTransferItems = async (
+  id: string,
+  
+) => {
   try {
-    
-    const response = await axiosInstance.post(`/transfers`, data);
+    const response = await axiosInstance.get(
+      `/transfers/${id}/items`
+    );
+    return response.data.items;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/* ================= STATS ================= */
+
+export const getTransferStats = async () => {
+  try {
+    const response = await axiosInstance.get(`/transfers/stats`);
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// ✅ Update a transfer
+/* ================= CREATE ================= */
+
+export const createTransfer = async (
+  data: any,
+  
+) => {
+  try {
+
+    const config =
+      data instanceof FormData
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
+        : {};
+
+    const response = await axiosInstance.post(
+      `/transfers`,
+      data,
+      config
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/* ================= UPDATE ================= */
+
 export const updateTransfer = async (
   id: string,
   data: any,
   
 ) => {
   try {
-    
-    const response = await axiosInstance.put(`/transfers/${id}`, data);
+
+    const config =
+      data instanceof FormData
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
+        : {};
+
+    const response = await axiosInstance.put(
+      `/transfers/${id}`,
+      data,
+      config
+    );
+
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// ✅ Complete a transfer
-export const completeTransfer = async (id: string, ) => {
+/* ================= COMPLETE ================= */
+
+export const completeTransfer = async (
+  id: string,
+  
+) => {
   try {
-    
-    const response = await axiosInstance.post(`/transfers/${id}/complete`);
+    const response = await axiosInstance.post(
+      `/transfers/${id}/complete`
+    );
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// ✅ Cancel a transfer
-export const cancelTransfer = async (id: string, ) => {
+/* ================= CANCEL ================= */
+
+export const cancelTransfer = async (
+  id: string,
+  
+) => {
   try {
-    
-    const response = await axiosInstance.post(`/transfers/${id}/cancel`);
+    const response = await axiosInstance.post(
+      `/transfers/${id}/cancel`
+    );
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// ✅ Delete a transfer
-export const deleteTransfer = async (id: string, ) => {
+/* ================= DELETE ================= */
+
+export const deleteTransfer = async (
+  id: string,
+  
+) => {
   try {
-    
-    const response = await axiosInstance.delete(`/transfers/${id}`);
+    const response = await axiosInstance.delete(
+      `/transfers/${id}`
+    );
     return response.data;
   } catch (error) {
     throw error;
   }
+};
+
+
+export const getProducts = async ({
+  type, // 'items' | 'materials'
+  source, // 'store' | 'showroom'
+  id,
+}: {
+  type: 'items' | 'materials';
+  source: 'store' | 'showroom';
+  id: string;
+}, ) => {
+
+  const response = await axiosInstance.get(
+    `/${source}/${id}/${type}`
+  );
+console.log('Products response:', response.data); // Debug log
+  return response.data;
 };

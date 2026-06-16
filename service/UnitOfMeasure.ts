@@ -1,7 +1,6 @@
-import { IncomingMessage } from 'http';
-import { axiosInstance } from "./axiosIntance";
 
 import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
+import { axiosInstance } from './axiosIntance';
 
 export interface GetParams {
   page?: number;
@@ -43,6 +42,7 @@ export const getAllUnitsOfMeasure = async ({
 // Get UnitsOfMeasure (SSR-safe)
 export const getUnitsOfMeasure = async () => {
   try {
+    
     const response = await axiosInstance.get(`/units-of-measure`);
     return response.data.units as IUnitOfMeasure[];
   } catch (error) {

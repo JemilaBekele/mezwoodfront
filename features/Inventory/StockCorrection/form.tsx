@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Select from 'react-select';
@@ -11,6 +11,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,36 +23,34 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { getStores } from '@/service/store';
-import { getShops } from '@/service/shop';
-import { getUnitOfMeasuresByProductId } from '@/service/Product';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { IconTrash } from '@tabler/icons-react';
-import { getAvailableProductsBySource } from '@/service/productBatchService';
-import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
-import { IStockCorrection } from '@/models/StockCorrection';
+import { IStockCorrection, StockCorrectionReason } from '@/models/StockCorrection';
 import {
   createStockCorrection,
   updateStockCorrection
 } from '@/service/StockCorrection';
-import { TransferEntityType } from '@/models/transfer';
+import { getStoresAll } from '@/service/store';
+import { getShowroomsAll } from '@/service/showroom';
+import { getProducts } from '@/service/transfer';
 
 // Define types for form data
 interface FormItemType {
   productId: string;
-  unitOfMeasureId: string;
   quantity: number | string;
-  height?: number;
-  width?: number;
-  variantId?: string;
+  availableStock?: number;
+  stockLoading?: boolean;
+  stockError?: string;
 }
 
 interface FormDataType {
-  storeId: string;
-  shopId: string;
-  reason: 'PURCHASE_ERROR' | 'TRANSFER_ERROR' | 'EXPIRED' | 'DAMAGED' | 'MANUAL_ADJUSTMENT';
+  reason: StockCorrectionReason | string;
   reference: string;
   notes: string;
+  locationType: 'STORE' | 'SHOWROOM';
+  storeId?: string;
+  showroomId?: string;
+  productType: 'items' | 'materials';
   items: FormItemType[];
 }
 
@@ -60,66 +59,35 @@ interface StockCorrectionFormProps {
   isEdit?: boolean;
 }
 
-interface StoreStockItem {
+interface AvailableProduct {
   id: string;
-  storeId: string;
-  productId: string;
-  quantity: number;
-  status: string;
-  unitOfMeasureId: string;
-  createdAt: string;
-  updatedAt: string;
-  store: {
-    id: string;
-    name: string;
-    branchId: string;
-  };
-  product: {
-    id: string;
-    productCode: string;
-    name: string;
-    generic: string | null;
-    description: string | null;
-    sellPrice: number | null;
-    imageUrl: string;
-    isActive: boolean;
-    warningQuantity: number;
-    category: any;
-    colour: {
-      id: string;
-      name: string;
-    } | null;
-    unitOfMeasure: IUnitOfMeasure;
-  };
-  unitOfMeasure: IUnitOfMeasure;
-  availableQuantity: number;
-  conversionFactor: number;
-  variants?: Array<{
-    id: string;
-    height: number;
-    width: number;
-    quantity: number;
-    area: number;
-  }>;
-  stockType: 'dimension' | 'quantity';
-  hasVariants: boolean;
+  name: string;
+  color?: string;
+  size?: string;
+  price?: number;
+  imageUrl?: string;
+  stockQuantity: number;
+  // For items
+  category?: string;
+  type?: string;
+  // For materials
+  materialType?: string;
+  unitOfMeasure?: string;
+  plainMDF?: boolean;
+  laminatedMDF?: boolean;
+  wood?: boolean;
+  metal?: boolean;
+  accessory?: boolean;
+  other?: boolean;
 }
 
-// Helper function to format product display with color
-const formatProductLabel = (product: any): string => {
-  const productName = product.name || 'Unknown Product';
-  const colourName = product.colour?.name;
-  
-  if (colourName) {
-    return `${productName} - ${colourName}`;
-  }
-  return productName;
-};
-
-// Helper function to format variant label
-const formatVariantLabel = (variant: any): string => {
-  return `${variant.height} x ${variant.width} (${variant.quantity} available)`;
-};
+// Reason options for the select dropdown
+const reasonOptions = [
+  { value: 'PURCHASE_ERROR', label: 'Purchase Error' },
+  { value: 'EXPIRED', label: 'Expired' },
+  { value: 'DAMAGED', label: 'Damaged' },
+  { value: 'MANUAL_ADJUSTMENT', label: 'Manual Adjustment' }
+];
 
 export default function StockCorrectionForm({
   initialData,
@@ -127,15 +95,11 @@ export default function StockCorrectionForm({
 }: StockCorrectionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
-  const [shops, setShops] = useState<any[]>([]);
-  const [storeStockItems, setStoreStockItems] = useState<StoreStockItem[]>([]);
-  const [unitsOfMeasure, setUnitsOfMeasure] = useState<{
-    [key: string]: IUnitOfMeasure[];
-  }>({});
+  const [showrooms, setShowrooms] = useState<any[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<AvailableProduct[]>([]);
   const [isMounted, setIsMounted] = useState(false);
-  const [loadingUOM, setLoadingUOM] = useState<{ [key: string]: boolean }>({});
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [initialSyncDone, setInitialSyncDone] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState(true);
   
   const hasFetchedProductsRef = useRef(false);
   const lastLocationRef = useRef<string>('');
@@ -145,155 +109,141 @@ export default function StockCorrectionForm({
   // Initialize form
   const form = useForm<FormDataType>({
     defaultValues: {
-      storeId: initialData?.storeId || '',
-      shopId: initialData?.shopId || '',
       reason: initialData?.reason || 'MANUAL_ADJUSTMENT',
       reference: initialData?.reference || '',
       notes: initialData?.notes || '',
-      items: initialData?.items?.map((item: any) => ({
-        productId: item.productId.toString(),
-        unitOfMeasureId: item.unitOfMeasureId.toString(),
+      locationType: initialData?.storeId ? 'STORE' : 'SHOWROOM',
+      storeId: initialData?.storeId || '',
+      showroomId: initialData?.showroomId || '',
+      productType: initialData?.items?.[0]?.materialId ? 'materials' : 'items',
+      items: initialData?.items?.map((item) => ({
+        productId: item.materialId?.toString() || item.itemId?.toString() || '',
         quantity: Number(item.quantity),
-        height: item.height,
-        width: item.width,
-        variantId: item.variantId
-      })) || [{ productId: '', unitOfMeasureId: '', quantity: 1 }]
+        availableStock: 0
+      })) || [{ productId: '', quantity: 1, availableStock: 0 }]
     }
   });
 
-  const locationType = form.watch('storeId') ? 'store' : 'shop';
-  const locationId = form.watch('storeId') || form.watch('shopId');
-  const items = form.watch('items');
+  const locationType = form.watch('locationType');
+  const storeId = form.watch('storeId');
+  const showroomId = form.watch('showroomId');
+  const productType = form.watch('productType');
+  const watchedItems = form.watch('items');
 
-  // Create a stable location identifier
-  const currentLocation = `${locationType}-${locationId}`;
-
-  // Get unique products from storeStockItems
-  const getUniqueProducts = (): StoreStockItem[] => {
-    const seenProductIds = new Set<string>();
-    return storeStockItems.filter((item) => {
-      if (!seenProductIds.has(item.product.id)) {
-        seenProductIds.add(item.product.id);
-        return true;
-      }
-      return false;
-    });
-  };
-
-  // Get variants for a specific product
-  // const getVariantsForProduct = (productId: string): StoreStockItem['variants'] => {
-  //   const productItem = storeStockItems.find(item => item.product.id === productId);
-  //   return productItem?.variants || [];
-  // };
-
-  // Check if product has variants
-  const productHasVariants = (productId: string): boolean => {
-    const productItem = storeStockItems.find(item => item.product.id === productId);
-    return productItem?.hasVariants || false;
-  };
-
-  // Helper function to calculate available quantity in selected unit
-  const calculateAvailableQuantity = (
-    storeStockItem: any,
-    selectedUnitOfMeasureId: string,
-    variantId?: string
-  ) => {
-    if (!storeStockItem || !selectedUnitOfMeasureId) return 0;
-
-    // For variant-based items, get quantity from specific variant
-    if (storeStockItem.hasVariants && variantId) {
-      const variant = storeStockItem.variants?.find((v: { id: string; }) => v.id === variantId);
-      return variant?.quantity || 0;
-    }
-
-    const baseQuantity = storeStockItem.quantity;
-    const baseConversion = storeStockItem.unitOfMeasure?.conversionFactor || 1;
-    const selectedUnit = unitsOfMeasure[storeStockItem.product.id]?.find(
-      (unit: IUnitOfMeasure) => unit.id === selectedUnitOfMeasureId
-    );
-
-    if (!selectedUnit) return baseQuantity;
-    return (baseQuantity * baseConversion) / 1;
-  };
+  const currentLocation = `${locationType}-${productType}-${locationType === 'STORE' ? storeId : showroomId}`;
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Fetch stores and shops
+  // Fetch stores and showrooms
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchLocations = async () => {
+      setLoadingLocations(true);
       try {
-        const [storesData, shopsData] = await Promise.all([
-          getStores(),
-          getShops()
+        const [storesData, showroomsData] = await Promise.all([
+          getStoresAll(),
+          getShowroomsAll(),
         ]);
         setStores(storesData);
-        setShops(shopsData);
-      } catch  {
-        toast.error('Failed to load stores or shops');
+        setShowrooms(showroomsData);
+      } catch {
+        toast.error('Failed to load stores or showrooms');
+      } finally {
+        setLoadingLocations(false);
       }
     };
-    fetchData();
+    fetchLocations();
   }, []);
 
-  const fetchUnitsOfMeasure = useCallback(
-    async (productId: string) => {
-      if (!productId) return;
-
-      if (!unitsOfMeasure[productId] && !loadingUOM[productId]) {
-        setLoadingUOM((prev) => ({ ...prev, [productId]: true }));
-        try {
-          const uomData = await getUnitOfMeasuresByProductId(productId);
-
-          if (Array.isArray(uomData)) {
-            setUnitsOfMeasure((prev) => ({ ...prev, [productId]: uomData }));
-          } else {
-            setUnitsOfMeasure((prev) => ({
-              ...prev,
-              [productId]: uomData ? [uomData] : []
-            }));
-          }
-        } catch  {
-          toast.error('Failed to load units of measure');
-          setUnitsOfMeasure((prev) => ({ ...prev, [productId]: [] }));
-        } finally {
-          setLoadingUOM((prev) => ({ ...prev, [productId]: false }));
-        }
-      }
-    },
-    [unitsOfMeasure, loadingUOM]
-  );
-
-  // Fetch products from location
+  // Fetch products from location using the getProducts API
   const fetchProductsFromLocation = useCallback(async () => {
-    if (!locationId) {
-      setStoreStockItems([]);
+    // Don't fetch if no location is selected
+    if (
+      (locationType === 'STORE' && !storeId) ||
+      (locationType === 'SHOWROOM' && !showroomId)
+    ) {
+      setAvailableProducts([]);
       hasFetchedProductsRef.current = false;
       lastLocationRef.current = '';
-      setInitialSyncDone(false);
       return;
     }
 
+    // Skip if we've already fetched for this location
     if (currentLocation === lastLocationRef.current && hasFetchedProductsRef.current) {
       return;
     }
 
+    console.log(`Fetching ${productType} for location: ${currentLocation}`);
+    
     setLoadingProducts(true);
     hasFetchedProductsRef.current = true;
     lastLocationRef.current = currentLocation;
 
     try {
-      const entityType = locationType === 'store' ? TransferEntityType.STORE : TransferEntityType.SHOP;
-      const stockData = await getAvailableProductsBySource(entityType, locationId);
-      setStoreStockItems(stockData);
-    } catch {
+      const locationId = locationType === 'STORE' ? storeId : showroomId;
+      if (!locationId) return;
+
+      const source = locationType === 'STORE' ? 'store' : 'showroom';
+      
+      // Use the getProducts API
+      const response = await getProducts({
+        type: productType,
+        source: source,
+        id: locationId
+      });
+
+      // Extract products from response
+      const products = response.products || response.data || response;
+      
+      // Map products to AvailableProduct format
+      const mappedProducts = products.map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        color: product.color,
+        size: product.size,
+        price: product.price,
+        imageUrl: product.imageUrl,
+        stockQuantity: product.stockQuantity || product.stock?.totalQuantity || 0,
+        // For items
+        category: product.category?.name,
+        type: product.type?.name,
+        // For materials
+        materialType: product.materialType?.name,
+        unitOfMeasure: product.unitOfMeasure?.name,
+        plainMDF: product.plainMDF,
+        laminatedMDF: product.laminatedMDF,
+        wood: product.wood,
+        metal: product.metal,
+        accessory: product.accessory,
+        other: product.other
+      }));
+
+      setAvailableProducts(mappedProducts);
+      
+      // Update available stock for selected items
+      const currentItems = form.getValues('items');
+      const updatedItems = currentItems.map((item) => {
+        const product = mappedProducts.find((p: { id: string; }) => p.id === item.productId);
+        if (product) {
+          return {
+            ...item,
+            availableStock: product.stockQuantity,
+            stockError: undefined
+          };
+        }
+        return item;
+      });
+      form.setValue('items', updatedItems);
+      
+    } catch (error) {
+      console.error('Failed to load products:', error);
       toast.error('Failed to load products from location');
-      setStoreStockItems([]);
+      setAvailableProducts([]);
     } finally {
       setLoadingProducts(false);
     }
-  }, [currentLocation, locationType, locationId]);
+  }, [currentLocation, locationType, storeId, showroomId, productType, form]);
 
   // Debounced fetch effect
   useEffect(() => {
@@ -306,85 +256,30 @@ export default function StockCorrectionForm({
     };
   }, [fetchProductsFromLocation]);
 
-  // Sync form items with loaded variants for edit mode
+  // Validate quantity when it changes
   useEffect(() => {
-    if (isEdit && storeStockItems.length > 0 && items.length > 0 && !initialSyncDone) {
-      const updatedItems = items.map((item) => {
-        if (!item.productId) return item;
+    const validateQuantities = () => {
+      if (!watchedItems) return;
 
-        const stockItem = storeStockItems.find(
-          (stock) => stock.product.id.toString() === item.productId
-        );
-
-        if (stockItem?.hasVariants && item.height && item.width) {
-          const matchingVariant = stockItem.variants?.find(
-            (v) => 
-              Math.abs(v.height - (item.height || 0)) < 0.01 && 
-              Math.abs(v.width - (item.width || 0)) < 0.01
-          );
-
-          if (matchingVariant && (!item.variantId || item.variantId !== matchingVariant.id)) {
-            return {
-              ...item,
-              variantId: matchingVariant.id
-            };
-          }
-        }
+      watchedItems.forEach((item, index) => {
+        if (!item.productId) return;
         
-        return item;
-      });
-
-      const hasChanges = updatedItems.some((item, index) => 
-        item.variantId !== items[index].variantId
-      );
-
-      if (hasChanges) {
-        form.setValue('items', updatedItems);
-      }
-      
-      setInitialSyncDone(true);
-    }
-  }, [isEdit, storeStockItems, items, form, initialSyncDone]);
-
-  // Load units for initial items
-  useEffect(() => {
-    if (isEdit && initialData) {
-      const loadInitialUnits = async () => {
-        for (const item of initialData.items) {
-          const productId = item.productId.toString();
-          await fetchUnitsOfMeasure(productId);
+        const quantity = parseFloat(item.quantity.toString());
+        const availableStock = item.availableStock || 0;
+        
+        if (!isNaN(quantity) && quantity < 0 && Math.abs(quantity) > availableStock) {
+          form.setError(`items.${index}.quantity` as any, {
+            type: 'manual',
+            message: `Cannot subtract ${Math.abs(quantity)}. Only ${availableStock} available.`
+          });
+        } else {
+          form.clearErrors(`items.${index}.quantity` as any);
         }
-      };
-      loadInitialUnits();
-    }
-  }, [isEdit, initialData, fetchUnitsOfMeasure]);
+      });
+    };
 
-  // Clear variant selection when product changes
-  const handleProductChange = (index: number, productId: string) => {
-    const newItems = [...items];
-    newItems[index].productId = productId;
-    newItems[index].unitOfMeasureId = '';
-    newItems[index].quantity = 1;
-    newItems[index].height = undefined;
-    newItems[index].width = undefined;
-    newItems[index].variantId = undefined;
-    form.setValue('items', newItems);
-
-    if (productId) {
-      fetchUnitsOfMeasure(productId);
-    }
-  };
-
-  // Handle variant selection
-  const handleVariantChange = (index: number, variant: any) => {
-    const newItems = [...items];
-    newItems[index].height = variant.height;
-    newItems[index].width = variant.width;
-    newItems[index].variantId = variant.id;
-    newItems[index].quantity = 1;
-    form.setValue('items', newItems);
-    form.trigger(`items.${index}.quantity`);
-  };
+    validateQuantities();
+  }, [watchedItems, form]);
 
   const [isDark, setIsDark] = useState(false);
 
@@ -432,108 +327,55 @@ export default function StockCorrectionForm({
     })
   };
 
-  const validateForm = (data: FormDataType) => {
-    const errors: any = {};
-
-    if (!data.storeId && !data.shopId) {
-      errors.storeId = 'Either store or shop must be selected';
-    }
-
-    if (!data.items || data.items.length === 0) {
-      errors.items = 'At least one item is required';
-    } else {
-      data.items.forEach((item, index) => {
-        if (!item.productId) {
-          errors.items = errors.items || {};
-          errors.items[index] = errors.items[index] || {};
-          errors.items[index].productId = 'Product is required';
-        }
-        if (!item.unitOfMeasureId) {
-          errors.items = errors.items || {};
-          errors.items[index] = errors.items[index] || {};
-          errors.items[index].unitOfMeasureId = 'Unit of measure is required';
-        }
-
-        // Check if variant is required
-        const hasVariants = productHasVariants(item.productId);
-        if (hasVariants && (!item.height || !item.width || !item.variantId)) {
-          errors.items = errors.items || {};
-          errors.items[index] = errors.items[index] || {};
-          errors.items[index].variantId = 'Variant selection is required';
-        }
-
-        if (item.quantity === '' || item.quantity === null || item.quantity === undefined) {
-          errors.items = errors.items || {};
-          errors.items[index] = errors.items[index] || {};
-          errors.items[index].quantity = 'Quantity is required';
-        } else if (typeof item.quantity === 'string') {
-          const num = parseFloat(item.quantity);
-          if (isNaN(num)) {
-            errors.items = errors.items || {};
-            errors.items[index] = errors.items[index] || {};
-            errors.items[index].quantity = 'Quantity must be a valid number';
-          }
-        }
-      });
-    }
-
-    return errors;
-  };
-
-  const onSubmit = async (data: FormDataType) => {
-    const errors = validateForm(data);
-    
-    if (Object.keys(errors).length > 0) {
-      Object.keys(errors).forEach((key) => {
-        if (key === 'items') {
-          Object.keys(errors.items).forEach((itemIndex) => {
-            Object.keys(errors.items[itemIndex]).forEach((field) => {
-              form.setError(`items.${itemIndex}.${field}` as any, {
-                type: 'manual',
-                message: errors.items[itemIndex][field]
-              });
-            });
-          });
-        } else {
-          form.setError(key as any, {
-            type: 'manual',
-            message: errors[key]
-          });
-        }
-      });
+  const onSubmit: SubmitHandler<FormDataType> = async (data) => {
+    // Validate location
+    if (data.locationType === 'STORE' && !data.storeId) {
+      toast.error('Store is required');
       return;
+    }
+
+    if (data.locationType === 'SHOWROOM' && !data.showroomId) {
+      toast.error('Showroom is required');
+      return;
+    }
+
+    // Filter out incomplete items
+    const validItems = data.items.filter(
+      (item) => item.productId && parseFloat(item.quantity.toString()) !== 0
+    );
+    
+    if (validItems.length === 0) {
+      toast.error('Please add at least one valid item');
+      return;
+    }
+
+    // Validate all negative quantities have sufficient stock
+    for (const item of validItems) {
+      const quantity = parseFloat(item.quantity.toString());
+      const availableStock = item.availableStock || 0;
+      
+      if (quantity < 0 && Math.abs(quantity) > availableStock) {
+        toast.error(`Insufficient stock for ${availableProducts.find(p => p.id === item.productId)?.name}. Only ${availableStock} available.`);
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
-      const validItems = data.items.filter((item) => {
-        if (!item.productId || !item.unitOfMeasureId) return false;
-        
-        const hasVariants = productHasVariants(item.productId);
-        if (hasVariants && (!item.height || !item.width || !item.variantId)) {
-          return false;
-        }
-        
-        const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
-        return quantity !== 0;
-      });
-
-      if (validItems.length === 0) {
-        toast.error('Please add at least one valid item with non-zero quantity');
-        setIsLoading(false);
-        return;
-      }
+      // Transform items based on product type
+      const transformedItems = validItems.map((item) => ({
+        [data.productType === 'items' ? 'itemId' : 'materialId']: item.productId,
+        quantity: typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity
+      }));
 
       const payload = {
-        ...data,
-        items: validItems.map((item) => ({
-          productId: item.productId.toString(),
-          unitOfMeasureId: item.unitOfMeasureId,
-          quantity: typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity,
-          ...(item.height && { height: Number(item.height) }),
-          ...(item.width && { width: Number(item.width) }),
-          ...(item.variantId && { variantId: item.variantId })
-        }))
+        reason: data.reason as StockCorrectionReason,
+        reference: data.reference?.trim() || undefined,
+        notes: data.notes?.trim() || undefined,
+        storeId: data.locationType === 'STORE' ? data.storeId : undefined,
+        showroomId: data.locationType === 'SHOWROOM' ? data.showroomId : undefined,
+        ismaterial: data.productType === 'materials',
+        items: transformedItems
       };
 
       if (isEdit && initialData?.id) {
@@ -556,7 +398,7 @@ export default function StockCorrectionForm({
     }
   };
 
-  if (!isMounted) {
+  if (!isMounted || loadingLocations) {
     return (
       <Card className='mx-auto w-full'>
         <CardHeader>
@@ -589,103 +431,6 @@ export default function StockCorrectionForm({
             <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
               <FormField
                 control={form.control}
-                name='storeId'
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel>Store (Optional)</FormLabel>
-                    <ShadcnSelect
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        if (value) {
-                          form.setValue('shopId', '');
-                        }
-                        form.setValue('items', [
-                          {
-                            productId: '',
-                            unitOfMeasureId: '',
-                            quantity: 1
-                          }
-                        ]);
-                        setStoreStockItems([]);
-                        setUnitsOfMeasure({});
-                        setInitialSyncDone(false);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select store' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {stores.map((store) => (
-                          <SelectItem
-                            key={store.id}
-                            value={store.id.toString()}
-                          >
-                            {store.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </ShadcnSelect>
-                    {fieldState.error && (
-                      <p className='text-sm font-medium text-destructive'>
-                        {fieldState.error.message}
-                      </p>
-                    )}
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='shopId'
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel>Shop (Optional)</FormLabel>
-                    <ShadcnSelect
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        if (value) {
-                          form.setValue('storeId', '');
-                        }
-                        form.setValue('items', [
-                          {
-                            productId: '',
-                            unitOfMeasureId: '',
-                            quantity: 1
-                          }
-                        ]);
-                        setStoreStockItems([]);
-                        setUnitsOfMeasure({});
-                        setInitialSyncDone(false);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select shop' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {shops.map((shop) => (
-                          <SelectItem key={shop.id} value={shop.id.toString()}>
-                            {shop.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </ShadcnSelect>
-                    {fieldState.error && (
-                      <p className='text-sm font-medium text-destructive'>
-                        {fieldState.error.message}
-                      </p>
-                    )}
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name='reason'
                 render={({ field, fieldState }) => (
                   <FormItem>
@@ -700,17 +445,11 @@ export default function StockCorrectionForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value='PURCHASE_ERROR'>
-                          Purchase Error
-                        </SelectItem>
-                        <SelectItem value='TRANSFER_ERROR'>
-                          Transfer Error
-                        </SelectItem>
-                        <SelectItem value='EXPIRED'>Expired</SelectItem>
-                        <SelectItem value='DAMAGED'>Damaged</SelectItem>
-                        <SelectItem value='MANUAL_ADJUSTMENT'>
-                          Manual Adjustment
-                        </SelectItem>
+                        {reasonOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </ShadcnSelect>
                     {fieldState.error && (
@@ -741,246 +480,259 @@ export default function StockCorrectionForm({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name='items'
-              render={({ field, fieldState }) => {
-                const itemsError = fieldState.error as any;
-                
-                return (
+            {/* Product Type Selection */}
+            <div className='rounded-lg border p-4'>
+              <h3 className='mb-4 text-lg font-semibold'>Step 1: Select Product Type</h3>
+              <FormField
+                control={form.control}
+                name='productType'
+                render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Items</FormLabel>
+                    <FormLabel>What do you want to adjust?</FormLabel>
+                    <ShadcnSelect
+                      value={field.value}
+                      onValueChange={(value: 'items' | 'materials') => {
+                        field.onChange(value);
+                        form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
+                        setAvailableProducts([]);
+                        hasFetchedProductsRef.current = false;
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder='Select product type' />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value='items'>Items (Products)</SelectItem>
+                        <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
+                      </SelectContent>
+                    </ShadcnSelect>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Location Selection */}
+            <div className='rounded-lg border p-4'>
+              <h3 className='mb-4 text-lg font-semibold'>Step 2: Select Location</h3>
+              <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
+                <FormField
+                  control={form.control}
+                  name='locationType'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location Type</FormLabel>
+                      <ShadcnSelect
+                        value={field.value}
+                        onValueChange={(value: 'STORE' | 'SHOWROOM') => {
+                          field.onChange(value);
+                          if (value === 'STORE') {
+                            form.setValue('showroomId', '');
+                          } else {
+                            form.setValue('storeId', '');
+                          }
+                          form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
+                          setAvailableProducts([]);
+                          hasFetchedProductsRef.current = false;
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder='Select location type' />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value='STORE'>Store</SelectItem>
+                          <SelectItem value='SHOWROOM'>Showroom</SelectItem>
+                        </SelectContent>
+                      </ShadcnSelect>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {locationType === 'STORE' && (
+                  <FormField
+                    control={form.control}
+                    name='storeId'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Store</FormLabel>
+                        <ShadcnSelect
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
+                            setAvailableProducts([]);
+                            hasFetchedProductsRef.current = false;
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select store' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {stores.map((store) => (
+                              <SelectItem key={store.id} value={store.id.toString()}>
+                                {store.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </ShadcnSelect>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {locationType === 'SHOWROOM' && (
+                  <FormField
+                    control={form.control}
+                    name='showroomId'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Showroom</FormLabel>
+                        <ShadcnSelect
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
+                            setAvailableProducts([]);
+                            hasFetchedProductsRef.current = false;
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select showroom' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {showrooms.map((showroom) => (
+                              <SelectItem key={showroom.id} value={showroom.id.toString()}>
+                                {showroom.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </ShadcnSelect>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Items Selection */}
+            <div className='rounded-lg border p-4'>
+              <h3 className='mb-4 text-lg font-semibold'>Step 3: Select Products to Adjust</h3>
+              <FormField
+                control={form.control}
+                name='items'
+                render={({ field }) => (
+                  <FormItem>
                     <FormControl>
                       <div className='space-y-4'>
-                        <div className='grid grid-cols-7 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
+                        <div className='grid grid-cols-5 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
                           <div className='col-span-2'>Product</div>
-                          <div>Unit</div>
-                          <div>Dimensions</div>
-                          <div>Quantity</div>
-                          <div>Available</div>
+                          <div>Quantity (+/-)</div>
+                          <div>Available Stock</div>
                           <div>Action</div>
                         </div>
 
                         {field.value.map((item, index) => {
-                          const storeStockItem = storeStockItems.find(
-                            (stock) => stock.product.id.toString() === item.productId
+                          const selectedProduct = availableProducts.find(
+                            (p) => p.id === item.productId
                           );
 
-                          const hasVariants = storeStockItem?.hasVariants || false;
-                          const variants = storeStockItem?.variants || [];
-                          
-                          const availableInSelectedUnit = hasVariants && item.variantId
-                            ? variants.find(v => v.id === item.variantId)?.quantity || 0
-                            : storeStockItem && item.unitOfMeasureId
-                              ? calculateAvailableQuantity(
-                                  storeStockItem,
-                                  item.unitOfMeasureId
-                                )
-                              : storeStockItem?.quantity || 0;
-
-                          const uniqueProducts = getUniqueProducts();
-                          const productOptions = uniqueProducts.map((storeStockItem) => ({
-                            value: storeStockItem.product.id.toString(),
-                            label: formatProductLabel(storeStockItem.product),
-                            data: storeStockItem
+                          const productOptions = availableProducts.map((product) => ({
+                            value: product.id,
+                            label: `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`,
+                            data: product
                           }));
-
-                          const variantOptions = variants.map((variant) => ({
-                            value: variant.id,
-                            label: formatVariantLabel(variant),
-                            data: variant
-                          }));
-
-                          // Find selected variant value
-                          let selectedVariantValue = null;
-                          if (item.variantId) {
-                            selectedVariantValue = variantOptions.find(
-                              (v) => v.value === item.variantId
-                            );
-                          } else if (item.height && item.width && !item.variantId) {
-                            selectedVariantValue = variantOptions.find(
-                              (v) => 
-                                Math.abs(v.data.height - (item.height || 0)) < 0.01 && 
-                                Math.abs(v.data.width - (item.width || 0)) < 0.01
-                            );
-                          }
-
-                          const itemError = itemsError?.[index];
 
                           return (
-                            <div
-                              key={index}
-                              className='grid grid-cols-7 items-center gap-4'
-                            >
-                              {/* Product Select */}
+                            <div key={index} className='grid grid-cols-5 items-center gap-4'>
                               <div className='col-span-2'>
                                 <Select
                                   instanceId={`product-select-${index}`}
                                   options={productOptions}
                                   onChange={(newValue: any) => {
-                                    handleProductChange(index, newValue?.value || '');
+                                    const newItems = [...field.value];
+                                    const selectedProductData = availableProducts.find(p => p.id === newValue?.value);
+                                    newItems[index].productId = newValue?.value || '';
+                                    newItems[index].quantity = 1;
+                                    newItems[index].availableStock = selectedProductData?.stockQuantity || 0;
+                                    newItems[index].stockError = undefined;
+                                    field.onChange(newItems);
                                   }}
                                   value={
                                     productOptions.find(
                                       (p) => p.value === item.productId
                                     ) || null
                                   }
-                                  placeholder={
-                                    loadingProducts
-                                      ? 'Loading products...'
-                                      : 'Search product'
-                                  }
+                                  placeholder={loadingProducts ? "Loading products..." : "Search product"}
                                   isSearchable
-                                  isDisabled={loadingProducts}
+                                  isDisabled={loadingProducts || availableProducts.length === 0}
+                                  isLoading={loadingProducts}
                                   styles={isDark ? darkStyles : {}}
                                 />
-                                {itemError?.productId && (
-                                  <p className='text-sm font-medium text-destructive mt-1'>
-                                    {itemError.productId.message}
-                                  </p>
+                                {selectedProduct && (
+                                  <div className='mt-1 text-xs text-gray-500'>
+                                    {productType === 'items' ? (
+                                      <>
+                                        {selectedProduct.category && `Category: ${selectedProduct.category}`}
+                                        {selectedProduct.type && ` | Type: ${selectedProduct.type}`}
+                                      </>
+                                    ) : (
+                                      <>
+                                        {selectedProduct.materialType && `Type: ${selectedProduct.materialType}`}
+                                        {selectedProduct.unitOfMeasure && ` | Unit: ${selectedProduct.unitOfMeasure}`}
+                                      </>
+                                    )}
+                                  </div>
                                 )}
                               </div>
 
-                              {/* Unit Select */}
                               <div>
-                                <Select
-                                  instanceId={`unit-select-${index}`}
-                                  options={
-                                    unitsOfMeasure[item.productId]?.map(
-                                      (unit) => ({
-                                        value: unit.id.toString(),
-                                        label: `${unit.name}`
-                                      })
-                                    ) || []
-                                  }
-                                  onChange={(newValue) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].unitOfMeasureId =
-                                      newValue?.value || '';
-                                    field.onChange(newItems);
+                                <Input
+                                  type='text'
+                                  inputMode='decimal'
+                                  placeholder='+/- Qty'
+                                  value={item.quantity.toString()}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    // Allow numbers, decimal point, and minus sign
+                                    const validPattern = /^-?\d*\.?\d*$/;
+                                    
+                                    if (validPattern.test(value)) {
+                                      const newItems = [...field.value];
+                                      newItems[index].quantity = value;
+                                      field.onChange(newItems);
+                                    }
                                   }}
-                                  value={
-                                    unitsOfMeasure[item.productId]
-                                      ?.map((u) => ({
-                                        value: u.id.toString(),
-                                        label: `${u.name} `
-                                      }))
-                                      .find(
-                                        (u) => u.value === item.unitOfMeasureId
-                                      ) ||
-                                    (item.unitOfMeasureId
-                                      ? {
-                                          value: item.unitOfMeasureId,
-                                          label: 'Loading...'
-                                        }
-                                      : null)
-                                  }
-                                  placeholder='Search unit'
-                                  isSearchable
-                                  isDisabled={!item.productId}
-                                  styles={isDark ? darkStyles : {}}
+                                  disabled={!item.productId || loadingProducts}
+                                  className={form.getFieldState(`items.${index}.quantity` as any).error ? 'border-red-500' : ''}
                                 />
-                                {itemError?.unitOfMeasureId && (
+                                {form.getFieldState(`items.${index}.quantity` as any).error && (
                                   <p className='text-sm font-medium text-destructive mt-1'>
-                                    {itemError.unitOfMeasureId.message}
+                                    {form.getFieldState(`items.${index}.quantity` as any).error?.message}
                                   </p>
                                 )}
                               </div>
 
-                              {/* Variant/Dimensions Select */}
-                              <div>
-                                {hasVariants ? (
-                                  <Select
-                                    instanceId={`variant-select-${index}`}
-                                    options={variantOptions}
-                                    onChange={(newValue: any) => {
-                                      handleVariantChange(index, newValue?.data);
-                                    }}
-                                    value={selectedVariantValue}
-                                    placeholder={'Select dimensions'}
-                                    isSearchable
-                                    isDisabled={loadingProducts || !item.productId}
-                                    isLoading={loadingProducts}
-                                    styles={isDark ? darkStyles : {}}
-                                  />
+                              <div className='text-sm'>
+                                {selectedProduct ? (
+                                  <span className={selectedProduct.stockQuantity === 0 ? 'text-red-500' : 'text-green-600'}>
+                                    {selectedProduct.stockQuantity} available
+                                  </span>
                                 ) : (
-                                  <div className='text-muted-foreground text-sm'>
-                                    {item.productId ? 'Standard item' : '—'}
-                                  </div>
-                                )}
-                                {itemError?.variantId && (
-                                  <p className='text-sm font-medium text-destructive mt-1'>
-                                    {itemError.variantId.message}
-                                  </p>
+                                  <span className='text-gray-400'>Select product</span>
                                 )}
                               </div>
 
-                              {/* Quantity Input */}
-                              <div>
-                                <FormField
-                                  control={form.control}
-                                  name={`items.${index}.quantity`}
-                                  render={({ field: quantityField, fieldState: quantityFieldState }) => (
-                                    <div>
-                                      <Input
-                                        type='text'
-                                        inputMode='decimal'
-                                        placeholder='Qty'
-                                        value={quantityField.value.toString()}
-                                        onChange={(e) => {
-                                          const value = e.target.value;
-                                          const validPattern = /^-?\d*\.?\d*$/;
-                                          
-                                          if (validPattern.test(value)) {
-                                            quantityField.onChange(value);
-                                          }
-                                        }}
-                                        onBlur={(e) => {
-                                          const value = e.target.value;
-                                          if (value === '' || value === '-' || value === '.') {
-                                            quantityField.onChange('0');
-                                          } else if (value.endsWith('.')) {
-                                            quantityField.onChange(value.slice(0, -1));
-                                          }
-                                        }}
-                                        disabled={loadingProducts || (hasVariants && !item.variantId)}
-                                      />
-                                      <div className='mt-1 text-xs text-gray-500'>
-                                        {(() => {
-                                          const numValue = parseFloat(quantityField.value.toString());
-                                          if (isNaN(numValue)) {
-                                            return 'Enter valid number';
-                                          }
-                                          return numValue < 0 ? 'Subtraction' : numValue > 0 ? 'Addition' : 'Zero adjustment';
-                                        })()}
-                                      </div>
-                                      {quantityFieldState.error && (
-                                        <p className='text-sm font-medium text-destructive mt-1'>
-                                          {quantityFieldState.error.message}
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                />
-                              </div>
-
-                              {/* Available Quantity */}
-                              <div className='text-muted-foreground text-sm'>
-                                {loadingProducts ? (
-                                  <div className='flex items-center gap-1'>
-                                    <div className='h-3 w-3 animate-spin rounded-full border-b-2 border-gray-400'></div>
-                                    <span>Loading...</span>
-                                  </div>
-                                ) : availableInSelectedUnit > 0 ? (
-                                  `${Math.floor(availableInSelectedUnit)} available`
-                                ) : hasVariants && item.productId && !item.variantId ? (
-                                  'Select variant'
-                                ) : (
-                                  'Out of stock'
-                                )}
-                              </div>
-
-                              {/* Delete Button */}
                               <div>
                                 <Button
                                   type='button'
@@ -1006,29 +758,28 @@ export default function StockCorrectionForm({
                             onClick={() => {
                               field.onChange([
                                 ...field.value,
-                                {
-                                  productId: '',
-                                  unitOfMeasureId: '',
-                                  quantity: 1
-                                }
+                                { productId: '', quantity: 1, availableStock: 0 }
                               ]);
                             }}
-                            disabled={loadingProducts}
+                            disabled={loadingProducts || availableProducts.length === 0}
                           >
                             Add Item
                           </Button>
                         </div>
+
+                        {availableProducts.length === 0 && !loadingProducts && (
+                          <div className='rounded-lg bg-yellow-50 p-4 text-center text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200'>
+                            <p>No products available at the selected location.</p>
+                            <p className='text-sm mt-1'>Please check that you have selected the correct product type and location.</p>
+                          </div>
+                        )}
                       </div>
                     </FormControl>
-                    {fieldState.error && typeof fieldState.error === 'object' && 'message' in fieldState.error && (
-                      <p className='text-sm font-medium text-destructive'>
-                        {fieldState.error.message as string}
-                      </p>
-                    )}
+                    <FormMessage />
                   </FormItem>
-                );
-              }}
-            />
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
@@ -1049,7 +800,11 @@ export default function StockCorrectionForm({
             />
 
             <div className='flex justify-end gap-2'>
-              <Button type='submit' disabled={isLoading || loadingProducts}>
+              <Button
+                type='submit'
+                disabled={isLoading || loadingProducts}
+                className='min-w-24'
+              >
                 {isLoading ? (
                   <div className='flex items-center gap-2'>
                     <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-white'></div>

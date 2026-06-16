@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { axiosInstance } from "./axiosIntance";
-
-import { IProduct, IProductBatch } from '@/models/Product';
+import { IncomingMessage } from 'http';
+import { IProduct } from '@/models/Product';
 import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
+import { axiosInstance } from './axiosIntance';
 
 export interface GetParams {
   page?: number;
@@ -30,7 +30,6 @@ export const getAllProducts = async ({
     const url = `/products?${query}`;
     const response = await axiosInstance.get<ProductsResponse>(url);
     const products = response.data.products;
-
     return {
       products: products,
       totalCount: response.data.count ?? products.length,
@@ -42,13 +41,12 @@ export const getAllProducts = async ({
 };
 export const getProductBatches = async (
   productId: string,
-  
-): Promise<IProductBatch[]> => {
+): Promise<any[]> => {
   try {
     const response = await axiosInstance.get(
       `/products/get/all/${productId}/batches`
     );
-    return response.data.batches as IProductBatch[];
+    return response.data.batches as any[];
   } catch (error) {
     throw error;
   }
@@ -73,7 +71,6 @@ export const getProductsnew = async () => {
 };
 export const ActivegetProducts = async () => {
   try {
-   
     const response = await axiosInstance.get(`/products/Active/All`);
     return response.data.products as IProduct[];
   } catch (error) {
@@ -90,7 +87,6 @@ interface TopProductsOptions {
 export const TopProducts = async (options: TopProductsOptions = {}) => {
   try {
     const { searchTerm, categoryId, subCategoryId } = options;
-   
 
     // Build query parameters
     const params: any = {};
@@ -137,7 +133,6 @@ export const getUnitOfMeasuresByProductId = async (
   
 ): Promise<IUnitOfMeasure[]> => {
   try {
-   
 
     const response = await axiosInstance.get(`/products/${productId}`);
     return response.data.product.unitOfMeasure;
@@ -147,7 +142,7 @@ export const getUnitOfMeasuresByProductId = async (
 };
 
 // Get Product by Code
-export const getProductByCode = async (code: string, ) => {
+export const getProductByCode = async (code: string) => {
   try {
     const response = await axiosInstance.get(`/products/code/${code}`);
     return response.data.product as IProduct;
@@ -157,9 +152,8 @@ export const getProductByCode = async (code: string, ) => {
 };
 
 // Create Product
-export const createProduct = async (data: any, ) => {
+export const createProduct = async (data: any) => {
   try {
-   
     const config =
       data instanceof FormData
         ? { headers: { 'Content-Type': 'multipart/form-data' } }
@@ -175,11 +169,8 @@ export const createProduct = async (data: any, ) => {
 // Create a product batch
 export const createProductstock = async (
   productId: string,
-  data: any | FormData,
-  
-) => {
+  data: any | FormData) => {
   try {
-   
 
     const config =
       data instanceof FormData
@@ -201,11 +192,8 @@ export const createProductstock = async (
 // Update Product
 export const updateProduct = async (
   id: string,
-  data: any,
-  
-) => {
+  data: any) => {
   try {
-   
     const config =
       data instanceof FormData
         ? { headers: { 'Content-Type': 'multipart/form-data' } }
@@ -219,9 +207,8 @@ export const updateProduct = async (
 };
 
 // Delete Product
-export const deleteProduct = async (id: string, ) => {
+export const deleteProduct = async (id: string) => {
   try {
-   
     const response = await axiosInstance.delete(`/products/${id}`);
     return response.data;
   } catch (error) {
@@ -231,10 +218,8 @@ export const deleteProduct = async (id: string, ) => {
 
 export const createProductBatchSingle = async (
   data: any,
-  
 ) => {
   try {
-   
     const response = await axiosInstance.post(`/products/Batch/single`, data);
     return response.data;
   } catch (error) {
@@ -243,10 +228,8 @@ export const createProductBatchSingle = async (
 };
 export const getProductdetailaById = async (
   id: string,
-  
 ) => {
   try {
-   
     const response = await axiosInstance.get(`/product/detail/${id}`);
     return response.data.product;
   } catch (error) {
@@ -256,10 +239,8 @@ export const getProductdetailaById = async (
 
 export const getProductByShops = async (
   productId: string,
-  
 ) => {
   try {
-   
     const response = await axiosInstance.get(
       `/products/Batch/shop/find/ByShops/${productId}`
     );

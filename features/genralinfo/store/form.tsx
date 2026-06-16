@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -18,22 +18,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 
-import { IBranch } from '@/models/Branch';
 import { createStore, updateStore } from '@/service/store';
 import { IStore } from '@/models/store';
-import { getBranches } from '@/service/branch';
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  branchId: z.string().min(1, 'Branch is required')
+  isMain: z.boolean().optional()
 });
 
 interface StoreFormProps {
@@ -48,24 +39,13 @@ export default function StoreForm({
   isEdit = false
 }: StoreFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [branches, setBranches] = useState<IBranch[]>([]);
   const router = useRouter();
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setBranches(await getBranches());
-      } catch (error) {
-        toast.error('Failed to load branches or locations');
-      }
-    })();
-  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: initialData?.name || '',
-      branchId: initialData?.branchId || ''
+      isMain: initialData?.isMain || false
     }
   });
 
@@ -79,74 +59,72 @@ export default function StoreForm({
         await createStore(data);
         toast.success('Store created successfully');
       }
+
       router.refresh();
       closeModal();
-    } catch  {
-      const message =
-        'An error occurred during saving.';
-      toast.error(message);
+    } catch {
+      toast.error('An error occurred during saving.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Card className='mx-auto w-full max-w-2xl'>
+    <Card className="mx-auto w-full max-w-2xl">
       <CardHeader>
-        <CardTitle className='text-left text-2xl font-bold'>
+        <CardTitle className="text-left text-2xl font-bold">
           {isEdit ? 'Edit Store' : 'Create Store'}
         </CardTitle>
       </CardHeader>
+
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+
             {/* Name */}
             <FormField
               control={form.control}
-              name='name'
+              name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder='e.g., Main Store' {...field} />
+                    <Input placeholder="e.g., Main Store" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Branch */}
+            {/* Is Main */}
             <FormField
               control={form.control}
-              name='branchId'
+              name="isMain"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Branch</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger>
-                      <SelectValue placeholder='Select branch' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <FormItem className="flex items-center justify-between rounded-md border p-3">
+                  <FormLabel>Main Store</FormLabel>
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className='flex justify-end gap-2'>
-              <Button variant='outline' type='button' onClick={closeModal}>
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" type="button" onClick={closeModal}>
                 Cancel
               </Button>
-              <Button type='submit' disabled={isLoading}>
+              <Button type="submit" disabled={isLoading}>
                 {isEdit ? 'Update Store' : 'Create Store'}
               </Button>
             </div>
+
           </form>
         </Form>
       </CardContent>

@@ -16,47 +16,30 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select as ShadcnSelect,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+
 import { IPurchase } from '@/models/purchase';
-import { IProduct } from '@/models/Product';
-import { getStores } from '@/service/store';
-import {
-  getProducts,
-  getUnitOfMeasuresByProductId,
-  getProductById
-} from '@/service/Product';
+import { IMaterial } from '@/models/material';
+import { getMaterials } from '@/service/material';
 import { createPurchase, updatePurchase } from '@/service/purchase';
 import { ISupplier } from '@/models/supplier';
-import { getSupplier } from '@/service/supplier';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { IconTrash, IconPlus } from '@tabler/icons-react';
 import { Modal } from '@/components/ui/modal';
 import CreateSupplierModal from './suppliyer';
-import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
 import { format } from 'date-fns';
-import { Label } from '@/components/ui/label';
+import { getSupplier } from '@/service/supplier';
 
 // TypeScript interfaces for form values
 interface FormItemValues {
-  productId: string;
-  unitOfMeasureId: string;
-  quantity?: number;
-  unitPrice?: number;
-  totalPrice?: number;
-  height?: number;
-  width?: number;
+  materialId: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
 }
 
 interface FormValues {
   invoiceNo: string;
   supplierId: string;
-  storeId: string;
   purchaseDate: string;
   paymentStatus: string;
   notes?: string;
@@ -74,23 +57,15 @@ export default function PurchaseForm({
 }: PurchaseFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<ISupplier[]>([]);
-  const [stores, setStores] = useState<any[]>([]);
-  const [products, setProducts] = useState<IProduct[]>([]);
-  const [unitsOfMeasure, setUnitsOfMeasure] = useState<{
-    [key: string]: IUnitOfMeasure[];
-  }>({});
+  const [materials, setMaterials] = useState<IMaterial[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [loadingUOM, setLoadingUOM] = useState<{ [key: string]: boolean }>({});
-  const [productDetails, setProductDetails] = useState<{ [key: string]: IProduct }>({});
-  const [loadingProductDetails, setLoadingProductDetails] = useState<{ [key: string]: boolean }>({});
   const router = useRouter();
 
   const form = useForm<FormValues>({
     defaultValues: {
       invoiceNo: initialData?.invoiceNo || '',
       supplierId: initialData?.supplierId?.toString() || '',
-      storeId: initialData?.storeId?.toString() || '',
       purchaseDate: initialData?.purchaseDate
         ? new Date(initialData.purchaseDate).toISOString().split('T')[0]
         : format(new Date(), 'yyyy-MM-dd'),
@@ -98,157 +73,42 @@ export default function PurchaseForm({
       notes: initialData?.notes || '',
       items:
         initialData?.items?.map((item) => ({
-          ...item,
-          productId: item.productId.toString(),
-          unitOfMeasureId: item.unitOfMeasureId.toString(),
+          materialId: item.materialId.toString(),
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice),
-          totalPrice: Number(item.totalPrice),
-          height: item.height ? Number(item.height) : undefined,
-          width: item.width ? Number(item.width) : undefined
+          totalPrice: Number(item.totalPrice)
         })) || []
     }
   });
 
-  // Function to check if product requires dimensions
-  const requiresDimensions = (product: IProduct | null | undefined): boolean => {
-    if (!product) return false;
-    return !!(product.thickCurtain || product.thinCurtain || product.poleCurtain);
-  };
-
-  // Fetch product details when product is selected
-  const fetchProductDetails = useCallback(async (productId: string) => {
-    if (!productId || productDetails[productId]) return;
-    
-    setLoadingProductDetails(prev => ({ ...prev, [productId]: true }));
-    try {
-      const product = await getProductById(productId);
-      setProductDetails(prev => ({ ...prev, [productId]: product }));
-    } catch (error) {
-      console.error('Failed to fetch product details:', error);
-    } finally {
-      setLoadingProductDetails(prev => ({ ...prev, [productId]: false }));
-    }
-  }, [productDetails]);
-
   // Calculate totals
   const items = form.watch('items');
   const grandTotal = items.reduce(
-    (total, item) => total + ((item.quantity || 0) * (item.unitPrice || 0)),
+    (total, item) => total + item.quantity * item.unitPrice,
     0
   );
-  const totalProducts = items.filter((item) => item.productId).length;
+  const totalProducts = items.filter((item) => item.materialId).length;
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Fetch suppliers, stores, products
+  // Fetch suppliers and materials
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [suppliersData, storesData, productsData] = await Promise.all([
+        const [suppliersData, materialsData] = await Promise.all([
           getSupplier(),
-          getStores(),
-          getProducts()
+          getMaterials()
         ]);
         setSuppliers(suppliersData);
-        setStores(storesData);
-        setProducts(productsData);
-      } catch {
-        toast.error('Failed to load suppliers, stores, or products');
+        setMaterials(materialsData);
+      } catch (error) {
+        toast.error('Failed to load suppliers or materials');
       }
     };
     fetchData();
   }, []);
-
-  const fetchUnitsOfMeasure = useCallback(
-    async (productId: string) => {
-      if (!productId) return;
-
-      if (!unitsOfMeasure[productId] && !loadingUOM[productId]) {
-        setLoadingUOM((prev) => ({ ...prev, [productId]: true }));
-        try {
-          const uomData = await getUnitOfMeasuresByProductId(productId);
-
-          let uomArray: IUnitOfMeasure[] = [];
-
-          if (Array.isArray(uomData)) {
-            uomArray = uomData;
-          } else if (uomData && typeof uomData === 'object') {
-            uomArray = [uomData as IUnitOfMeasure];
-          }
-
-          setUnitsOfMeasure((prev) => ({ ...prev, [productId]: uomArray }));
-
-          if (uomArray.length === 1) {
-            const currentItems = form.getValues('items');
-            const updatedItems = currentItems.map((item) => {
-              if (item.productId === productId && !item.unitOfMeasureId) {
-                return {
-                  ...item,
-                  unitOfMeasureId: uomArray[0]?.id?.toString() || ''
-                };
-              }
-              return item;
-            });
-            form.setValue('items', updatedItems);
-          }
-        } catch {
-          toast.error('Failed to load units of measure');
-          setUnitsOfMeasure((prev) => ({ ...prev, [productId]: [] }));
-        } finally {
-          setLoadingUOM((prev) => ({ ...prev, [productId]: false }));
-        }
-      }
-    },
-    [unitsOfMeasure, loadingUOM, form]
-  );
-
-  useEffect(() => {
-    items.forEach((item) => {
-      if (
-        item.productId &&
-        !unitsOfMeasure[item.productId] &&
-        !loadingUOM[item.productId]
-      ) {
-        fetchUnitsOfMeasure(item.productId);
-      }
-    });
-  }, [
-    items,
-    unitsOfMeasure,
-    loadingUOM,
-    fetchUnitsOfMeasure
-  ]);
-
-  // Fetch product details when product is selected
-  useEffect(() => {
-    items.forEach((item) => {
-      if (
-        item.productId &&
-        !productDetails[item.productId] &&
-        !loadingProductDetails[item.productId]
-      ) {
-        fetchProductDetails(item.productId);
-      }
-    });
-  }, [items, productDetails, loadingProductDetails, fetchProductDetails]);
-
-  // Check if a product is already selected
-  const isProductSelected = (productId: string, currentIndex: number): boolean => {
-    return items.some((item, idx) => idx !== currentIndex && item.productId === productId);
-  };
-
-  // Get available products (excluding already selected ones)
-  const getAvailableProducts = (currentIndex: number) => {
-    const selectedProductIds = items
-      .filter((_, idx) => idx !== currentIndex)
-      .map(item => item.productId)
-      .filter(id => id);
-    
-    return products.filter(product => !selectedProductIds.includes(product.id.toString()));
-  };
 
   const handleSupplierCreated = () => {
     setShowSupplierModal(false);
@@ -262,7 +122,7 @@ export default function PurchaseForm({
   const updateItemTotal = (index: number) => {
     const items = form.getValues('items');
     const item = items[index];
-    const totalPrice = (item.quantity || 0) * (item.unitPrice || 0);
+    const totalPrice = item.quantity * item.unitPrice;
 
     const updatedItems = [...items];
     updatedItems[index] = { ...item, totalPrice };
@@ -284,14 +144,6 @@ export default function PurchaseForm({
       form.setError('supplierId', {
         type: 'manual',
         message: 'Supplier is required'
-      });
-      isValid = false;
-    }
-
-    if (!data.storeId || data.storeId.trim() === '') {
-      form.setError('storeId', {
-        type: 'manual',
-        message: 'Store is required'
       });
       isValid = false;
     }
@@ -321,69 +173,34 @@ export default function PurchaseForm({
     }
 
     data.items.forEach((item, index) => {
-      const product = productDetails[item.productId];
-      const requiresDim = requiresDimensions(product);
-
-      if (!item.productId || item.productId.trim() === '') {
-        form.setError(`items.${index}.productId` as any, {
+      if (!item.materialId || item.materialId.trim() === '') {
+        form.setError(`items.${index}.materialId` as any, {
           type: 'manual',
-          message: 'Product is required'
+          message: 'Material is required'
         });
         isValid = false;
       }
 
-      if (!item.unitOfMeasureId || item.unitOfMeasureId.trim() === '') {
-        form.setError(`items.${index}.unitOfMeasureId` as any, {
-          type: 'manual',
-          message: 'Unit of measure is required'
-        });
-        isValid = false;
-      }
-
-      // Quantity validation
-      if (item.quantity === undefined || item.quantity === null || isNaN(item.quantity)) {
+      if (item.quantity <= 0 || isNaN(item.quantity)) {
         form.setError(`items.${index}.quantity` as any, {
           type: 'manual',
-          message: 'Quantity is required'
-        });
-        isValid = false;
-      } else if (item.quantity < 0) {
-        form.setError(`items.${index}.quantity` as any, {
-          type: 'manual',
-          message: 'Quantity must be 0 or greater'
+          message: 'Quantity must be greater than 0'
         });
         isValid = false;
       }
 
-      // FORCE height and width validation for products that require dimensions
-      if (requiresDim) {
-        if (!item.height || item.height <= 0 || isNaN(item.height)) {
-          form.setError(`items.${index}.height` as any, {
-            type: 'manual',
-            message: 'Height is required and must be greater than 0'
-          });
-          isValid = false;
-        }
-        if (!item.width || item.width <= 0 || isNaN(item.width)) {
-          form.setError(`items.${index}.width` as any, {
-            type: 'manual',
-            message: 'Width is required and must be greater than 0'
-          });
-          isValid = false;
-        }
-      }
-
-      // Unit price validation
-      if (item.unitPrice === undefined || item.unitPrice === null || isNaN(item.unitPrice)) {
+      if (item.unitPrice < 0 || isNaN(item.unitPrice)) {
         form.setError(`items.${index}.unitPrice` as any, {
           type: 'manual',
-          message: 'Unit price is required'
+          message: 'Unit price must be positive'
         });
         isValid = false;
-      } else if (item.unitPrice < 0) {
-        form.setError(`items.${index}.unitPrice` as any, {
+      }
+
+      if (item.totalPrice < 0 || isNaN(item.totalPrice)) {
+        form.setError(`items.${index}.totalPrice` as any, {
           type: 'manual',
-          message: 'Unit price must be 0 or greater'
+          message: 'Total price must be positive'
         });
         isValid = false;
       }
@@ -403,29 +220,12 @@ export default function PurchaseForm({
     try {
       const payload = {
         ...data,
-        items: data.items.map((item, index) => {
-          const product = productDetails[item.productId];
-          const requiresDim = requiresDimensions(product);
-          
-          const baseItem = {
-            productId: item.productId,
-            unitOfMeasureId: item.unitOfMeasureId,
-            quantity: Number(item.quantity),
-            unitPrice: Number(item.unitPrice),
-            totalPrice: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-          };
-
-          // ALWAYS include dimensions for products that require them
-          if (requiresDim) {
-            return {
-              ...baseItem,
-              height: Number(item.height),
-              width: Number(item.width)
-            };
-          }
-
-          return baseItem;
-        })
+        items: data.items.map((item) => ({
+          materialId: item.materialId,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+          totalPrice: Number(item.totalPrice)
+        }))
       };
 
       if (isEdit && initialData?.id) {
@@ -479,9 +279,7 @@ export default function PurchaseForm({
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isFocused ? '#374151' : '#1f2937',
-      color: '#f9fafb',
-      cursor: state.isDisabled ? 'not-allowed' : 'default',
-      opacity: state.isDisabled ? 0.5 : 1
+      color: '#f9fafb'
     }),
     singleValue: (base: any) => ({
       ...base,
@@ -497,17 +295,30 @@ export default function PurchaseForm({
     })
   };
 
-  // Function to delete item
-  const deleteItem = (index: number, field: any) => {
-    const newItems = [...field.value];
-    newItems.splice(index, 1);
-    field.onChange(newItems);
+  const getMaterialDisplayName = (material: IMaterial) => {
+    const details = [material.color, material.size].filter(Boolean).join(' - ');
+    return details ? `${material.name} (${details})` : material.name;
   };
 
-  // Get if product requires dimensions
-  const productRequiresDimensions = (productId: string): boolean => {
-    const product = productDetails[productId];
-    return requiresDimensions(product);
+  // Helper function to get available materials (not selected in other rows)
+  const getAvailableMaterials = (currentIndex: number) => {
+    const selectedMaterialIds = form
+      .getValues('items')
+      .filter((_, idx) => idx !== currentIndex)
+      .map(item => item.materialId)
+      .filter(id => id); // Remove empty ids
+
+    return materials.filter(material => !selectedMaterialIds.includes(material.id));
+  };
+
+  // Get all available materials for the Add button (excluding all selected materials)
+  const getAllAvailableMaterials = () => {
+    const selectedMaterialIds = form
+      .getValues('items')
+      .map(item => item.materialId)
+      .filter(id => id); // Remove empty ids
+
+    return materials.filter(material => !selectedMaterialIds.includes(material.id));
   };
 
   if (!isMounted) {
@@ -524,6 +335,8 @@ export default function PurchaseForm({
       </Card>
     );
   }
+
+  const allAvailableMaterials = getAllAvailableMaterials();
 
   return (
     <>
@@ -595,37 +408,6 @@ export default function PurchaseForm({
 
                 <FormField
                   control={form.control}
-                  name='storeId'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Store</FormLabel>
-                      <ShadcnSelect
-                        value={field.value}
-                        onValueChange={(value: string) => field.onChange(value)}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder='Select a store' />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {stores.map((store) => (
-                            <SelectItem
-                              key={store.id}
-                              value={store.id.toString()}
-                            >
-                              {store.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </ShadcnSelect>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
                   name='purchaseDate'
                   render={({ field }) => (
                     <FormItem>
@@ -647,436 +429,194 @@ export default function PurchaseForm({
                     <FormLabel>Items</FormLabel>
                     <FormControl>
                       <div className='space-y-4'>
-                        {/* Responsive header - hidden on mobile */}
-                        <div className='hidden lg:grid lg:grid-cols-8 xl:grid-cols-9 gap-4 text-sm font-semibold'>
-                          <div>Product</div>
-                          <div>Unit</div>
-                          <div>Qty</div>
-                          <div>Height *</div>
-                          <div>Width *</div>
-                          <div>Price</div>
+                        <div className='grid grid-cols-6 gap-4 text-sm font-semibold'>
+                          <div className='col-span-2'>Material</div>
+                          <div>Quantity</div>
+                          <div>Purchase Price</div>
                           <div>Total</div>
                           <div>Action</div>
                         </div>
 
                         {field.value.map((item, index) => {
-                          const requiresDim = productRequiresDimensions(item.productId);
-                          const isLoadingProduct = item.productId && loadingProductDetails[item.productId];
+                          const selectedMaterial = materials.find(
+                            m => m.id === item.materialId
+                          );
+                          
+                          // Get available materials excluding already selected ones
+                          const availableMaterials = getAvailableMaterials(index);
+                          
+                          // Check if current material is already selected elsewhere
+                          const isMaterialAlreadySelected = form
+                            .getValues('items')
+                            .some((i, idx) => idx !== index && i.materialId === item.materialId);
                           
                           return (
                             <div
                               key={index}
-                              className='border rounded-lg p-4 lg:p-0 lg:border-none space-y-4 lg:space-y-0'
+                              className='grid grid-cols-6 items-center gap-4'
                             >
-                              {/* Mobile view - stacked layout */}
-                              <div className='lg:hidden space-y-3'>
-                                <div className='flex justify-between items-start'>
-                                  <Label className='font-semibold'>Product</Label>
-                                  <Button
-                                    type='button'
-                                    variant='destructive'
-                                    size='sm'
-                                    onClick={() => deleteItem(index, field)}
-                                  >
-                                    <IconTrash size={16} />
-                                  </Button>
-                                </div>
-                                
-                                <div>
-                                  <Label className='text-sm'>Product *</Label>
-                                  <Select
-                                    instanceId={`product-select-mobile-${index}`}
-                                    options={getAvailableProducts(index).map((product) => ({
-                                      value: product.id.toString(),
-                                      label: product.name
-                                    }))}
-                                    onChange={(newValue) => {
-                                      const newItems = [...field.value];
-                                      newItems[index].productId = newValue?.value || '';
-                                      newItems[index].unitOfMeasureId = '';
-                                      newItems[index].height = undefined;
-                                      newItems[index].width = undefined;
-                                      field.onChange(newItems);
-                                      if (newValue?.value) {
-                                        fetchUnitsOfMeasure(newValue.value);
-                                        fetchProductDetails(newValue.value);
-                                      }
-                                    }}
-                                    value={products
-                                      .map((p) => ({
-                                        value: p.id.toString(),
-                                        label: p.name
-                                      }))
-                                      .find((p) => p.value === item.productId)}
-                                    placeholder='Search product'
-                                    isSearchable
-                                    isOptionDisabled={(option) => isProductSelected(option.value, index)}
-                                    styles={isDark ? darkStyles : {}}
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label className='text-sm'>Unit *</Label>
-                                  <Select
-                                    instanceId={`uom-select-mobile-${index}`}
-                                    options={
-                                      Array.isArray(unitsOfMeasure[item.productId])
-                                        ? unitsOfMeasure[item.productId].map(
-                                            (uom) => ({
-                                              value: uom.id.toString(),
-                                              label: uom.name
-                                            })
-                                          )
-                                        : []
-                                    }
-                                    onChange={(newValue) => {
-                                      const newItems = [...field.value];
-                                      newItems[index].unitOfMeasureId = newValue?.value || '';
-                                      field.onChange(newItems);
-                                    }}
-                                    value={
-                                      Array.isArray(unitsOfMeasure[item.productId])
-                                        ? unitsOfMeasure[item.productId]
-                                            .map((uom) => ({
-                                              value: uom.id.toString(),
-                                              label: uom.name
-                                            }))
-                                            ?.find(
-                                              (u) => u.value === item.unitOfMeasureId
-                                            )
-                                        : undefined
-                                    }
-                                    placeholder={
-                                      loadingUOM[item.productId]
-                                        ? 'Loading...'
-                                        : 'Select unit'
-                                    }
-                                    isSearchable
-                                    isDisabled={
-                                      !item.productId ||
-                                      loadingUOM[item.productId] ||
-                                      (Array.isArray(unitsOfMeasure[item.productId]) &&
-                                        unitsOfMeasure[item.productId].length === 1)
-                                    }
-                                    isLoading={loadingUOM[item.productId]}
-                                    styles={isDark ? darkStyles : {}}
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label className='text-sm'>Quantity *</Label>
-                                  <Input
-                                    type='number'
-                                    placeholder='Qty'
-                                    value={item.quantity === undefined ? '' : item.quantity}
-                                    onChange={(e) => {
-                                      const newItems = [...field.value];
-                                      const value = e.target.value;
-                                      const quantity = value === '' ? undefined : Number(value);
-                                      if (quantity !== undefined && !isNaN(quantity) && quantity >= 0) {
-                                        newItems[index].quantity = quantity;
-                                        newItems[index].totalPrice = (quantity || 0) * (newItems[index].unitPrice || 0);
-                                      } else if (value === '') {
-                                        newItems[index].quantity = undefined;
-                                        newItems[index].totalPrice = 0;
-                                      }
-                                      field.onChange(newItems);
-                                      updateItemTotal(index);
-                                    }}
-                                  />
-                                </div>
-
-                                {/* Height and Width - Required for curtain products */}
-                                {requiresDim && !isLoadingProduct && (
-                                  <>
-                                    <div>
-                                      <Label className='text-sm'>Height *</Label>
-                                      <Input
-                                        type='number'
-                                        min={0}
-                                        placeholder='Height (required)'
-                                        value={item.height || ''}
-                                        onChange={(e) => {
-                                          const newItems = [...field.value];
-                                          const height = Number(e.target.value);
-                                          newItems[index].height = isNaN(height) ? undefined : height;
-                                          field.onChange(newItems);
-                                        }}
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className='text-sm'>Width *</Label>
-                                      <Input
-                                        type='number'
-                                        min={0}
-                                        placeholder='Width (required)'
-                                        value={item.width || ''}
-                                        onChange={(e) => {
-                                          const newItems = [...field.value];
-                                          const width = Number(e.target.value);
-                                          newItems[index].width = isNaN(width) ? undefined : width;
-                                          field.onChange(newItems);
-                                        }}
-                                      />
-                                    </div>
-                                  </>
+                              {/* Material */}
+                              <div className='col-span-2'>
+                                <Select
+                                  instanceId={`material-select-${index}`}
+                                  options={availableMaterials.map((material) => ({
+                                    value: material.id.toString(),
+                                    label: getMaterialDisplayName(material)
+                                  }))}
+                                  onChange={(newValue) => {
+                                    const newItems = [...field.value];
+                                    newItems[index].materialId =
+                                      newValue?.value || '';
+                                    field.onChange(newItems);
+                                  }}
+                                  value={
+                                    item.materialId
+                                      ? {
+                                          value: item.materialId,
+                                          label: selectedMaterial 
+                                            ? getMaterialDisplayName(selectedMaterial)
+                                            : 'Loading...'
+                                        }
+                                      : null
+                                  }
+                                  placeholder='Search material'
+                                  isSearchable
+                                  styles={isDark ? darkStyles : {}}
+                                  isDisabled={isMaterialAlreadySelected && !!item.materialId}
+                                />
+                                {isMaterialAlreadySelected && item.materialId && (
+                                  <p className='text-xs text-red-500 mt-1'>
+                                    This material is already selected in another row
+                                  </p>
                                 )}
-
-                                <div>
-                                  <Label className='text-sm'>Unit Price *</Label>
-                                  <Input
-                                    type='number'
-                                    placeholder='Price'
-                                    value={item.unitPrice === undefined ? '' : item.unitPrice}
-                                    onChange={(e) => {
-                                      const newItems = [...field.value];
-                                      const value = e.target.value;
-                                      const unitPrice = value === '' ? undefined : Number(value);
-                                      if (unitPrice !== undefined && !isNaN(unitPrice) && unitPrice >= 0) {
-                                        newItems[index].unitPrice = unitPrice;
-                                        newItems[index].totalPrice = (newItems[index].quantity || 0) * unitPrice;
-                                      } else if (value === '') {
-                                        newItems[index].unitPrice = undefined;
-                                        newItems[index].totalPrice = 0;
-                                      }
-                                      field.onChange(newItems);
-                                      updateItemTotal(index);
-                                    }}
-                                  />
-                                </div>
-
-                                <div className='flex justify-between items-center pt-2 border-t'>
-                                  <Label className='font-semibold'>Total</Label>
-                                  <span className='text-lg font-bold text-green-600'>
-                                    {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
-                                  </span>
-                                </div>
                               </div>
 
-                              {/* Desktop view - grid layout */}
-                              <div className='hidden lg:grid lg:grid-cols-8 xl:grid-cols-8 items-center gap-4'>
-                                <div>
-                                  <Select
-                                    instanceId={`product-select-${index}`}
-                                    options={getAvailableProducts(index).map((product) => ({
-                                      value: product.id.toString(),
-                                      label: product.name
-                                    }))}
-                                    onChange={(newValue) => {
-                                      const newItems = [...field.value];
-                                      newItems[index].productId = newValue?.value || '';
-                                      newItems[index].unitOfMeasureId = '';
-                                      newItems[index].height = undefined;
-                                      newItems[index].width = undefined;
-                                      field.onChange(newItems);
-                                      if (newValue?.value) {
-                                        fetchUnitsOfMeasure(newValue.value);
-                                        fetchProductDetails(newValue.value);
-                                      }
-                                    }}
-                                    value={products
-                                      .map((p) => ({
-                                        value: p.id.toString(),
-                                        label: p.name
-                                      }))
-                                      .find((p) => p.value === item.productId)}
-                                    placeholder='Search product'
-                                    isSearchable
-                                    isOptionDisabled={(option) => isProductSelected(option.value, index)}
-                                    styles={isDark ? darkStyles : {}}
-                                  />
-                                </div>
+                              {/* Quantity */}
+                              <div>
+                                <Input
+                                  type='number'
+                                  placeholder='Qty'
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const newItems = [...field.value];
+                                    const quantity = Number(e.target.value);
+                                    newItems[index].quantity = isNaN(quantity)
+                                      ? 0
+                                      : quantity;
+                                    newItems[index].totalPrice =
+                                      newItems[index].quantity *
+                                      newItems[index].unitPrice;
+                                    field.onChange(newItems);
+                                    updateItemTotal(index);
+                                  }}
+                                />
+                              </div>
 
-                                <div>
-                                  <Select
-                                    instanceId={`uom-select-${index}`}
-                                    options={
-                                      Array.isArray(unitsOfMeasure[item.productId])
-                                        ? unitsOfMeasure[item.productId].map(
-                                            (uom) => ({
-                                              value: uom.id.toString(),
-                                              label: uom.name
-                                            })
-                                          )
-                                        : []
-                                    }
-                                    onChange={(newValue) => {
-                                      const newItems = [...field.value];
-                                      newItems[index].unitOfMeasureId = newValue?.value || '';
-                                      field.onChange(newItems);
-                                    }}
-                                    value={
-                                      Array.isArray(unitsOfMeasure[item.productId])
-                                        ? unitsOfMeasure[item.productId]
-                                            .map((uom) => ({
-                                              value: uom.id.toString(),
-                                              label: uom.name
-                                            }))
-                                            ?.find(
-                                              (u) => u.value === item.unitOfMeasureId
-                                            )
-                                        : undefined
-                                    }
-                                    placeholder={
-                                      loadingUOM[item.productId]
-                                        ? 'Loading units...'
-                                        : 'Select unit'
-                                    }
-                                    isSearchable
-                                    isDisabled={
-                                      !item.productId ||
-                                      loadingUOM[item.productId] ||
-                                      (Array.isArray(unitsOfMeasure[item.productId]) &&
-                                        unitsOfMeasure[item.productId].length === 1)
-                                    }
-                                    isLoading={loadingUOM[item.productId]}
-                                    styles={isDark ? darkStyles : {}}
-                                    noOptionsMessage={() => 'No units available'}
-                                  />
-                                </div>
+                              {/* Unit Price */}
+                              <div>
+                                <Input
+                                  type='number'
+                                  placeholder='Price'
+                                  value={item.unitPrice}
+                                  onChange={(e) => {
+                                    const newItems = [...field.value];
+                                    const unitPrice = Number(e.target.value);
+                                    newItems[index].unitPrice = isNaN(unitPrice)
+                                      ? 0
+                                      : unitPrice;
+                                    newItems[index].totalPrice =
+                                      newItems[index].quantity *
+                                      newItems[index].unitPrice;
+                                    field.onChange(newItems);
+                                    updateItemTotal(index);
+                                  }}
+                                />
+                              </div>
 
-                                <div>
-                                  <Input
-                                    type='number'
-                                    placeholder='Qty'
-                                    value={item.quantity === undefined ? '' : item.quantity}
-                                    onChange={(e) => {
-                                      const newItems = [...field.value];
-                                      const value = e.target.value;
-                                      const quantity = value === '' ? undefined : Number(value);
-                                      if (quantity !== undefined && !isNaN(quantity) && quantity >= 0) {
-                                        newItems[index].quantity = quantity;
-                                        newItems[index].totalPrice = (quantity || 0) * (newItems[index].unitPrice || 0);
-                                      } else if (value === '') {
-                                        newItems[index].quantity = undefined;
-                                        newItems[index].totalPrice = 0;
-                                      }
-                                      field.onChange(newItems);
-                                      updateItemTotal(index);
-                                    }}
-                                  />
-                                </div>
+                              {/* Total Price */}
+                              <div className='flex items-center justify-center'>
+                                <span className='text-sm font-medium'>
+                                  {(item.quantity * item.unitPrice).toFixed(2)}
+                                </span>
+                              </div>
 
-                                <div>
-                                  <Input
-                                    type='number'
-                                    min={0}
-                                    placeholder='Height *'
-                                    value={item.height || ''}
-                                    required={requiresDim}
-                                    className={requiresDim ? 'border-red-300 focus:border-red-500' : ''}
-                                    onChange={(e) => {
-                                      const newItems = [...field.value];
-                                      const height = Number(e.target.value);
-                                      newItems[index].height = isNaN(height) ? undefined : height;
-                                      field.onChange(newItems);
-                                    }}
-                                  />
-                                </div>
-
-                                <div>
-                                  <Input
-                                    type='number'
-                                    min={0}
-                                    placeholder='Width *'
-                                    value={item.width || ''}
-                                    required={requiresDim}
-                                    className={requiresDim ? 'border-red-300 focus:border-red-500' : ''}
-                                    onChange={(e) => {
-                                      const newItems = [...field.value];
-                                      const width = Number(e.target.value);
-                                      newItems[index].width = isNaN(width) ? undefined : width;
-                                      field.onChange(newItems);
-                                    }}
-                                  />
-                                </div>
-
-                                <div>
-                                  <Input
-                                    type='number'
-                                    placeholder='Price'
-                                    value={item.unitPrice === undefined ? '' : item.unitPrice}
-                                    onChange={(e) => {
-                                      const newItems = [...field.value];
-                                      const value = e.target.value;
-                                      const unitPrice = value === '' ? undefined : Number(value);
-                                      if (unitPrice !== undefined && !isNaN(unitPrice) && unitPrice >= 0) {
-                                        newItems[index].unitPrice = unitPrice;
-                                        newItems[index].totalPrice = (newItems[index].quantity || 0) * unitPrice;
-                                      } else if (value === '') {
-                                        newItems[index].unitPrice = undefined;
-                                        newItems[index].totalPrice = 0;
-                                      }
-                                      field.onChange(newItems);
-                                      updateItemTotal(index);
-                                    }}
-                                  />
-                                </div>
-
-                                <div className='flex items-center justify-center'>
-                                  <span className='text-sm font-medium'>
-                                    {((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
-                                  </span>
-                                </div>
-
-                                <div>
-                                  <Button
-                                    type='button'
-                                    variant='destructive'
-                                    size='sm'
-                                    onClick={() => deleteItem(index, field)}
-                                  >
-                                    <IconTrash size={16} />
-                                  </Button>
-                                </div>
+                              {/* Delete Button */}
+                              <div>
+                                <Button
+                                  type='button'
+                                  variant='destructive'
+                                  size='sm'
+                                  onClick={() => {
+                                    const newItems = [...field.value];
+                                    newItems.splice(index, 1);
+                                    field.onChange(newItems);
+                                  }}
+                                  disabled={field.value.length <= 1}
+                                >
+                                  <IconTrash size={16} />
+                                </Button>
                               </div>
                             </div>
                           );
                         })}
 
-                        {/* Summary Row - Responsive */}
-                        <div className='border-t pt-4 mt-4'>
-                          <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3'>
-                            <div className='text-sm'>
-                              Total Products: {totalProducts}
-                            </div>
-                            <div className='flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto'>
-                              <div className='flex justify-between items-center w-full sm:w-auto'>
-                                <span className='font-semibold mr-4'>Grand Total:</span>
-                                <span className='text-2xl font-bold text-green-600'>
-                                  {grandTotal.toFixed(2)}
-                                </span>
-                              </div>
-                              <Button
-                                type='button'
-                                onClick={() => {
-                                  field.onChange([
-                                    ...field.value,
-                                    {
-                                      productId: '',
-                                      unitOfMeasureId: '',
-                                      quantity: undefined,
-                                      unitPrice: undefined,
-                                      totalPrice: 0,
-                                      height: undefined,
-                                      width: undefined
-                                    }
-                                  ]);
-                                }}
-                                className='w-full sm:w-auto'
-                              >
-                                <IconPlus size={16} className='mr-2' />
-                                Add Item
-                              </Button>
-                            </div>
+                        {/* Summary Row */}
+                        <div className='grid grid-cols-6 items-center gap-4 border-t pt-4'>
+                          <div className='col-span-4 text-right font-semibold'>
+                            Summary:
+                          </div>
+                          <div className='text-center text-lg font-bold'>
+                            {grandTotal.toFixed(2)}
+                          </div>
+                          <div></div>
+                        </div>
+
+                        <div className='grid grid-cols-6 items-center gap-4'>
+                          <div className='col-span-5 text-sm'>
+                            Total Products: {totalProducts}
+                          </div>
+                          <div className='text-right'>
+                            <Button
+                              type='button'
+                              onClick={() => {
+                                field.onChange([
+                                  ...field.value,
+                                  {
+                                    materialId: '',
+                                    quantity: 1,
+                                    unitPrice: 0,
+                                    totalPrice: 0
+                                  }
+                                ]);
+                              }}
+                              disabled={allAvailableMaterials.length === 0}
+                            >
+                              Add Item
+                            </Button>
                           </div>
                         </div>
+                        
+                        {allAvailableMaterials.length === 0 && field.value.length > 0 && (
+                          <p className='text-sm text-yellow-600 text-center'>
+                            No more materials available to add. All materials have been selected.
+                          </p>
+                        )}
                       </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* Grand Total Display */}
+              <div className='rounded-lg p-4'>
+                <div className='flex items-center justify-between'>
+                  <div className='text-lg font-semibold'>Grand Total</div>
+                  <div className='text-2xl font-bold text-green-600'>
+                    {grandTotal.toFixed(2)}
+                  </div>
+                </div>
+              </div>
 
               <FormField
                 control={form.control}
@@ -1102,6 +642,7 @@ export default function PurchaseForm({
         </CardContent>
       </Card>
 
+      {/* Supplier Creation Modal */}
       <Modal
         isOpen={showSupplierModal}
         onClose={() => setShowSupplierModal(false)}

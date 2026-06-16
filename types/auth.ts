@@ -1,6 +1,5 @@
-import type { IBranch } from "@/models/Branch";
-import type { IShop } from "@/models/shop";
-import type { IStore } from "@/models/store";
+import { IShowroom } from "@/models/showroom";
+import { IStore } from "@/models/store";
 
 export type AuthUser = {
   id: string;
@@ -10,9 +9,8 @@ export type AuthUser = {
   status?: string;
   roleType?: string;
   role?: string;
-  permissions: string[];
-  branch?: IBranch | null;
-  shops?: IShop[];
+  permissions: string[]; 
+  showroom?: IShowroom[];
   stores?: IStore[];
   lastLoginAt?: string;
 };
@@ -35,8 +33,7 @@ export type BackendAuthUser = {
   roleType?: string;
   role?: BackendRole;
   permissions?: string[];
-  branch?: IBranch | null;
-  shops?: IShop[];
+  showroom?: IShowroom[];
   stores?: IStore[];
   lastLoginAt?: string;
 };

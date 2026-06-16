@@ -1,8 +1,7 @@
 /* eslint-disable import/no-unresolved */
-import { axiosInstance } from "./axiosIntance";
-
 import { ISupplier } from '@/models/supplier';
 import { GetParams } from './roleService';
+import { axiosInstance } from './axiosIntance';
 
 interface SupplierResponse {
   success: boolean;

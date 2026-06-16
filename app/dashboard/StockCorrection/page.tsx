@@ -11,8 +11,8 @@ import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
 import StockCorrectionsListingPage from '@/features/Inventory/StockCorrection/listing';
+import ItemTableAction from '@/features/Bank/tableaction';
 
 export const metadata = {
   title: 'Dashboard: Stock Corrections'

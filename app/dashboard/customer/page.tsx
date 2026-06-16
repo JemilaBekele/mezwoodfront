@@ -4,7 +4,6 @@ import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
 import CustomersListingPage from '@/features/customer/listing';
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
 import { searchParamsCache } from '@/lib/searchparams';
 import { cn } from '@/lib/utils';
 import { IconPlus } from '@tabler/icons-react';
@@ -13,6 +12,7 @@ import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
+import UserTableAction from '@/features/Employee/components/employee-table-action';
 
 export const metadata = {
   title: 'Dashboard: Customer'
@@ -54,7 +54,7 @@ export default async function SupplierPage({ searchParams }: PageProps) {
           }
         >
           {' '}
-          <ItemTableAction />
+        <UserTableAction />
           <CustomersListingPage />
         </Suspense>
       </div>

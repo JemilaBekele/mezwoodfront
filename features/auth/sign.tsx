@@ -191,9 +191,9 @@ export default function SignInViewPage() {
   </div>
 
 <div>
-  <h2 className="login-brand__name">ikiz Curtain</h2>
+  <h2 className="login-brand__name">Rosewood</h2>
   <p className="login-brand__tagline">
-    Curtain Management System
+     Management System
   </p>
 </div>
 </div>

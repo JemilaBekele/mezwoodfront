@@ -8,7 +8,7 @@ type CompanyViewPageProps = {
 };
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.1:5000';
+  process.env.NEXT_PUBLIC_BACKEND_URL || 'http:// 192.168.1.2:5000';
 
 export default async function CompanyViewPage({
   companyId

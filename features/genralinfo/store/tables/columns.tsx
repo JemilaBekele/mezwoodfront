@@ -3,24 +3,28 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { IStore } from '@/models/store';
 import { DataTableColumnHeader } from '@/components/ui/table/data-table-column-header';
-import { StoreCellAction } from './cell-action'; // Adjust path if needed
+import { StoreCellAction } from './cell-action';
 
 export const storeColumns: ColumnDef<IStore>[] = [
   {
     accessorKey: 'name',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Name' />
+      <DataTableColumnHeader column={column} title="Name" />
     ),
     cell: ({ row }) => <div>{row.original.name}</div>,
     enableColumnFilter: true
   },
 
   {
-    accessorKey: 'branch',
+    accessorKey: 'isMain',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Branch' />
+      <DataTableColumnHeader column={column} title="Main Store" />
     ),
-    cell: ({ row }) => <div>{row.original.branch?.name || '-'}</div>,
+    cell: ({ row }) => (
+      <div>
+        {row.original.isMain ? 'Yes' : 'No'}
+      </div>
+    ),
     enableColumnFilter: true
   },
   {

@@ -2,7 +2,6 @@ import PageContainer from '@/components/layout/page-container';
 import { Heading } from '@/components/ui/heading';
 import { Separator } from '@/components/ui/separator';
 import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
 import PermissionListingPage from '@/features/RoleandPermisson/permlist';
 import { searchParamsCache } from '@/lib/searchparams';
 
@@ -32,7 +31,7 @@ export default async function PermissionPage(props: pageProps) {
           <Heading title='Permission' description='Manage Permission ' />
         </div>
         <Separator />
-        <ItemTableAction />
+        {/* <ItemTableAction /> */}
         <Suspense
           // key={key}
           fallback={

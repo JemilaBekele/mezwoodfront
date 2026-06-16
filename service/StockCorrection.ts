@@ -1,8 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { axiosInstance } from "./axiosIntance";
+import { axiosInstance } from './axiosIntance';
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
 
-import { PaginationParams } from './store';
-
+  startDate?: string;
+  endDate?: string;
+}
 // 🔹 Define StockCorrection type (adjust fields to your model)
 export interface IStockCorrection {
   id: string;
@@ -69,7 +73,7 @@ export const getStockCorrections = async () => {
 // ✅ Get stock correction by ID
 export const getStockCorrectionById = async (
   id: string,
-  
+
 ) => {
   try {
     const response = await axiosInstance.get(`/stock-corrections/${id}`);
@@ -80,7 +84,7 @@ export const getStockCorrectionById = async (
 };
 export const getStockCorrectionId = async (
   id: string,
-  
+
 ) => {
   try {
     const response = await axiosInstance.get(`/stock-corrections/${id}`);
@@ -93,7 +97,7 @@ export const getStockCorrectionId = async (
 // ✅ Get stock correction by reference
 export const getStockCorrectionByReference = async (
   reference: string,
-  
+
 ) => {
   try {
     const response = await axiosInstance.get(
@@ -108,9 +112,11 @@ export const getStockCorrectionByReference = async (
 // ✅ Create stock correction
 export const createStockCorrection = async (
   data: any,
-  
+
 ) => {
   try {
+    
+    
     const response = await axiosInstance.post(`/stock-corrections`, data);
     return response.data;
   } catch (error) {
@@ -122,9 +128,10 @@ export const createStockCorrection = async (
 export const updateStockCorrection = async (
   id: string,
   data: any,
-  
+
 ) => {
   try {
+    
     const response = await axiosInstance.put(`/stock-corrections/${id}`, data);
     return response.data;
   } catch (error) {
@@ -135,9 +142,10 @@ export const updateStockCorrection = async (
 // ✅ Approve stock correction
 export const approveStockCorrection = async (
   id: string,
-  
+
 ) => {
   try {
+    
     const response = await axiosInstance.post(
       `/stock-corrections/${id}/approve`
     );
@@ -150,9 +158,10 @@ export const approveStockCorrection = async (
 // ✅ Reject stock correction
 export const rejectStockCorrection = async (
   id: string,
-  
+
 ) => {
   try {
+    
     const response = await axiosInstance.post(
       `/stock-corrections/${id}/reject`
     );
@@ -165,11 +174,51 @@ export const rejectStockCorrection = async (
 // ✅ Delete stock correction
 export const deleteStockCorrection = async (
   id: string,
-  
+
 ) => {
   try {
+    
     const response = await axiosInstance.delete(`/stock-corrections/${id}`);
     return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+export interface MaterialStockResponse {
+  success: boolean;
+  data: {
+    materialId: string;
+    materialName: string;
+    totalQuantity: number;
+  };
+}
+
+// ✅ Get material stock by material ID
+export const getMaterialStockById = async (
+  materialId: string,
+
+) => {
+  try {
+    const response = await axiosInstance.get<MaterialStockResponse>(
+      `/Material/Stock/all/${materialId}`
+    );
+    return response.data.data;
+  } catch (error) {
+    throw error;
+  }
+};
+// ✅ Get material stock by material ID
+export const getMaterialStockreserveId = async (
+  materialId: string,
+
+) => {
+  try {
+    const response = await axiosInstance.get<MaterialStockResponse>(
+      `/Material/Stock/all/only/reserve/${materialId}`
+    );
+    return response.data.data;
   } catch (error) {
     throw error;
   }

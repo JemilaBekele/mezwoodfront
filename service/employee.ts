@@ -2,7 +2,7 @@
 /* eslint-disable import/no-unresolved */
 
 import { IEmployee } from '@/models/employee';
-import { axiosInstance } from "./axiosIntance";
+import { axiosInstance } from './axiosIntance';
 
 export interface GetParams {
   page?: number;
@@ -72,7 +72,6 @@ export const changePassword = async (
   userId: string,
   currentPassword: string,
   newPassword: string,
-  
 ) => {
   try {
     const response = await axiosInstance.put(
@@ -90,7 +89,6 @@ export const changePassword = async (
 export const resetUserPassword = async (
   userId: string,
   newPassword: string,
-  
 ) => {
   try {
     const response = await axiosInstance.put(`/user/reset-password/${userId}`, {
@@ -197,6 +195,7 @@ export const getEmployeeId = async (
   
 ) => {
   try {
+    // Send `id` as a query parameter
     const response = await axiosInstance.get(`/user/${id}`);
     return response.data;
   } catch (error) {
@@ -206,7 +205,6 @@ export const getEmployeeId = async (
 
 export const createEmployee = async (
   employeeData: any,
-  
 ) => {
   try {
     const response = await axiosInstance.post('/register', employeeData);

@@ -9,7 +9,7 @@
  *
  * Usage:
  *   <BrandedSplash />                                      — "Checking authentication"
- *   <BrandedSplash title="ikiz curtain
+ *   <BrandedSplash title="Rosewood curtain
 " message="Loading…" /> — custom text
  *   <BrandedSplash variant="success" title="Welcome back" message="Preparing your dashboard" />
  */
@@ -24,7 +24,7 @@ interface BrandedSplashProps {
 
 export default function BrandedSplash({
   variant = "loading",
-  title = "ikiz curtain",
+  title = "Rosewood",
   message = "Checking authentication",
 }: BrandedSplashProps) {
   const isSuccess = variant === "success";

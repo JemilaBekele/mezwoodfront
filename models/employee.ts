@@ -1,7 +1,6 @@
 import { IRole } from '@/service/roleService';
-import { IBranch } from './Branch';
-import { IShop } from './shop';
 import { IStore } from './store';
+import { IShowroom } from './showroom';
 
 export interface IEmployee {
   id?: string; // UUID
@@ -10,8 +9,7 @@ export interface IEmployee {
   userCode?: string;
   email: string;
   password: string;
-  branchId?: string;
-  branch?: IBranch;
+
   roleId: string;
   role?: IRole;
   status: 'Active' | 'Inactive' | 'Suspended';
@@ -19,9 +17,16 @@ export interface IEmployee {
   updatedAt?: string; // ISO date string
   lastLoginAt?: string;
   shopIds?: string[]; // for assigning shops
-  storeIds?: string[]; // for assigning stores
-  shops?: IShop[]; // populated shops (optional in responses)
-  stores?: IStore[]; // ISO date string
+  storeIds?: string[]; 
+    storeId?: string;
+
+  // Showroom Assignment
+  showroomId?: string;
+
+  store?: IStore; // for assigning stores
+
+  showroom?: IShowroom; // for assigning showrooms
+ 
 }
 export interface Imployee {
   id: string; // UUID
@@ -30,18 +35,29 @@ export interface Imployee {
   userCode?: string;
   email: string;
   password: string;
-  branchId?: string;
-  branch?: IBranch;
   roleId: string;
   role?: IRole;
   status: 'Active' | 'Inactive' | 'Suspended';
   createdAt?: string; // ISO date string
   updatedAt?: string; // ISO date string
   lastLoginAt?: string;
-  shopIds?: string[]; // for assigning shops
-  storeIds?: string[]; // for assigning stores
-  shops?: IShop[]; // populated shops (optional in responses)
-  stores?: IStore[]; // ISO date string
+   // Optional populated relations
+     // Store Assignment
+  storeId?: string;
+
+  // Showroom Assignment
+  showroomId?: string;
+
+  store?: {
+    id: string;
+    name: string;
+  };
+
+  showroom?: {
+    id: string;
+    name: string;
+  };
+// ISO date string
 }
 
 export interface Iupdate {
@@ -75,16 +91,26 @@ export interface ITenant {
 
 export interface ICompany {
   id?: string;
+
   name: string;
   email?: string;
   phone?: string;
+
   address?: string;
+  addressTow?: string;
+  tiktok?: string;
+  logo?: string | File;
+
+
+  
   description?: string;
+
   tinAddress?: string;
   TIN?: string;
   From?: string;
-  logo?: string | File;
-  // Relationships
+
+
+
 
   // Timestamps
   createdAt?: Date | string;

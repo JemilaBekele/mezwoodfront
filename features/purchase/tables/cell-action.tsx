@@ -88,10 +88,10 @@ export const PurchaseCellAction: React.FC<CellActionProps> = ({ data }) => {
             <PermissionGuard
               requiredPermission={PERMISSIONS.STOCK_CORRECTION.CREATE.name}
             >
-                <DropdownMenuItem
+              <DropdownMenuItem
                 onClick={() =>
                   router.push(
-                    `/dashboard/purchase/StockCorrection/${data.id}`
+                    `/dashboard/purchase/StockCorrection?id=${data.id}`
                   )
                 }
               >

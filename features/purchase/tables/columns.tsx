@@ -40,16 +40,6 @@ export const purchaseColumns: ColumnDef<IPurchase>[] = [
     enableColumnFilter: true
   },
   {
-    accessorKey: 'store',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Store' />
-    ),
-    cell: ({ cell }) => (
-      <div>{cell.getValue<IPurchase['store']>()?.name || '-'}</div>
-    ),
-    enableColumnFilter: true
-  },
-  {
     accessorKey: 'purchaseDate',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Purchase Date' />
@@ -87,16 +77,6 @@ export const purchaseColumns: ColumnDef<IPurchase>[] = [
       <div className='font-medium'>{cell.getValue<number>().toFixed(2)}</div>
     )
   },
-  {
-    accessorKey: 'totalProducts',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Total Product' />
-    ),
-    cell: ({ cell }) => (
-      <div className='font-medium'>{cell.getValue<number>()}</div>
-    )
-  },
-
   {
     id: 'actions',
     header: 'Actions',

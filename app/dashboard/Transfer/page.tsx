@@ -11,8 +11,8 @@ import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
-import TransfersListingPage from '@/features/transfer/listing';
+import ItemTableAction from '@/features/Bank/tableaction';
+import TransferListingPage from '@/features/transfer/listing';
 
 export const metadata = {
   title: 'Dashboard: Transfers'
@@ -32,7 +32,7 @@ export default async function SupplierPage({ searchParams }: PageProps) {
         <div className='flex items-start justify-between'>
           <Heading
             title='Transfers'
-            description='Manage all transfer records between branches and locations.'
+            description='Manage all transfer records include product and material.'
           />
 
           <PermissionGuard
@@ -55,7 +55,7 @@ export default async function SupplierPage({ searchParams }: PageProps) {
         >
           {' '}
           <ItemTableAction />
-          <TransfersListingPage />
+          <TransferListingPage />
         </Suspense>
       </div>
     </PageContainer>

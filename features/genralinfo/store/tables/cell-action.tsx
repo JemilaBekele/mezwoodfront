@@ -87,7 +87,7 @@ export const StoreCellAction: React.FC<CellActionProps> = ({ data }) => {
               <Edit className='mr-2 h-4 w-4' /> Update
             </DropdownMenuItem>
           </PermissionGuard>
-          <PermissionGuard requiredPermission={PERMISSIONS.STORE.UPDATE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.STORE.DELETE.name}>
             <DropdownMenuItem onClick={() => setOpen(true)}>
               <IconTrash className='mr-2 h-4 w-4' /> Delete
             </DropdownMenuItem>

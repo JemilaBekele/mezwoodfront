@@ -42,6 +42,14 @@ export default async function EmployeePage(props: pageProps) {
               <IconPlus className='mr-2 h-4 w-4' /> Add New
             </Link>{' '}
           </PermissionGuard>
+           {/* <PermissionGuard requiredPermission={PERMISSIONS.REPORT.RESET.name}>
+            <Link
+              href='/dashboard/Reset'
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+              <IconPlus className='mr-2 h-4 w-4' /> Re
+            </Link>{' '}
+          </PermissionGuard> */}
         </div>
         <Separator />
         <UserTableAction />

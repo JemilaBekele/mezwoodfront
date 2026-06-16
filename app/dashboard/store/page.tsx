@@ -9,10 +9,10 @@ import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
 
 import StoreModal from '@/features/genralinfo/store/modal';
 import StoreListingPage from '@/features/genralinfo/store/listing';
+import UserTableAction from '@/features/Shop/table/selltable-action';
 
 export const metadata = {
   title: 'Dashboard: Store'
@@ -43,7 +43,7 @@ export default async function StorePage(props: pageProps) {
           </PermissionGuard>
         </div>
         <Separator />
-        <ItemTableAction />
+        <UserTableAction />
 
         <Suspense
           // key={key}

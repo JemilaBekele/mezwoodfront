@@ -37,6 +37,9 @@ export default function CompanyForm({
       email: initialData?.email || '',
       phone: initialData?.phone || '',
       address: initialData?.address || '',
+      addressTow: initialData?.addressTow || '',
+            tiktok: initialData?.tiktok || '',
+
       description: initialData?.description || '',
       tinAddress: initialData?.tinAddress || '',
       TIN: initialData?.TIN || '',
@@ -151,6 +154,32 @@ export default function CompanyForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                    <FormField
+                  name='addressTow'
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address Two</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                    <FormField
+                  name='tiktok'
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tiktok</FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>

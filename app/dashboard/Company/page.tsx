@@ -20,7 +20,7 @@ export default async function SupplierPage({ searchParams }: PageProps) {
   searchParamsCache.parse(parsedParams);
 
   return (
-    <PageContainer scrollable={false}>
+    <PageContainer scrollable={true}>
       <div className='flex flex-1 flex-col space-y-4'>
         <div className='flex items-start justify-between'></div>
         <Separator />
@@ -28,7 +28,8 @@ export default async function SupplierPage({ searchParams }: PageProps) {
           fallback={
             <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />
           }
-        >
+        >               
+
           <CompaniesPage />
         </Suspense>
       </div>

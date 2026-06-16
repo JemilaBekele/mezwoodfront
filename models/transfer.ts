@@ -1,57 +1,85 @@
-import { IEmployee } from './employee';
-import { IProduct } from './Product';
-import { IShop } from './shop';
-import { IStore } from './store';
-import { IUnitOfMeasure } from './UnitOfMeasure';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* ================= ENUMS ================= */
 
-// Types
-export interface ITransferItem {
-  id: string;
-  transferId: string;
-  productId: string;
-    product: IProduct;
-
-  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
-  height?: number;
-  width?: number;
-
-  // can work piece-based items
-  quantity: number;  unitOfMeasureId: string; // foreign key
-  unitOfMeasure?: IUnitOfMeasure;
-}
-
-export enum TransferEntityType {
-  STORE = 'STORE',
-  SHOP = 'SHOP'
-}
+import { IShowroom } from "./showroom";
+import { IStore } from "./store";
 
 export enum TransferStatus {
   PENDING = 'PENDING',
   COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED'
+  CANCELLED = 'CANCELLED',
 }
+
+export enum TransferEntityType {
+  STORE = 'STORE',
+  SHOWROOM = 'SHOWROOM', // ✅ FIXED (was SHOP)
+}
+
+/* ================= TRANSFER ITEM ================= */
+
+export interface ITransferItem {
+  id: string;
+
+  transferId: string;
+
+  ismaterial: boolean;
+
+  itemId?: string | null;
+  item?: any | null; // replace with IItem
+
+  materialId?: string | null;
+  material?: any | null; // replace with IMaterial
+
+  quantity: number;
+
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+/* ================= TRANSFER ================= */
 
 export interface ITransfer {
   id: string;
-  reference?: string;
-  shortCode?: string;
-  
+
+  shortCode: string;
+
+  /* ===== SOURCE ===== */
   sourceType: TransferEntityType;
-  sourceStoreId?: string;
-  sourceShopId?: string;
+
+  sourceStoreId?: string | null;
+  sourceStore?: IStore | null; // replace with IStore
+
+  sourceShowroomId?: string | null;
+  sourceShowroom?: IShowroom | null; // replace with IShowroom
+
+  /* ===== DESTINATION ===== */
   destinationType: TransferEntityType;
-  destStoreId?: string;
-  destShopId?: string;
+
+  destStoreId?: string | null;
+  destStore?: IStore | null; // replace with IStore
+
+  destShowroomId?: string | null;
+  destShowroom?: IShowroom | null; // replace with IShowroom
+
+  /* ===== DETAILS ===== */
+  reference?: string | null;
+  notes?: string | null;
+
   status: TransferStatus;
-  notes?: string;
-  createdById?: string;
-  createdAt: string;
-  updatedAt: string;
-  items: ITransferItem[];
-  sourceStore: IStore;
-  sourceShop: IShop;
-  destStore: IStore;
-  destShop: IShop;
-  createdBy?: IEmployee;
-  updatedBy?: IEmployee;
+
+  movementDate: string | Date;
+
+  /* ===== USERS ===== */
+  createdById?: string | null;
+  createdBy?: any | null; // replace with IUser
+
+  updatedById?: string | null;
+  updatedBy?: any | null; // replace with IUser
+
+  /* ===== TIMESTAMPS ===== */
+  createdAt: string | Date;
+  updatedAt: string | Date;
+
+  /* ===== RELATIONS ===== */
+  items?: ITransferItem[];
 }

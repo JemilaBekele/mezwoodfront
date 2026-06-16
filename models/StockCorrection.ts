@@ -1,74 +1,79 @@
 import { IEmployee } from './employee';
-import { IProduct, IProductBatch } from './Product';
+import { IMaterial } from './material';
 import { IPurchase } from './purchase';
-import { IShop } from './shop';
+import { IItem } from './item'; // ✅ add this
 import { IStore } from './store';
-import { ITransfer } from './transfer';
-import { IUnitOfMeasure } from './UnitOfMeasure';
+import { IShowroom } from './showroom';
 
 // ======================= ENUMS ======================= //
 
-export type StockCorrectionReason =
-  | 'PURCHASE_ERROR'
-  | 'TRANSFER_ERROR'
-  | 'EXPIRED'
-  | 'DAMAGED'
-  | 'MANUAL_ADJUSTMENT';
+export enum StockCorrectionReason {
+  PURCHASE_ERROR = 'PURCHASE_ERROR',
+  EXPIRED = 'EXPIRED',
+  DAMAGED = 'DAMAGED',
+  MANUAL_ADJUSTMENT = 'MANUAL_ADJUSTMENT',
+}
 
 export enum StockCorrectionStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED'
+  REJECTED = 'REJECTED',
 }
 
 // ======================= ITEM ======================= //
+
 export interface IStockCorrectionItem {
   id: string;
   correctionId: string;
 
-  productId: string;
-  product?: IProduct;
+  itemId?: string | null;
+  item?: IItem | null;
 
- 
-  unitOfMeasureId: string;
-  unitOfMeasure?: IUnitOfMeasure;
+  materialId?: string | null;
+  material?: IMaterial | null;
 
-  // ✅ Optional — for dimension-based items (curtains, fabric, etc.)
-  height?: number;
-  width?: number;
+  quantity: number; // can be positive or negative
 
-  // ✅ Optional — for piece-based items
-  quantity: number;
-  
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 // ======================= MAIN ======================= //
+
 export interface IStockCorrection {
-  shortCode: string | undefined;
-  id: string; // Prisma uses "id" instead of "_id"
-  storeId?: string;
-  shopId?: string;
-  shop?: IShop;
-  store?: IStore;
+  id: string;
+
+  shortCode: string;
+
+  ismaterial: boolean; // ✅ IMPORTANT (from schema)
+
+  // Location
+  storeId?: string | null;
+  showroomId?: string | null;
+
+  store?: IStore | null; // replace with IStore
+  showroom?: IShowroom | null; // replace with IShowroom
+  // Details
   reason: StockCorrectionReason;
   status: StockCorrectionStatus;
 
-  purchaseId?: string;
-  transferId?: string;
-  purchase: IPurchase;
-  transfer: ITransfer;
+  // Optional relation
+  purchaseId?: string | null;
+  purchase?: IPurchase | null;
 
-  reference?: string;
-  notes?: string;
+  reference?: string | null;
+  notes?: string | null;
 
-  createdById?: string;
-  updatedById?: string;
+  // Users
+  createdById?: string | null;
+  updatedById?: string | null;
+  createdBy?: IEmployee | null;
+  updatedBy?: IEmployee | null;
 
-  createdAt: string;
-  updatedAt: string;
-  createdBy?: IEmployee;
-  updatedBy?: IEmployee;
+  // Timestamps
+  createdAt: string | Date;
+  updatedAt: string | Date;
+
+  // Relations
   items: IStockCorrectionItem[];
 }

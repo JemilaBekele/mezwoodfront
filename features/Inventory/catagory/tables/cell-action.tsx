@@ -89,20 +89,20 @@ export const CategoryCellAction: React.FC<CategoryCellActionProps> = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end'>
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <PermissionGuard
+          {/* <PermissionGuard
             requiredPermission={PERMISSIONS.CATEGORY.UPDATE.name}
-          >
+          > */}
             <DropdownMenuItem onClick={() => setOpenEditModal(true)}>
               <IconEdit className='mr-2 h-4 w-4' /> Update
             </DropdownMenuItem>
-          </PermissionGuard>
-          <PermissionGuard
+          {/* </PermissionGuard> */}
+          {/* <PermissionGuard
             requiredPermission={PERMISSIONS.CATEGORY.UPDATE.name}
-          >
+          > */}
             <DropdownMenuItem onClick={() => setOpenDeleteModal(true)}>
               <IconTrash className='mr-2 h-4 w-4' /> Delete
             </DropdownMenuItem>
-          </PermissionGuard>
+          {/* </PermissionGuard> */}
         </DropdownMenuContent>
       </DropdownMenu>
     </>

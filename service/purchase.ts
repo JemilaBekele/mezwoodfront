@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { axiosInstance } from "./axiosIntance";
+import { IncomingMessage } from 'http';
 
 import { GetParams } from './roleService';
 import { IPurchase } from '@/models/purchase';
 import { IStockCorrection } from '@/models/StockCorrection';
+import { axiosInstance } from './axiosIntance';
 
 // Types
 
@@ -51,6 +52,7 @@ export const getAllPurchases = async (
 // Get all purchases (simple version)
 export const getPurchases = async () => {
   try {
+    
     const response = await axiosInstance.get(`/purchases`);
     return response.data.purchases as IPurchase[];
   } catch (error) {
@@ -69,6 +71,7 @@ export const getPurchaseById = async (id: string, ) => {
 };
 export const getPurchaseId = async (id: string, ) => {
   try {
+    
     const response = await axiosInstance.get(`/purchases/${id}`);
     return response.data.purchase as IPurchase;
   } catch (error) {
@@ -80,6 +83,7 @@ export const getStockCorrectionsByPurchaseId = async (
   
 ): Promise<IStockCorrection[]> => {
   try {
+    
     const response = await axiosInstance.get(
       `/stock-corrections/purchase/${id}`
     );
@@ -104,6 +108,7 @@ export const getPurchaseByInvoiceNo = async (
 // Create a purchase
 export const createPurchase = async (data: any, ) => {
   try {
+    
     const response = await axiosInstance.post(`/purchases`, data);
     return response.data;
   } catch (error) {
@@ -118,6 +123,7 @@ export const updatePurchase = async (
   
 ) => {
   try {
+    
     const response = await axiosInstance.put(`/purchases/${id}`, data);
     return response.data;
   } catch (error) {
@@ -130,6 +136,7 @@ export const acceptPurchase = async (
   
 ) => {
   try {
+    
 
     // ✅ Send paymentStatus inside request body
     const response = await axiosInstance.put(`/purchases/accept/${id}`, {
@@ -145,6 +152,7 @@ export const acceptPurchase = async (
 // Delete a purchase
 export const deletePurchase = async (id: string, ) => {
   try {
+    
     const response = await axiosInstance.delete(`/purchases/${id}`);
     return response.data;
   } catch (error) {

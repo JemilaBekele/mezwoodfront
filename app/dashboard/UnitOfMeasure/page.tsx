@@ -9,10 +9,10 @@ import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
 
 import UnitOfMeasureModal from '@/features/Inventory/UnitOfMeasure/view-page';
 import UnitsListingPage from '@/features/Inventory/UnitOfMeasure/listing';
+import ItemTableAction from '@/features/capacitySlots/tableaction';
 
 export const metadata = {
   title: 'Dashboard: UnitOfMeasure'

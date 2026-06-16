@@ -1,8 +1,8 @@
-import { PaymentStatusChart } from '@/features/Dasboard/megargedashboard/chart';
+import { MonthlySalesPIBarChart } from '@/features/Dasboard/main/chart';
 import { delay } from '@/lib/delay';
 
 export default async function BarStats() {
   await delay(1000);
 
-  return <PaymentStatusChart />;
+  return <MonthlySalesPIBarChart />;
 }

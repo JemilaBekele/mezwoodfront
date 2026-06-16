@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -25,14 +26,10 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { getRoleall, IRole } from '@/service/roleService';
-import { IBranch } from '@/models/Branch';
-import { getBranches } from '@/service/branch';
-import { IShop } from '@/models/shop';
 import { IStore } from '@/models/store';
-import { getShops } from '@/service/shop';
-import { getStores } from '@/service/store';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
+import { IShowroom } from '@/models/showroom';
+import { getStoresAll } from '@/service/store';
+import { getShowroomsAll } from '@/service/showroom';
 
 // Define the form data type
 interface FormData {
@@ -41,11 +38,10 @@ interface FormData {
   password?: string;
   phone?: string;
   userCode?: string;
-  branchId?: string;
   roleId: string;
   status: 'Active' | 'Inactive' | 'Suspended';
-  shopIds: string[];
-  storeIds: string[];
+  storeId?: string | null;
+  showroomId?: string | null;
 }
 
 export default function EmployeeForm({
@@ -57,13 +53,11 @@ export default function EmployeeForm({
 }) {
   const router = useRouter();
   const [roles, setRoles] = useState<IRole[]>([]);
-  const [branches, setBranches] = useState<IBranch[]>([]);
-  const [shops, setShops] = useState<IShop[]>([]);
   const [stores, setStores] = useState<IStore[]>([]);
+  const [showrooms, setShowrooms] = useState<IShowroom[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
-  const [loadingBranches, setLoadingBranches] = useState(true);
-  const [loadingShops, setLoadingShops] = useState(true);
   const [loadingStores, setLoadingStores] = useState(true);
+  const [loadingShowrooms, setLoadingShowrooms] = useState(true);
 
   const isUpdateMode = !!initialData;
 
@@ -74,17 +68,10 @@ export default function EmployeeForm({
       password: '',
       phone: initialData?.phone || '',
       userCode: initialData?.userCode || '',
-      branchId: initialData?.branchId || '',
       roleId: initialData?.roleId || initialData?.role?.id || '',
       status: initialData?.status || 'Active',
-      shopIds:
-        initialData?.shopIds ||
-        initialData?.shops?.map((shop) => shop.id) ||
-        [],
-      storeIds:
-        initialData?.storeIds ||
-        initialData?.stores?.map((store) => store.id) ||
-        []
+      storeId: initialData?.storeId || initialData?.store?.id || null,
+      showroomId: initialData?.showroomId || initialData?.showroom?.id || null,
     }),
     [initialData]
   );
@@ -97,45 +84,21 @@ export default function EmployeeForm({
   useEffect(() => {
     (async () => {
       try {
-        const rolesData = await getRoleall();
+        const [rolesData, storesData, showroomsData] = await Promise.all([
+          getRoleall(),
+          getStoresAll(),
+          getShowroomsAll()
+        ]);
         setRoles(rolesData);
-      } catch {
-        toast.error('Failed to fetch roles');
+        setStores(storesData);
+        setShowrooms(showroomsData);
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+        toast.error('Failed to fetch data');
       } finally {
         setLoadingRoles(false);
-      }
-    })();
-
-    (async () => {
-      try {
-        const branchesData = await getBranches();
-        setBranches(branchesData);
-      } catch {
-        toast.error('Failed to fetch branches');
-      } finally {
-        setLoadingBranches(false);
-      }
-    })();
-
-    (async () => {
-      try {
-        const shopsData = await getShops();
-        setShops(shopsData);
-      } catch {
-        toast.error('Failed to fetch shops');
-      } finally {
-        setLoadingShops(false);
-      }
-    })();
-
-    (async () => {
-      try {
-        const storesData = await getStores();
-        setStores(storesData);
-      } catch {
-        toast.error('Failed to fetch stores');
-      } finally {
         setLoadingStores(false);
+        setLoadingShowrooms(false);
       }
     })();
   }, []);
@@ -155,13 +118,8 @@ export default function EmployeeForm({
       errors.email = 'Please enter a valid email address.';
     }
 
-    // Password validation for create mode
+    // Password validation - only for create mode
     if (!isUpdateMode && (!data.password || data.password.length < 6)) {
-      errors.password = 'Password must be at least 6 characters.';
-    }
-
-    // Password validation for update mode (only if provided)
-    if (isUpdateMode && data.password && data.password.length > 0 && data.password.length < 6) {
       errors.password = 'Password must be at least 6 characters.';
     }
 
@@ -188,11 +146,45 @@ export default function EmployeeForm({
         return;
       }
 
-      // Remove password field if it's empty during update
-      const submitData = { ...data };
-      if (isUpdateMode && !submitData.password) {
-        delete submitData.password;
+      // Prepare submit data
+      const submitData: any = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone || undefined,
+        roleId: data.roleId,
+        status: data.status,
+      };
+
+      // Handle password
+      if (isUpdateMode) {
+        // For update mode, only include password if provided
+        if (data.password && data.password.length > 0) {
+          submitData.password = data.password;
+        }
+      } else {
+        // For create mode, password is required
+        if (!data.password) {
+          toast.error('Password is required');
+          return;
+        }
+        submitData.password = data.password;
       }
+
+      // Handle storeId - send null for "None", otherwise send the ID
+      if (data.storeId === null || data.storeId === '') {
+        submitData.storeId = null;
+      } else if (data.storeId) {
+        submitData.storeId = data.storeId;
+      }
+
+      // Handle showroomId - send null for "None", otherwise send the ID
+      if (data.showroomId === null || data.showroomId === '') {
+        submitData.showroomId = null;
+      } else if (data.showroomId) {
+        submitData.showroomId = data.showroomId;
+      }
+
+      console.log('Submitting data:', submitData);
 
       if (isUpdateMode && initialData?.id) {
         await updateEmployee(initialData.id, submitData);
@@ -203,29 +195,12 @@ export default function EmployeeForm({
         toast.success('Employee created successfully');
         router.push(`/dashboard/employee`);
       }
-    } catch {
+    } catch (error) {
+      console.error('Submit error:', error);
       toast.error(
         isUpdateMode ? 'Error updating employee' : 'Error creating employee'
       );
     }
-  };
-
-  const handleShopChange = (shopId: string, checked: boolean) => {
-    const currentShopIds = form.getValues('shopIds') || [];
-    const updatedShopIds = checked
-      ? [...currentShopIds, shopId]
-      : currentShopIds.filter((id) => id !== shopId);
-
-    form.setValue('shopIds', updatedShopIds, { shouldValidate: true });
-  };
-
-  const handleStoreChange = (storeId: string, checked: boolean) => {
-    const currentStoreIds = form.getValues('storeIds') || [];
-    const updatedStoreIds = checked
-      ? [...currentStoreIds, storeId]
-      : currentStoreIds.filter((id) => id !== storeId);
-
-    form.setValue('storeIds', updatedStoreIds, { shouldValidate: true });
   };
 
   return (
@@ -266,22 +241,47 @@ export default function EmployeeForm({
                 )}
               />
 
-              {/* Password Field */}
-              <FormField
-                name='password'
-                control={form.control}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Password {isUpdateMode ? '(Leave empty to keep current)' : ''}
-                    </FormLabel>
-                    <FormControl>
-                      <Input type='password' {...field} placeholder={isUpdateMode ? 'Enter new password if changing' : ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Password Field - Only show in create mode */}
+              {!isUpdateMode && (
+                <FormField
+                  name='password'
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type='password' 
+                          {...field} 
+                          placeholder='Enter password' 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Password Field for update mode - optional */}
+              {isUpdateMode && (
+                <FormField
+                  name='password'
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password (Optional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type='password' 
+                          {...field} 
+                          placeholder='Leave empty to keep current password' 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 name='phone'
@@ -298,45 +298,15 @@ export default function EmployeeForm({
               />
 
               <FormField
-                name='branchId'
-                control={form.control}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Branch</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              loadingBranches
-                                ? 'Loading branches...'
-                                : 'Select branch'
-                            }
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {branches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              
-
-              <FormField
                 name='roleId'
                 control={form.control}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select 
+                      value={field.value} 
+                      onValueChange={field.onChange}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue
@@ -358,85 +328,121 @@ export default function EmployeeForm({
                   </FormItem>
                 )}
               />
+
+              {/* Store Selection - Independent */}
+              <FormField
+                name='storeId'
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Store (Optional)</FormLabel>
+                    <Select 
+                      value={field.value || 'none'} 
+                      onValueChange={(value) => {
+                        field.onChange(value === 'none' ? null : value);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              loadingStores ? 'Loading stores...' : 'Select store'
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value='none'>None</SelectItem>
+                        {stores.map((store) => (
+                          <SelectItem key={store.id} value={store.id}>
+                            {store.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Showroom Selection - Independent */}
+              <FormField
+                name='showroomId'
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Showroom (Optional)</FormLabel>
+                    <Select 
+                      value={field.value || 'none'} 
+                      onValueChange={(value) => {
+                        field.onChange(value === 'none' ? null : value);
+                      }}
+                      disabled={loadingShowrooms}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              loadingShowrooms 
+                                ? 'Loading showrooms...' 
+                                : 'Select showroom'
+                            }
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value='none'>None</SelectItem>
+                        {showrooms.map((showroom) => (
+                          <SelectItem key={showroom.id} value={showroom.id}>
+                            {showroom.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Status Field - Only show in update mode */}
+              {isUpdateMode && (
+                <FormField
+                  name='status'
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder='Select status' />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value='Active'>Active</SelectItem>
+                          <SelectItem value='Inactive'>Inactive</SelectItem>
+                          <SelectItem value='Suspended'>Suspended</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
-            {/* Shops Assignment Section */}
-            <div className='space-y-4'>
-              <Label className='text-lg font-semibold'>Assign Shops</Label>
-              {loadingShops ? (
-                <div className='text-muted-foreground text-sm'>
-                  Loading shops...
-                </div>
-              ) : (
-                <div className='grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3'>
-                  {shops.map((shop) => (
-                    <div key={shop.id} className='flex items-center space-x-2'>
-                      <Checkbox
-                        id={`shop-${shop.id}`}
-                        checked={
-                          form.watch('shopIds')?.includes(shop.id) || false
-                        }
-                        onCheckedChange={(checked) =>
-                          handleShopChange(shop.id, checked as boolean)
-                        }
-                      />
-                      <Label
-                        htmlFor={`shop-${shop.id}`}
-                        className='cursor-pointer text-sm font-normal'
-                      >
-                        {shop.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {form.formState.errors.shopIds && (
-                <p className='text-destructive text-sm font-medium'>
-                  {form.formState.errors.shopIds.message}
-                </p>
-              )}
+            <div className='flex gap-4'>
+              <Button type='submit'>
+                {isUpdateMode ? 'Update Employee' : 'Add Employee'}
+              </Button>
+              <Button 
+                type='button' 
+                variant='outline'
+                onClick={() => router.push('/dashboard/employee')}
+              >
+                Cancel
+              </Button>
             </div>
-
-            {/* Stores Assignment Section */}
-            <div className='space-y-4'>
-              <Label className='text-lg font-semibold'>Assign Stores</Label>
-              {loadingStores ? (
-                <div className='text-muted-foreground text-sm'>
-                  Loading stores...
-                </div>
-              ) : (
-                <div className='grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3'>
-                  {stores.map((store) => (
-                    <div key={store.id} className='flex items-center space-x-2'>
-                      <Checkbox
-                        id={`store-${store.id}`}
-                        checked={
-                          form.watch('storeIds')?.includes(store.id) || false
-                        }
-                        onCheckedChange={(checked) =>
-                          handleStoreChange(store.id, checked as boolean)
-                        }
-                      />
-                      <Label
-                        htmlFor={`store-${store.id}`}
-                        className='cursor-pointer text-sm font-normal'
-                      >
-                        {store.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {form.formState.errors.storeIds && (
-                <p className='text-destructive text-sm font-medium'>
-                  {form.formState.errors.storeIds.message}
-                </p>
-              )}
-            </div>
-
-            <Button type='submit'>
-              {isUpdateMode ? 'Update Employee' : 'Add Employee'}
-            </Button>
           </form>
         </Form>
       </CardContent>

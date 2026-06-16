@@ -27,9 +27,7 @@ export default function TransferListingPage({}: TransferListingPageProps) {
 
         const response = await getAllTransfers({
           page,
-          limit,
-          startDate,
-          endDate,
+          limit
         });
 
         if (cancelled) {
@@ -65,22 +63,14 @@ export default function TransferListingPage({}: TransferListingPageProps) {
   }
 
   const filteredData = transfers.filter((item) => {
-    const searchTerm = search.toLowerCase();
+    const searchTerm = search?.toLowerCase() || "";
 
     const reference = item?.reference?.toLowerCase() || "";
     const status = item?.status?.toLowerCase() || "";
-    const sourceStore = item?.sourceStoreId?.toLowerCase() || "";
-    const sourceShop = item?.sourceShopId?.toLowerCase() || "";
-    const destStore = item?.destStoreId?.toLowerCase() || "";
-    const destShop = item?.destShopId?.toLowerCase() || "";
 
     return (
       reference.includes(searchTerm) ||
-      status.includes(searchTerm) ||
-      sourceStore.includes(searchTerm) ||
-      sourceShop.includes(searchTerm) ||
-      destStore.includes(searchTerm) ||
-      destShop.includes(searchTerm)
+      status.includes(searchTerm)
     );
   });
 

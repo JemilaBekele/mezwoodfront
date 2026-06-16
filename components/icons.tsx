@@ -62,7 +62,30 @@ import {
   IconWallet,
   IconBuildingWarehouse,
   IconLock,
+
+  // NEW ADDED ICONS
+  IconFolder,
+  IconTruck,
+  IconSearch,
+  IconHammer,
+  IconCpu,
+  IconScissors,
+  IconSparkles,
+  IconPaint,
+  IconBrush,
+  IconUserCheck,
+  IconUserOff,
+  IconShoppingCartOff,
+  IconCalendar,
+  IconCalendarCog,
+  IconTruckReturn,
+  IconBuilding,
+  IconPackage,
+  IconMaximize,
+  IconRefresh,
+  IconTagsOff
 } from '@tabler/icons-react';
+
 import { Trophy } from 'lucide-react';
 
 export type Icon = React.ComponentType<IconProps>;
@@ -102,14 +125,33 @@ export const Icons = {
   sun: IconSun,
   moon: IconMoon,
   laptop: IconDeviceLaptop,
-lock: IconLock,
+
+  lock: IconLock,
+
   // Social
   github: IconBrandGithub,
   twitter: IconBrandTwitter,
+// ===== FIX NAV ICON TYPE ERRORS =====
+fileText: IconFileText,
+barChart: IconChartBar,
+layers: IconLayoutKanban,
+shoppingBag: IconShoppingCart,
+// ===== FIX MISSING NAV ICONS =====
 
+penTool: IconBrush,          // or IconPencil
+userX: IconUserOff,
+boxes: IconBox,
+wrench: IconSettings,        // or IconTool
+archive: IconBox,
+creditCard: IconCreditCard,
+userCircle: IconUserCircle,
+badge: IconShieldLock,
   // User
   user: IconUser,
   users: IconUsers,
+  userRound: IconUserCircle,
+  userCheck: IconUserCheck,
+  userOff: IconUserOff,
   shield: IconShieldLock,
   key: IconKey,
 
@@ -140,6 +182,7 @@ lock: IconLock,
 
   // Product / Inventory
   box: IconBox,
+  package: IconBox,
   category: IconCategory,
   tags: IconTags,
   palette: IconPalette,
@@ -147,14 +190,35 @@ lock: IconLock,
   transfer: IconArrowsRightLeft,
 
   // Logistics
-  truck: IconTruckDelivery,
+  truck: IconTruck,
+  truckDelivery: IconTruckDelivery,
   clipboard: IconClipboardList,
   packageCheck: IconPackageExport,
 
-  // Production
+  // Production / Manufacturing
   factory: IconBuildingFactory,
+  hammer: IconHammer,
+  cpu: IconCpu,
+  scissors: IconScissors,
+  sparkles: IconSparkles,
+  paintbrush: IconBrush,
+  paint: IconBrush,
   move: IconArrowsMove,
 
-  // Misc
-  pizza: IconPizza
+  // Project / Planning
+  folder: IconFolder,
+  folderKanban: IconFolder,
+  gantt: IconLayoutKanban,
+  calendar: IconCalendar,
+  calendarCog: IconCalendarCog,
+  search: IconSearch,
+
+  // UI / Misc fixes
+  refreshCcw: IconRefresh,
+  maximize: IconMaximize,
+  type: IconListDetails,
+
+  // extra safety aliases
+  buildingSkyscraper: IconBuildingSkyscraper,
+  buildingStore: IconBuildingStore
 };

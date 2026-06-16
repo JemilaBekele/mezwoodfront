@@ -1,5 +1,8 @@
-import { axiosInstance } from "./axiosIntance";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { IncomingMessage } from 'http';
+
 import { ICategory, IColour } from '@/models/Category';
+import { axiosInstance } from './axiosIntance';
 
 // Generic Pagination Params
 export interface GetParams {
@@ -8,8 +11,6 @@ export interface GetParams {
 }
 
 // ========================= CATEGORIES ========================= //
-
-// Get all categories
 interface CategoriesResponse {
   success: boolean;
   count: number;
@@ -41,13 +42,32 @@ export const getAllCategories = async ({
 
 export const getCategories = async () => {
   try {
-    
     const response = await axiosInstance.get(`/categories`);
     return response.data.categories as ICategory[];
   } catch (error) {
     throw error;
   }
 };
+export const getAllDailyStageCapacities = async () => {
+  try {
+    const response = await axiosInstance.get(`/daily/all/capacity`);
+    console.log("capacity", response.data);
+    
+    // Extract the array from the nested structure
+    // The array is at response.data.category.dailyStageCapacities
+    const data = response.data?.category?.dailyStageCapacities || [];
+    
+    // If data is not an array, try alternative paths
+    const result = Array.isArray(data) ? data : [];
+    console.log('Extracted capacities array length:', result.length);
+    
+    return result;
+  } catch (error) {
+    console.error('Error fetching daily stage capacities:', error);
+    return []; // Return empty array on error
+  }
+};
+
 export const getCategoriesapi = async () => {
   try {
     const response = await axiosInstance.get(`/categories`);
@@ -57,7 +77,7 @@ export const getCategoriesapi = async () => {
   }
 };
 
-export const getCategoryById = async (id: string, ) => {
+export const getCategoryById = async (id: string) => {
   try {
     const response = await axiosInstance.get(`/categories/${id}`);
     return response.data.category as ICategory;
@@ -68,10 +88,8 @@ export const getCategoryById = async (id: string, ) => {
 
 export const createCategory = async (
   data: Partial<ICategory>,
-  
 ) => {
   try {
-    
     const response = await axiosInstance.post(`/categories`, data);
     return response.data;
   } catch (error) {
@@ -82,10 +100,8 @@ export const createCategory = async (
 export const updateCategory = async (
   id: string,
   data: Partial<ICategory>,
-  
 ) => {
   try {
-    
     const response = await axiosInstance.put(`/categories/${id}`, data);
     return response.data;
   } catch (error) {
@@ -93,9 +109,8 @@ export const updateCategory = async (
   }
 };
 
-export const deleteCategory = async (id: string, ) => {
+export const deleteCategory = async (id: string) => {
   try {
-    
     const response = await axiosInstance.delete(`/categories/${id}`);
     return response.data;
   } catch (error) {
@@ -104,7 +119,82 @@ export const deleteCategory = async (id: string, ) => {
 };
 
 
+export const resetDailyStageCapacities = async (
+  
+) => {
+  try {
 
+    const response = await axiosInstance.delete(
+      '/daily-stage-capacities/reset',
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Non-destructive: rebuild the capacity ledger from current projects
+// (re-reserves capacity for every in-flight project instead of  wiping it).
+export const rebuildCapacityweek = async (
+  mode: "FULL" | "WEEK_ONLY" = "FULL",
+) => {
+  try {
+
+    const response = await axiosInstance.post(
+      "/daily-stage-capacities/rebuild/week",
+      { mode },
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+export const rebuildCapacity = async (
+  req?: IncomingMessage,
+) => {
+  try {
+
+    const response = await axiosInstance.post(
+      '/daily-stage-capacities/rebuild',
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+/** Fetch aggregated telemetry stats for a date range. */
+export const getCapacityTelemetry = async (
+  from: string,
+  to: string,
+  stage?: string,
+) => {
+  try {
+    const params: Record<string, string> = { from, to };
+    if (stage && stage !== 'ALL') params.stage = stage;
+    const response = await axiosInstance.get('/capacity/telemetry', { params });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching capacity telemetry:', error);
+    throw error;
+  }
+};
+
+/** Fetch per-stage load rail for a date range. */
+export const getStageLoadRail = async (
+  from: string,
+  to: string,
+) => {
+  try {
+    const response = await axiosInstance.get('/capacity/stage-load', { params: { from, to } });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching stage load rail:', error);
+    throw error;
+  }
+};
 
 
 
@@ -183,7 +273,7 @@ export const getColoursApi = async () => {
 };
 
 // Get colour by ID
-export const getColourById = async (id: string, ) => {
+export const getColourById = async (id: string) => {
   try {
     const response = await axiosInstance.get(`/colours/${id}`);
     return response.data.colour as IColour;
@@ -195,10 +285,8 @@ export const getColourById = async (id: string, ) => {
 // Create colour
 export const createColour = async (
   data: Partial<IColour>,
-  
 ) => {
   try {
-    
     const response = await axiosInstance.post(`/colours`, data);
     return response.data;
   } catch (error) {
@@ -210,10 +298,9 @@ export const createColour = async (
 export const updateColour = async (
   id: string,
   data: Partial<IColour>,
-  
+  req?: IncomingMessage
 ) => {
   try {
-    
     const response = await axiosInstance.patch(`/colours/${id}`, data);
     return response.data;
   } catch (error) {
@@ -222,9 +309,8 @@ export const updateColour = async (
 };
 
 // Delete colour
-export const deleteColour = async (id: string, ) => {
+export const deleteColour = async (id: string, req?: IncomingMessage) => {
   try {
-    
     const response = await axiosInstance.delete(`/colours/${id}`);
     return response.data;
   } catch (error) {

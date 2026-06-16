@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import {
@@ -7,6 +8,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { IEmployee } from '@/models/employee';
+import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from 'react';
 
 interface EmployeeViewModalProps {
   isOpen: boolean;
@@ -44,15 +46,14 @@ export const EmployeeViewModal: React.FC<EmployeeViewModalProps> = ({
           <p className='font-medium'>Role:</p>
           <p>{data.role?.name || 'N/A'}</p>
           <p className='font-medium'>Branch:</p>
-          <p>{data.branch?.name || 'N/A'}</p>
         </div>
 
         {/* Shops Section */}
         <div className='mt-5'>
           <h3 className='mb-1 text-sm font-semibold'>Assigned Shops</h3>
-          {data.shops && data.shops.length > 0 ? (
+          {Array.isArray(data.showroom) && data.showroom.length > 0 ? (
             <ul className='ml-5 list-disc text-sm'>
-              {data.shops.map((shop) => (
+              {data.showroom.map((shop: { id: Key | null | undefined; name: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
                 <li key={shop.id}>{shop.name}</li>
               ))}
             </ul>
@@ -64,9 +65,9 @@ export const EmployeeViewModal: React.FC<EmployeeViewModalProps> = ({
         {/* Stores Section */}
         <div className='mt-4'>
           <h3 className='mb-1 text-sm font-semibold'>Assigned Stores</h3>
-          {data.stores && data.stores.length > 0 ? (
+          {data.store && Array.isArray(data.store) && data.store.length > 0 ? (
             <ul className='ml-5 list-disc text-sm'>
-              {data.stores.map((store) => (
+              {data.store.map((store: { id: Key | null | undefined; name: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
                 <li key={store.id}>{store.name}</li>
               ))}
             </ul>

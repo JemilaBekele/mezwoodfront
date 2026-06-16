@@ -9,7 +9,7 @@ import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import ItemTableAction from '@/features/genralinfo/Branch/tableaction';
+import UserTableAction from '@/features/Employee/components/employee-table-action';
 
 export const metadata = {
   title: 'Dashboard: Role'
@@ -34,7 +34,7 @@ export default async function RolePage(props: pageProps) {
           </PermissionGuard>
         </div>
         <Separator />
-        <ItemTableAction />
+            <UserTableAction />
         <Suspense
           // key={key}
           fallback={

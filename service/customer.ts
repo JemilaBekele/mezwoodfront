@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { IncomingMessage } from 'http';
-import { axiosInstance } from "./axiosIntance";
 import { GetParams } from './roleService';
 import { ICustomer } from '@/models/customer';
+import { axiosInstance } from './axiosIntance';
 
 interface CustomerResponse {
   success: boolean;
@@ -34,7 +33,7 @@ export const getAllCustomers = async ({
   }
 };
 
-export const getCustomer = async (req?: IncomingMessage) => {
+export const getCustomer = async () => {
   try {
     const response = await axiosInstance.get('/customers');
     return response.data.customers;
@@ -56,6 +55,7 @@ export const createCustomer = async (
   customerData: any,
 ) => {
   try {
+    console.log("customer data",customerData)
     const response = await axiosInstance.post('/customers', customerData);
     return response.data;
   } catch (error) {

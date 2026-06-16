@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { axiosInstance } from "./axiosIntance";
-
+import { axiosInstance } from './axiosIntance';
 // Get User by ID !QAZxsw2
 export const getUserById = async () => {
   try {
     // usser id is get by backend
+    
     const response = await axiosInstance.get(`/users/Usermy/data`);
     return response.data.user;
   } catch (error: any) {
@@ -19,6 +19,7 @@ export const updateUserById = async (
   
 ) => {
   try {
+    
 
     const response = await axiosInstance.put(`/users/${userID}`, updatedData);
     return response.data;
@@ -34,7 +35,7 @@ export const changePassword = async (
   
 ) => {
   try {
-   
+    
 
     const response = await axiosInstance.patch(`/users/change-password`, {
       currentPassword,

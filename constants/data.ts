@@ -19,237 +19,206 @@ export const navItems: NavItem[] = [
     isActive: false,
     shortcut: ['d', 'd'],
     permission: 'VIEW_MAIN_DASHBOARD',
-    group: 'Main',
     items: []
   },
 
   {
     title: 'Report',
-    url: '#',
-    icon: 'chart',
-    isActive: false,
-    shortcut: ['r', 'r'],
-    permission: 'VIEW_REPORT_DASHBOARD',
-    group: 'Analytics',
+    url: '/dashboard/CombinedReportDashboard',
+    icon: 'fileText',
+    permission: 'VIEW_COMPANY',
     items: [
       {
-        title: 'Top Performers',
-        url: '/dashboard/topperformance',
-        icon: 'Trophy',
-        shortcut: ['tp', 'tp']
+        title: 'Combined Report',
+        url: '/dashboard/CombinedReportDashboard',
+        icon: 'fileText',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_COMBINED_REPORT'
       },
       {
-        title: 'Invoice Report',
-        url: '/dashboard/invoicerreport',
-        icon: 'receipt',
-        shortcut: ['ir', 'ir']
+        title: 'Complete Statistics Report',
+        url: '/dashboard/completestatic',
+        icon: 'barChart',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_COMPLETE_STATISTICS_REPORT'
       },
       {
-        title: 'Worker Payment Report',
-        url: '/dashboard/workcomission',
-        icon: 'wallet',
-        shortcut: ['wp', 'wp'],
-        permission: 'GIVE_WORKER_PAYMENT'
+        title: 'Sales Trend',
+        url: '/dashboard/proformasales',
+        icon: 'trendingUp',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_ALL_SELLS_TREND'
       },
       {
-        title: 'Worker Report',
-        url: '/dashboard/WorkerCommissionReport',
-        icon: 'users',
-        shortcut: ['wr', 'wr'],
-        permission: 'VIEW_WORKER_PAYMENT_REPORT'
-      },
-      {
-        title: 'Low Stock',
-        url: '/dashboard/lowstock',
-        icon: 'alertTriangle',
-        shortcut: ['ls', 'ls']
+        title: 'Finished Product',
+        url: '/dashboard/finishedproduct',
+        icon: 'package',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_DETAILED_FINISHED_PRODUCTS'
       }
     ]
   },
 
   {
-    title: 'Production',
-    url: '#',
-    icon: 'factory',
-    isActive: false,
-    shortcut: ['p', 'p'],
-    permission: 'VIEW_ALL_CURTAIN_ORDERS',
-    group: 'Production',
+    title: 'Company',
+    url: '/dashboard/Company',
+    icon: 'building',
+    permission: 'VIEW_COMPANY'
+  },
+
+  {
+    title: 'Projects',
+    url: '/dashboard/',
+    icon: 'folderKanban',
+    permission: 'VIEW_PROJECT_DASHBOARD',
     items: [
       {
-        title: 'Curtain Order',
-        url: '/dashboard/CurtainOrder',
-        icon: 'clipboard',
-        shortcut: ['co', 'co'],
-        permission: 'VIEW_ALL_CURTAIN_ORDERS'
+        title: 'Proforma Invoice',
+        url: '/dashboard/ProformaInvoice',
+        icon: 'fileText',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_ALL_PROFORMA'
       },
       {
-        title: 'My Delivery Curtain Order',
-        url: '/dashboard/deliverby',
+        title: 'Project',
+        url: '/dashboard/Project',
+        icon: 'folder',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_PROJECTS'
+      },
+      {
+        title: 'Gantt Chart',
+        url: '/dashboard/allprojectgant',
+        icon: 'gantt',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_PROJECTS'
+      },
+      {
+        title: 'Delivery Estimation',
+        url: '/dashboard/DeliveryEstimation',
         icon: 'truck',
-        shortcut: ['md', 'md'],
-        permission: 'VIEW_ALL_CURTAIN_ORDERS'
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_DELIVERY_ESTIMATION'
       },
       {
-        title: 'Delivery Management',
-        url: '/dashboard/Delivertcurtainorder',
-        icon: 'packageCheck',
-        shortcut: ['dm', 'dm'],
-        permission: 'VIEW_ALL_CURTAIN_ORDERS'
+        title: 'Capacity Calendar',
+        url: '/dashboard/capacitycalendar',
+        icon: 'calendar',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_PROJECTS'
       }
     ]
   },
 
   {
-    title: 'Product Management',
+    title: 'Project Stages',
     url: '#',
-    icon: 'box',
-    isActive: true,
-    permission: 'VIEW_PRODUCT_DASHBOARD',
-    group: 'Inventory',
+    icon: 'layers',
+    permission: 'VIEW_PROJECT_STAGES_DASHBOARD',
     items: [
-      {
-        title: 'Category',
-        url: '/dashboard/category',
-        icon: 'category',
-        shortcut: ['c', 'c'],
-        permission: 'VIEW_ALL_CATEGORIES'
-      },
-      {
-        title: 'Colour',
-        url: '/dashboard/Colour',
-        icon: 'palette',
-        shortcut: ['cl', 'cl'],
-        permission: 'VIEW_ALL_COLOURS'
-      },
-      {
-        title: 'Movement Type',
-        url: '/dashboard/MovementType',
-        icon: 'move',
-        shortcut: ['mt', 'mt'],
-        permission: 'VIEW_ALL_MOVEMENT_TYPES'
-      },
-      {
-        title: 'Unit OfMeasure',
-        url: '/dashboard/UnitOfMeasure',
-        icon: 'ruler',
-        shortcut: ['u', 'u'],
-        permission: 'VIEW_ALL_UNIT_OF_MEASURE'
-      },
-      {
-        title: 'Products',
-        url: '/dashboard/Products',
-        icon: 'box',
-        shortcut: ['p', 'p'],
-        permission: 'VIEW_PRODUCT_ALL'
-      },
-      {
-        title: 'Purchase',
-        url: '/dashboard/purchase',
-        icon: 'shoppingCart',
-        shortcut: ['pu', 'pu'],
-        permission: 'VIEW_ALL_PURCHASES'
-      },
-      {
-        title: 'Transfer',
-        url: '/dashboard/Transfer',
-        icon: 'transfer',
-        shortcut: ['tr', 'tr'],
-        permission: 'VIEW_ALL_TRANSFERS'
-      },
-      {
-        title: 'Stock Correction',
-        url: '/dashboard/StockCorrection',
-        icon: 'adjustments',
-        shortcut: ['sc', 'sc'],
-        permission: 'VIEW_ALL_STOCK_CORRECTIONS'
-      },
-      {
-        title: 'Expense',
-        url: '/dashboard/expense',
-        icon: 'wallet',
-        shortcut: ['ex', 'ex']
-      }
+      { title: 'View all Design', url: '/dashboard/Stage/Design', icon: 'penTool', shortcut: ['m', 'm'], permission: 'VIEW_DESIGN_PROJECTS' },
+      { title: 'Unassigned Design', url: '/dashboard/Stage/Design/unassigned', icon: 'userX', shortcut: ['m', 'm'], permission: 'VIEW_UNASSIGNED_DESIGN_PROJECTS' },
+      { title: 'My Design', url: '/dashboard/Stage/Design/mydesign', icon: 'userCheck', shortcut: ['m', 'm'], permission: 'VIEW_DESIGN_PROJECTS_BY_DESIGNER' },
+
+      { title: 'Purchase', url: '/dashboard/Stage/Purchase', icon: 'shoppingCart', shortcut: ['m', 'm'], permission: 'VIEW_PURCHASING_PROJECTS' },
+      { title: 'Stock check Purchase', url: '/dashboard/Stage/Purchase/stockcheck', icon: 'search', shortcut: ['m', 'm'], permission: 'VIEW_PURCHASING_PROJECTS' },
+
+      { title: 'Metal Works', url: '/dashboard/Stage/metalworks', icon: 'hammer', shortcut: ['m', 'm'], permission: 'VIEW_METAL_WORK_PROJECTS' },
+      { title: 'Cnc', url: '/dashboard/Stage/cnc', icon: 'cpu', shortcut: ['m', 'm'], permission: 'VIEW_CNC_PROJECTS' },
+      { title: 'Cutting', url: '/dashboard/Stage/cutting', icon: 'scissors', shortcut: ['m', 'm'], permission: 'VIEW_CUTTING_PROJECTS' },
+      { title: 'Edge Banding', url: '/dashboard/Stage/edgebanding', icon: 'ruler', shortcut: ['m', 'm'], permission: 'VIEW_EDGE_BANDING_PROJECTS' },
+      { title: 'Assembly', url: '/dashboard/Stage/assembly', icon: 'boxes', shortcut: ['m', 'm'], permission: 'VIEW_ASSEMBLY_PROJECTS' },
+      { title: 'Painting', url: '/dashboard/Stage/painting', icon: 'paintbrush', shortcut: ['m', 'm'], permission: 'VIEW_PAINTING_PROJECTS' },
+      { title: 'Finishing', url: '/dashboard/Stage/finishing', icon: 'sparkles', shortcut: ['m', 'm'], permission: 'VIEW_FINISHED_PROJECTS' },
+      { title: 'Delivery', url: '/dashboard/Stage/delivery', icon: 'truck', shortcut: ['m', 'm'], permission: 'VIEW_DELIVERY_PROJECTS' },
+      { title: 'Delivery Date Comparison', url: '/dashboard/deliverydatecampare', icon: 'calendar', shortcut: ['d', 'c'], permission: 'VIEW_DELIVERY_PROJECTS' },
+      { title: 'Installation', url: '/dashboard/Stage/installation', icon: 'wrench', shortcut: ['m', 'm'], permission: 'VIEW_INSTALLATION_PROJECTS' }
     ]
   },
 
+
+
+  {
+    title: 'Pos',
+    url: '#',
+    icon: 'shoppingBag',
+    permission: 'VIEW_POS_DASHBOARD',
+    items: [
+      { title: 'Order', url: '/dashboard/Pos', icon: 'shoppingCart', shortcut: ['b', 'b'], permission: 'CREATE_SELL' },
+      { title: 'View All Orders', url: '/dashboard/Sell', icon: 'list', shortcut: ['rs', 'rs'], permission: 'VIEW_ALL_SELLS' },
+      { title: 'My Orders', url: '/dashboard/UserBasedSell', icon: 'user', shortcut: ['rs', 'rs'], permission: 'CREATE_SELL' },
+      { title: 'Store Orders', url: '/dashboard/StoreOrder', icon: 'store', shortcut: ['so', 'so'], permission: 'DELIVER_ALL_SALE_ITEMS' }
+    ]
+  },
+  {
+    title: 'Product',
+    url: '#',
+    icon: 'package',
+    permission: 'VIEW_PRODUCT_DASHBOARD',
+    items: [
+      { title: 'Product Category', url: '/dashboard/productcategory', icon: 'tags', shortcut: ['b', 'b'], permission: 'VIEW_PRODUCT_CATEGORIES' },
+      { title: 'Product Size', url: '/dashboard/productsize', icon: 'maximize', shortcut: ['b', 'b'], permission: 'VIEW_SIZES' },
+      { title: 'Product Type', url: '/dashboard/producttype', icon: 'type', shortcut: ['b', 'b'], permission: 'VIEW_PRODUCT_TYPES' },
+      { title: 'Product', url: '/dashboard/Item', icon: 'package', shortcut: ['b', 'b'], permission: 'VIEW_PRODUCT_ALL' }
+    ]
+  },
+
+
+  {
+    title: 'Inventory',
+    url: '#',
+    icon: 'archive',
+    permission: 'VIEW_INVENTORY_DASHBOARD',
+    items: [
+      { title: 'Material Category', url: '/dashboard/MaterialCategory', icon: 'tags', shortcut: ['b', 'b'], permission: 'VIEW_MATERIAL_CATEGORY_ALL' },
+      { title: 'Unit Of Measure', url: '/dashboard/UnitOfMeasure', icon: 'ruler', shortcut: ['u', 'u'], permission: 'VIEW_ALL_UNIT_OF_MEASURE' },
+      { title: 'Material', url: '/dashboard/Material', icon: 'box', shortcut: ['b', 'b'], permission: 'VIEW_MATERIAL_ALL' },
+      { title: 'Stock Correction', url: '/dashboard/StockCorrection', icon: 'refreshCcw', shortcut: ['s', 's'], permission: 'VIEW_ALL_STOCK_CORRECTIONS' },
+      { title: 'Transfer', url: '/dashboard/Transfer', icon: 'move', shortcut: ['y', 'y'], permission: 'VIEW_ALL_TRANSFERS' }
+    ]
+  },
+
+  {
+    title: 'Purchase',
+    url: '#',
+    icon: 'shoppingCart',
+    permission: 'VIEW_ALL_PURCHASES',
+    items: [
+      { title: 'Purchase', url: '/dashboard/purchase', icon: 'shoppingCart', shortcut: ['P', 'P'], permission: 'VIEW_ALL_PURCHASES' },
+      { title: 'Stock check Purchase', url: '/dashboard/Stage/Purchase/stockcheck', icon: 'search', shortcut: ['m', 'm'], permission: 'VIEW_ALL_PURCHASES' }
+    ]
+  },
+
+  {
+    title: 'Settings',
+    url: '#',
+    icon: 'settings',
+    permission: 'VIEW_SYSTEM_DASHBOARD',
+    items: [
+      { title: 'Scheduling Settings', url: '/dashboard/scheduling-settings', icon: 'calendarCog', shortcut: ['sc', 'sc'], permission: 'VIEW_CAPACITY_SLOT' },
+      { title: 'Capacity Slots', url: '/dashboard/capacitySlots', icon: 'calendar', shortcut: ['b', 'b'], permission: 'VIEW_CAPACITY_SLOT' },
+      { title: 'Bank', url: '/dashboard/Bank', icon: 'creditCard', shortcut: ['b', 'b'], permission: 'VIEW_BANK' },
+      { title: 'Show Room', url: '/dashboard/showroom', icon: 'home', shortcut: ['h', 'h'], permission: 'VIEW_SHOWROOMS' },
+      { title: 'Store', url: '/dashboard/store', icon: 'store', shortcut: ['sm', 'sm'], permission: 'VIEW_ALL_STORES' }
+    ]
+  },
   {
     title: 'User',
     url: '#',
     icon: 'users',
-    isActive: true,
     permission: 'VIEW_Users_DASHBOARD',
-    group: 'Management',
     items: [
-      {
-        title: 'Employee',
-        url: '/dashboard/employee',
-        icon: 'employee',
-        shortcut: ['eb', 'eb'],
-        permission: 'VIEW_ALL_EMPLOYEES'
-      },
-      {
-        title: 'Customer',
-        url: '/dashboard/customer',
-        icon: 'users',
-        shortcut: ['cu', 'cu'],
-        permission: 'VIEW_ALL_CUSTOMERS'
-      },
-      {
-        title: 'Supplier',
-        url: '/dashboard/supplier',
-        icon: 'truck',
-        shortcut: ['su', 'su'],
-        permission: 'VIEW_ALL_SUPPLIERS'
-      }
+      { title: 'Employee', url: '/dashboard/employee', icon: 'user', shortcut: ['eb', 'eb'], permission: 'VIEW_ALL_EMPLOYEES' },
+      { title: 'Customer', url: '/dashboard/customer', icon: 'userRound', shortcut: ['b', 'b'], permission: 'VIEW_ALL_CUSTOMERS' },
+      { title: 'Supplier', url: '/dashboard/supplier', icon: 'truck', shortcut: ['l', 'l'], permission: 'VIEW_ALL_SUPPLIERS' }
     ]
   },
-
-  {
-    title: 'System',
-    url: '#',
-    icon: 'settings',
-    isActive: true,
-    permission: 'VIEW_SYSTEM_DASHBOARD',
-    group: 'Management',
-    items: [
-      {
-        title: 'Branch',
-        url: '/dashboard/Branch',
-        icon: 'building',
-        shortcut: ['b', 'b'],
-        permission: 'VIEW_ALL_BRANCHES'
-      },
-      {
-        title: 'Shop',
-        url: '/dashboard/Shop',
-        icon: 'store',
-        shortcut: ['sh', 'sh'],
-        permission: 'VIEW_ALL_SHOPS'
-      },
-      {
-        title: 'Store',
-        url: '/dashboard/store',
-        icon: 'warehouse',
-        shortcut: ['st', 'st'],
-        permission: 'VIEW_ALL_STORES'
-      }
-    ]
-  },
-
   {
     title: 'Account',
     url: '#',
-    icon: 'user2',
-    isActive: true,
-    group: 'Personal',
+    icon: 'userCircle',
     items: [
-      {
-        title: 'Profile',
-        url: '/dashboard/profile',
-        icon: 'user',
-        shortcut: ['m', 'm']
-      }
+      { title: 'Profile', url: '/dashboard/profile', icon: 'user', shortcut: ['m', 'm'] }
     ]
   },
 
@@ -257,31 +226,11 @@ export const navItems: NavItem[] = [
     title: 'Role and Permission',
     url: '#',
     icon: 'shield',
-    isActive: true,
     permission: 'VIEW_ROLE_PERMISSION_DASHBOARD',
-    group: 'Administration',
     items: [
-      {
-        title: 'Role',
-        url: '/dashboard/Role',
-        icon: 'shield',
-        shortcut: ['ro', 'ro'],
-        permission: 'VIEW_ALL_ROLES'
-      },
-      {
-        title: 'Role Permission',
-        url: '/dashboard/RolePermission',
-        icon: 'key',
-        shortcut: ['rp', 'rp'],
-        permission: 'VIEW_ALL_ROLE_PERMISSIONS'
-      },
-      {
-        title: 'Permission',
-        url: '/dashboard/Permission',
-        icon: 'lock',
-        shortcut: ['pr', 'pr'],
-        permission: 'VIEW_ALL_PERMISSIONS'
-      }
+      { title: 'Role', url: '/dashboard/Role', icon: 'badge', shortcut: ['ro', 'ro'], permission: 'VIEW_ALL_ROLES' },
+      { title: 'Role Permission', url: '/dashboard/RolePermission', icon: 'lock', shortcut: ['po', 'po'], permission: 'VIEW_ALL_ROLE_PERMISSIONS' },
+      { title: 'Permission', url: '/dashboard/Permission', icon: 'key', shortcut: ['pr', 'pr'], permission: 'VIEW_ALL_PERMISSIONS' }
     ]
   }
 ];
