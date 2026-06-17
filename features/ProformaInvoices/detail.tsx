@@ -100,7 +100,7 @@ import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
 // Helper function for image URLs
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.2:5000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://rcf.ordere.net';
 
 export const normalizeImagePath = (path?: string) => {
   if (!path) return '/placeholder-image.jpg';

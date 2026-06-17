@@ -140,7 +140,7 @@ export default function SignInViewPage() {
       <div className="login-hero">
         <div className="login-hero__bg">
 <img
-  src="/construction-hero.png"
+  src="/wood.png"
   alt="Construction Management"
   className="login-hero__img"
   loading="eager"
@@ -193,7 +193,7 @@ export default function SignInViewPage() {
 <div>
   <h2 className="login-brand__name">Rosewood</h2>
   <p className="login-brand__tagline">
-     Management System
+    Enterprise Wood Manufacturing System
   </p>
 </div>
 </div>
@@ -201,8 +201,7 @@ export default function SignInViewPage() {
 {/* Quote */}
 <div className="login-hero__quote">
   <blockquote>
-    &ldquo;Manage curtain orders, fabrics, measurements, installations,
-    and customer projects with elegance and efficiency.&rdquo;
+    &ldquo;Plan, produce, track, and deliver wood products efficiently while managing inventory, projects, customers, and production workflows in one place.&rdquo;
   </blockquote>
 </div>
 

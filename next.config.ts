@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   images: {
     remotePatterns: [
-      { protocol: 'http', hostname: 'Rosewood.smartdent.online', port: '4000', pathname: '/**' }
+      { protocol: 'http', hostname: 'rcf.ordere.net', port: '4000', pathname: '/**' }
     ],
     unoptimized: true,
   },
