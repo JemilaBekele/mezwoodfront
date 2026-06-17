@@ -466,7 +466,7 @@ const rangeLabel = (from: Date, to: Date) => {
   return `${fmt(from)} – ${fmt(to)}`;
 };
 
-const CapacityCalendar: React.FC = () => {
+const ThCapacityCalendar: React.FC = () => {
   const [rows, setRows] = useState<any[]>([]);
   const [slots, setSlots] = useState<Record<string, { parallelSlots: number; workingHours: number; capacity: number }>>({});
   const [loading, setLoading] = useState(true);
@@ -2040,4 +2040,4 @@ const CC_STYLES = `
 .dark .capcal .cc-drag-overlay{background:#1a1d26;border-color:#2a2d36;color:#e8eaed;}
 `;
 
-export default CapacityCalendar;
+export default ThCapacityCalendar;

@@ -1,5 +1,6 @@
 import PageContainer from '@/components/layout/page-container';
 import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
+import ThCapacityCalendar from '@/features/Project/calander';
 import CapacityCalendar from '@/features/Project/calander';
 import { searchParamsCache } from '@/lib/searchparams';
 
@@ -33,7 +34,7 @@ export default async function SupplierPage({
           }
         >
           <div className='w-full'>
-            <CapacityCalendar />
+            <ThCapacityCalendar />
           </div>
         </Suspense>
       </div>
