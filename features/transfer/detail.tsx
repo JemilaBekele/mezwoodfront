@@ -72,10 +72,8 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
         console.log('DEBUG - User Profile:', {
           id: profile.id,
           name: profile.name,
-          store: profile.store?.name || null,
-          storeId: profile.store?.id || null,
-          showroom: profile.showroom?.name || null,
-          showroomId: profile.showroom?.id || null
+          stores: profile.stores?.map((s: { id: any; name: any; }) => ({ id: s.id, name: s.name })) || [],
+          showrooms: profile.showrooms?.map((s: { id: any; name: any; }) => ({ id: s.id, name: s.name })) || []
         });
         setUserProfile(profile);
       } catch (error) {
@@ -128,29 +126,27 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
     let hasAccess = false;
 
     if (transfer.destinationType === TransferEntityType.STORE) {
-      // Check if user's assigned store matches the destination store
+      // Check if user's assigned stores include the destination store
       const destStoreId = transfer.destStore?.id;
-      const userStoreId = userProfile.store?.id;
+      const userStoreIds = userProfile.stores?.map(s => s.id) || [];
+      const storeHasAccess = destStoreId ? userStoreIds.includes(destStoreId) : false;
       
-      console.log('Checking store access:', {
-        destStoreId,
-        userStoreId,
-        match: destStoreId === userStoreId
-      });
+    
       
-      hasAccess = destStoreId === userStoreId;
+      hasAccess = storeHasAccess;
     } else if (transfer.destinationType === TransferEntityType.SHOWROOM) {
-      // Check if user's assigned showroom matches the destination showroom
+      // Check if user's assigned showrooms include the destination showroom
       const destShowroomId = transfer.destShowroom?.id;
-      const userShowroomId = userProfile.showroom?.id;
+      const userShowroomIds = userProfile.showrooms?.map(s => s.id) || [];
+      const showroomHasAccess = destShowroomId ? userShowroomIds.includes(destShowroomId) : false;
       
       console.log('Checking showroom access:', {
         destShowroomId,
-        userShowroomId,
-        match: destShowroomId === userShowroomId
+        userShowroomIds,
+        match: showroomHasAccess
       });
       
-      hasAccess = destShowroomId === userShowroomId;
+      hasAccess = showroomHasAccess;
     }
 
     setHasDestinationAccess(hasAccess);
@@ -234,6 +230,16 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
     }
   };
 
+  // Get user's assigned locations summary
+  const getUserLocationsSummary = () => {
+    if (!userProfile) return null;
+    
+    const storeNames = userProfile.stores?.map(s => s.name).join(', ') || 'None';
+    const showroomNames = userProfile.showrooms?.map(s => s.name).join(', ') || 'None';
+    
+    return { storeNames, showroomNames };
+  };
+
   // Show loading states
   if (loading) {
     return (
@@ -265,6 +271,8 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
   // Determine if user can complete the transfer
   const canComplete = !isImmutable && hasDestinationAccess;
 
+  const userLocations = getUserLocationsSummary();
+
   return (
     <div className='container mx-auto space-y-6 p-4 md:p-8'>
       {/* Confirmation Modals */}
@@ -291,8 +299,6 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
         cancelText='Go Back'
         variant='destructive'
       />
-
-
 
       {/* Transfer Status Update Section */}
       {!isImmutable && (
@@ -363,6 +369,8 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
                   </Badge>
                 )}
               </div>
+
+         
             </div>
           </CardContent>
         </Card>
