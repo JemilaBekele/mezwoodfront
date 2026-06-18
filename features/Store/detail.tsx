@@ -57,7 +57,7 @@ export const normalizeImagePath = (path?: string) => {
   const cleanPath = normalizedPath.replace(/^\/+/, '');
   
   // Construct the full URL  192.168.1.2
-  const BACKEND_URL = 'http:// rcf.ordere.net';
+  const BACKEND_URL = 'http://rcf.ordere.net';
   return `${BACKEND_URL}/${cleanPath}`;
 };
 

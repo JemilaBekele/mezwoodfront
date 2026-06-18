@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://store.smartdent.online';
+const BACKEND_URL = 'https://rcf.ordere.net';
 
 export const normalizeImagePath = (path?: string) => {
   if (!path) return undefined;
