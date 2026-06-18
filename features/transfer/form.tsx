@@ -28,7 +28,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconTrash } from '@tabler/icons-react';
 import { ITransfer, TransferEntityType } from '@/models/transfer';
 import { getStoresAll } from '@/service/store';
-import { getShowroomsAll } from '@/service/showroom';
+import { getShowroomsAll, getShowroomsByUser, getStoresByUser } from '@/service/showroom';
 
 interface FormData {
   reference?: string;
@@ -132,8 +132,8 @@ export default function TransferForm({
       setLoadingStoresShops(true);
       try {
         const [storesData, showroomsData, destStoresData, destShowroomsData] = await Promise.all([
-          getStoresAll(),
-          getShowroomsAll(), // Assuming getShops returns showrooms
+          getStoresByUser(),
+          getShowroomsByUser(), // Assuming getShops returns showrooms
           getStoresAll(),
           getShowroomsAll(),
         ]);

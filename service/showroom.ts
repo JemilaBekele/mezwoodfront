@@ -53,6 +53,13 @@ export const getShowroomsByUser = async () => {
   );
   return response.data.showrooms as IShowroom[];
 };
+export const getStoresByUser = async () => {
+  
+  const response = await axiosInstance.get(
+    `stores/find/based/user`
+  );
+  return response.data.stores as IShowroom[];
+};
 
 // Get showroom by ID
 export const getShowroomById = async (
