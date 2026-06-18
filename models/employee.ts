@@ -16,16 +16,11 @@ export interface IEmployee {
   createdAt?: string; // ISO date string
   updatedAt?: string; // ISO date string
   lastLoginAt?: string;
-  shopIds?: string[]; // for assigning shops
+// Populated relations
+    showroomIds?: string[];   // for assigning shops
   storeIds?: string[]; 
-    storeId?: string;
-
-  // Showroom Assignment
-  showroomId?: string;
-
-  store?: IStore; // for assigning stores
-
-  showroom?: IShowroom; // for assigning showrooms
+  stores?: IStore[]; // populated store objects
+  showrooms?: IShowroom[]; // populated showroom obj
  
 }
 export interface Imployee {
@@ -43,20 +38,13 @@ export interface Imployee {
   lastLoginAt?: string;
    // Optional populated relations
      // Store Assignment
-  storeId?: string;
 
-  // Showroom Assignment
-  showroomId?: string;
+      showroomIds?: string[];   // for assigning shops
+  storeIds?: string[];  // for assigning stores
 
-  store?: {
-    id: string;
-    name: string;
-  };
 
-  showroom?: {
-    id: string;
-    name: string;
-  };
+stores?: IStore[]; // populated store objects
+  showrooms?: IShowroom[]; 
 // ISO date string
 }
 

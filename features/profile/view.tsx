@@ -316,9 +316,9 @@ export default function ProfileViewPage() {
     );
   }
 
-  // Get store and showroom data from profile
-  const store = profile.store as IStore | null;
-  const showroom = profile.showroom as IShowroom | null;
+  // Get store and showroom data from profile (plural)
+  const stores = profile.stores as IStore[] | undefined;
+  const showrooms = profile.showrooms as IShowroom[] | undefined;
 
   return (
     <div className='min-h-screen bg-gray-50 p-6 dark:bg-gray-900'>
@@ -383,44 +383,56 @@ export default function ProfileViewPage() {
                 </div>
               )}
 
-              {/* Assigned Store Section */}
-              {store && (
+              {/* Assigned Stores Section - Multiple Stores */}
+              {stores && stores.length > 0 && (
                 <div className='md:col-span-2'>
                   <strong className='mb-2 flex items-center gap-2 font-medium text-gray-500 dark:text-gray-400'>
                     <Store className='h-4 w-4' />
-                    Assigned Store:
+                    Assigned Stores:
                   </strong>
-                  <div className='mt-2'>
-                    <div className='rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900 dark:bg-green-900/20'>
-                      <p className='font-medium text-gray-900 dark:text-gray-100'>
-                        {store.name}
-                      </p>
-                   
-                    </div>
+                  <div className='mt-2 space-y-2'>
+                    {stores.map((store) => (
+                      <div
+                        key={store.id}
+                        className='rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900 dark:bg-green-900/20'
+                      >
+                        <p className='font-medium text-gray-900 dark:text-gray-100'>
+                          {store.name}
+                        </p>
+                        {store.isMain && (
+                          <span className='mt-1 inline-block text-xs text-green-600 dark:text-green-400'>
+                            Main Store
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Assigned Showroom Section */}
-              {showroom && (
+              {/* Assigned Showrooms Section - Multiple Showrooms */}
+              {showrooms && showrooms.length > 0 && (
                 <div className='md:col-span-2'>
                   <strong className='mb-2 flex items-center gap-2 font-medium text-gray-500 dark:text-gray-400'>
                     <Building2 className='h-4 w-4' />
-                    Assigned Showroom:
+                    Assigned Showrooms:
                   </strong>
-                  <div className='mt-2'>
-                    <div className='rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-900/20'>
-                      <p className='font-medium text-gray-900 dark:text-gray-100'>
-                        {showroom.name}
-                      </p>
-                      
-                  
-                      {store && (
-                        <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-                          Belongs to Store: {store.name}
+                  <div className='mt-2 space-y-2'>
+                    {showrooms.map((showroom) => (
+                      <div
+                        key={showroom.id}
+                        className='rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-900/20'
+                      >
+                        <p className='font-medium text-gray-900 dark:text-gray-100'>
+                          {showroom.name}
                         </p>
-                      )}
-                    </div>
+                        {showroom.isMain && (
+                          <span className='mt-1 inline-block text-xs text-blue-600 dark:text-blue-400'>
+                            Main Showroom
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

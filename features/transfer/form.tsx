@@ -788,7 +788,6 @@ export default function TransferForm({
                         {availableProducts.length === 0 && !loadingProducts && (
                           <div className='rounded-lg bg-yellow-50 p-4 text-center text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200'>
                             <p>No products available at the selected source location.</p>
-                            <p className='text-sm mt-1'>Please check that you have selected the correct product type and source location.</p>
                           </div>
                         )}
                       </div>

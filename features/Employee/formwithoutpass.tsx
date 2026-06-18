@@ -30,6 +30,7 @@ import { IStore } from '@/models/store';
 import { IShowroom } from '@/models/showroom';
 import { getStoresAll } from '@/service/store';
 import { getShowroomsAll } from '@/service/showroom';
+import { MultiSelect } from './mm';
 
 // Define the form data type
 interface FormData {
@@ -40,8 +41,8 @@ interface FormData {
   userCode?: string;
   roleId: string;
   status: 'Active' | 'Inactive' | 'Suspended';
-  storeId?: string | null;
-  showroomId?: string | null;
+  storeIds: string[];
+  showroomIds: string[];
 }
 
 export default function EmployeeForm({
@@ -70,8 +71,8 @@ export default function EmployeeForm({
       userCode: initialData?.userCode || '',
       roleId: initialData?.roleId || initialData?.role?.id || '',
       status: initialData?.status || 'Active',
-      storeId: initialData?.storeId || initialData?.store?.id || null,
-      showroomId: initialData?.showroomId || initialData?.showroom?.id || null,
+      storeIds: initialData?.storeIds || initialData?.stores?.map(s => s.id) || [],
+      showroomIds: initialData?.showroomIds || initialData?.showrooms?.map(s => s.id) || [],
     }),
     [initialData]
   );
@@ -153,6 +154,8 @@ export default function EmployeeForm({
         phone: data.phone || undefined,
         roleId: data.roleId,
         status: data.status,
+        storeIds: data.storeIds || [],
+        showroomIds: data.showroomIds || [],
       };
 
       // Handle password
@@ -168,20 +171,6 @@ export default function EmployeeForm({
           return;
         }
         submitData.password = data.password;
-      }
-
-      // Handle storeId - send null for "None", otherwise send the ID
-      if (data.storeId === null || data.storeId === '') {
-        submitData.storeId = null;
-      } else if (data.storeId) {
-        submitData.storeId = data.storeId;
-      }
-
-      // Handle showroomId - send null for "None", otherwise send the ID
-      if (data.showroomId === null || data.showroomId === '') {
-        submitData.showroomId = null;
-      } else if (data.showroomId) {
-        submitData.showroomId = data.showroomId;
       }
 
       console.log('Submitting data:', submitData);
@@ -329,76 +318,57 @@ export default function EmployeeForm({
                 )}
               />
 
-              {/* Store Selection - Independent */}
+              {/* Multiple Store Selection */}
               <FormField
-                name='storeId'
+                name='storeIds'
                 control={form.control}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Store (Optional)</FormLabel>
-                    <Select 
-                      value={field.value || 'none'} 
-                      onValueChange={(value) => {
-                        field.onChange(value === 'none' ? null : value);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              loadingStores ? 'Loading stores...' : 'Select store'
-                            }
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value='none'>None</SelectItem>
-                        {stores.map((store) => (
-                          <SelectItem key={store.id} value={store.id}>
-                            {store.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Stores (Optional - Multiple)</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={stores.map(store => ({
+                          label: store.name,
+                          value: store.id
+                        }))}
+                        selected={field.value}
+                        onChange={field.onChange}
+                        placeholder={
+                          loadingStores 
+                            ? 'Loading stores...' 
+                            : 'Select stores'
+                        }
+                        disabled={loadingStores}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Showroom Selection - Independent */}
+              {/* Multiple Showroom Selection */}
               <FormField
-                name='showroomId'
+                name='showroomIds'
                 control={form.control}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Showroom (Optional)</FormLabel>
-                    <Select 
-                      value={field.value || 'none'} 
-                      onValueChange={(value) => {
-                        field.onChange(value === 'none' ? null : value);
-                      }}
-                      disabled={loadingShowrooms}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              loadingShowrooms 
-                                ? 'Loading showrooms...' 
-                                : 'Select showroom'
-                            }
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value='none'>None</SelectItem>
-                        {showrooms.map((showroom) => (
-                          <SelectItem key={showroom.id} value={showroom.id}>
-                            {showroom.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Showrooms (Optional - Multiple)</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={showrooms.map(showroom => ({
+                          label: showroom.name,
+                          value: showroom.id
+                        }))}
+                        selected={field.value}
+                        onChange={field.onChange}
+                        placeholder={
+                          loadingShowrooms 
+                            ? 'Loading showrooms...' 
+                            : 'Select showrooms'
+                        }
+                        disabled={loadingShowrooms}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -10,7 +10,7 @@ export type AuthUser = {
   roleType?: string;
   role?: string;
   permissions: string[]; 
-  showroom?: IShowroom[];
+  showrooms?: IShowroom[];
   stores?: IStore[];
   lastLoginAt?: string;
 };
@@ -33,7 +33,7 @@ export type BackendAuthUser = {
   roleType?: string;
   role?: BackendRole;
   permissions?: string[];
-  showroom?: IShowroom[];
+  showrooms?: IShowroom[];
   stores?: IStore[];
   lastLoginAt?: string;
 };
