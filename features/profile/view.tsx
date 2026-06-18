@@ -13,7 +13,22 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Edit, Store, LogOut, Building2 } from 'lucide-react';
+import { 
+  Eye, 
+  EyeOff, 
+  Edit, 
+  Store, 
+  LogOut, 
+  Building2, 
+  User, 
+  Mail, 
+  Phone, 
+  Calendar,
+  Shield,
+  CheckCircle,
+  XCircle,
+  Clock
+} from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Imployee } from '@/models/employee';
 import { logout } from '@/service/authApi';
@@ -228,10 +243,36 @@ export default function ProfileViewPage() {
     setIsProfileModalOpen(true);
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'Inactive':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+      case 'Suspended':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'Inactive':
+        return <XCircle className="h-4 w-4" />;
+      case 'Suspended':
+        return <Clock className="h-4 w-4" />;
+      default:
+        return null;
+    }
+  };
+
   // Handle auth loading state
   if (!hydrated) {
     return (
-      <div className='flex h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-900'>
+      <div className='flex h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
         <div className='text-center'>
           <div className='mb-4 inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600'></div>
           <p className='text-lg font-semibold text-gray-600 dark:text-gray-300'>
@@ -248,9 +289,14 @@ export default function ProfileViewPage() {
   // Handle unauthenticated state
   if (!isAuthenticated || !authUser) {
     return (
-      <div className='flex h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-900'>
-        <div className='max-w-md rounded-lg bg-white p-8 text-center shadow-md dark:bg-gray-800'>
-          <h2 className='mb-4 text-xl font-semibold text-gray-700 dark:text-gray-300'>
+      <div className='flex h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
+        <div className='max-w-md rounded-2xl bg-white p-8 text-center shadow-xl dark:bg-gray-800'>
+          <div className="mb-6 flex justify-center">
+            <div className="rounded-full bg-blue-100 p-4 dark:bg-blue-900/20">
+              <Shield className="h-12 w-12 text-blue-600 dark:text-blue-400" />
+            </div>
+          </div>
+          <h2 className='mb-4 text-2xl font-semibold text-gray-700 dark:text-gray-300'>
             Authentication Required
           </h2>
           <p className='mb-6 text-gray-600 dark:text-gray-400'>
@@ -270,7 +316,7 @@ export default function ProfileViewPage() {
   // Handle loading state with better UX
   if (loading) {
     return (
-      <div className='flex h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-900'>
+      <div className='flex h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
         <div className='text-center'>
           <div className='mb-4 inline-block h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600'></div>
           <p className='text-lg font-semibold text-gray-600 dark:text-gray-300'>
@@ -287,9 +333,12 @@ export default function ProfileViewPage() {
   // Handle case when profile data is not available
   if (!profile) {
     return (
-      <div className='flex h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-900'>
-        <div className='max-w-md rounded-lg bg-white p-8 text-center shadow-md dark:bg-gray-800'>
+      <div className='flex h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
+        <div className='max-w-md rounded-2xl bg-white p-8 text-center shadow-xl dark:bg-gray-800'>
           <div className='mb-6 text-center'>
+            <div className="inline-block rounded-full bg-red-100 p-4 dark:bg-red-900/20">
+              <XCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
+            </div>
           </div>
           <div className='space-y-3'>
             <Button
@@ -321,152 +370,174 @@ export default function ProfileViewPage() {
   const showrooms = profile.showrooms as IShowroom[] | undefined;
 
   return (
-    <div className='min-h-screen bg-gray-50 p-6 dark:bg-gray-900'>
-      <div className='mx-auto rounded-lg bg-white p-8 shadow-sm dark:bg-gray-800'>
-        <div className='flex flex-col items-center space-y-6 md:flex-row md:items-start md:space-y-0 md:space-x-8'>
-          {/* Profile Details */}
-          <div className='flex-1 space-y-4'>
-            <div className='flex items-center justify-between'>
-              <h2 className='text-3xl font-semibold text-gray-900 dark:text-gray-100'>
-                User Profile
-              </h2>
+    <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 dark:from-gray-900 dark:to-gray-800'>
+      <div className='mx-auto max-w-5xl'>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+          <p className="mt-1 text-gray-500 dark:text-gray-400">
+            Manage your personal information and account settings
+          </p>
+        </div>
+
+        <div className='grid gap-6 lg:grid-cols-3'>
+          {/* Profile Card - Left Column */}
+          <div className="lg:col-span-1">
+            <div className='overflow-hidden rounded-2xl bg-white shadow-lg dark:bg-gray-800'>
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6">
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/20 text-4xl font-bold text-white">
+                      {profile.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 rounded-full bg-green-500 p-1.5">
+                      <div className="h-2.5 w-2.5 rounded-full bg-green-400"></div>
+                    </div>
+                  </div>
+                  <h2 className="mt-4 text-xl font-semibold text-white">{profile.name}</h2>
+                  <p className="text-sm text-blue-100">{profile.role?.name || 'User'}</p>
+                  <div className="mt-3">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(profile.status)}`}>
+                      {getStatusIcon(profile.status)}
+                      {profile.status || 'Active'}
+                    </span>
+                  </div>
+                  <div className="mt-3 text-xs text-blue-100">
+                    User Code: {profile.userCode || 'N/A'}
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 p-6 dark:border-gray-700">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20">
+                      <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{profile.email}</p>
+                    </div>
+                  </div>
+                  {profile.phone && (
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20">
+                        <Phone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Phone</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{profile.phone}</p>
+                      </div>
+                    </div>
+                  )}
+                  {profile.lastLoginAt && (
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20">
+                        <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Last Login</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {new Date(profile.lastLoginAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Details */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3">
               <Button
                 onClick={openProfileModal}
-                variant='outline'
-                className='flex items-center gap-2'
+                variant="default"
+                className="flex items-center gap-2"
               >
-                <Edit size={16} />
+                <Edit className="h-4 w-4" />
                 Edit Profile
               </Button>
-            </div>
-
-            <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-              {profile.name && (
-                <div>
-                  <strong className='font-medium text-gray-500 dark:text-gray-400'>
-                    Name:
-                  </strong>
-                  <p className='text-gray-900 dark:text-gray-100'>
-                    {profile.name}
-                  </p>
-                </div>
-              )}
-              {profile.email && (
-                <div>
-                  <strong className='font-medium text-gray-500 dark:text-gray-400'>
-                    Email:
-                  </strong>
-                  <p className='text-gray-900 dark:text-gray-100'>
-                    {profile.email}
-                  </p>
-                </div>
-              )}
-              {profile.phone && (
-                <div>
-                  <strong className='font-medium text-gray-500 dark:text-gray-400'>
-                    Phone:
-                  </strong>
-                  <p className='text-gray-900 dark:text-gray-100'>
-                    {profile.phone || 'Not provided'}
-                  </p>
-                </div>
-              )}
-
-              {profile.role?.name && (
-                <div>
-                  <strong className='font-medium text-gray-500 dark:text-gray-400'>
-                    Role:
-                  </strong>
-                  <p className='text-gray-900 dark:text-gray-100'>
-                    {profile.role.name}
-                  </p>
-                </div>
-              )}
-
-              {/* Assigned Stores Section - Multiple Stores */}
-              {stores && stores.length > 0 && (
-                <div className='md:col-span-2'>
-                  <strong className='mb-2 flex items-center gap-2 font-medium text-gray-500 dark:text-gray-400'>
-                    <Store className='h-4 w-4' />
-                    Assigned Stores:
-                  </strong>
-                  <div className='mt-2 space-y-2'>
-                    {stores.map((store) => (
-                      <div
-                        key={store.id}
-                        className='rounded-lg border border-green-100 bg-green-50 p-3 dark:border-green-900 dark:bg-green-900/20'
-                      >
-                        <p className='font-medium text-gray-900 dark:text-gray-100'>
-                          {store.name}
-                        </p>
-                        {store.isMain && (
-                          <span className='mt-1 inline-block text-xs text-green-600 dark:text-green-400'>
-                            Main Store
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Assigned Showrooms Section - Multiple Showrooms */}
-              {showrooms && showrooms.length > 0 && (
-                <div className='md:col-span-2'>
-                  <strong className='mb-2 flex items-center gap-2 font-medium text-gray-500 dark:text-gray-400'>
-                    <Building2 className='h-4 w-4' />
-                    Assigned Showrooms:
-                  </strong>
-                  <div className='mt-2 space-y-2'>
-                    {showrooms.map((showroom) => (
-                      <div
-                        key={showroom.id}
-                        className='rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-900/20'
-                      >
-                        <p className='font-medium text-gray-900 dark:text-gray-100'>
-                          {showroom.name}
-                        </p>
-                        {showroom.isMain && (
-                          <span className='mt-1 inline-block text-xs text-blue-600 dark:text-blue-400'>
-                            Main Showroom
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {profile.lastLoginAt && (
-                <div>
-                  <strong className='font-medium text-gray-500 dark:text-gray-400'>
-                    Last Login:
-                  </strong>
-                  <p className='text-gray-900 dark:text-gray-100'>
-                    {new Date(profile.lastLoginAt).toLocaleString()}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className='flex flex-col gap-3 pt-4 sm:flex-row'>
               <Button
                 onClick={() => setIsPasswordModalOpen(true)}
-                className='sm:w-auto'
+                variant="outline"
+                className="flex items-center gap-2"
               >
+                <Shield className="h-4 w-4" />
                 Change Password
               </Button>
             </div>
+
+            {/* Assigned Stores Section */}
+            {stores && stores.length > 0 && (
+              <div className="rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-800">
+                <div className="mb-4 flex items-center gap-2">
+                  <Store className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Assigned Stores ({stores.length})
+                  </h3>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {stores.map((store) => (
+                    <div
+                      key={store.id}
+                      className="rounded-xl border border-green-100 bg-green-50/50 p-4 transition-all hover:shadow-md dark:border-green-900/50 dark:bg-green-900/10"
+                    >
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        {store.name}
+                      </p>
+                      {store.isMain && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-200 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-400">
+                          <CheckCircle className="h-3 w-3" />
+                          Main Store
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assigned Showrooms Section */}
+            {showrooms && showrooms.length > 0 && (
+              <div className="rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-800">
+                <div className="mb-4 flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Assigned Showrooms ({showrooms.length})
+                  </h3>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {showrooms.map((showroom) => (
+                    <div
+                      key={showroom.id}
+                      className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 transition-all hover:shadow-md dark:border-blue-900/50 dark:bg-blue-900/10"
+                    >
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        {showroom.name}
+                      </p>
+                      {showroom.isMain && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-blue-200 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-400">
+                          <CheckCircle className="h-3 w-3" />
+                          Main Showroom
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
 
       {/* Password Change Modal */}
       <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
-        <DialogContent className='rounded-lg bg-white sm:max-w-md dark:bg-gray-800'>
+        <DialogContent className='rounded-2xl bg-white sm:max-w-md dark:bg-gray-800'>
           <DialogHeader>
-            <DialogTitle className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
+            <DialogTitle className='text-2xl font-semibold text-gray-900 dark:text-gray-100'>
               Change Password
             </DialogTitle>
           </DialogHeader>
@@ -487,7 +558,7 @@ export default function ProfileViewPage() {
                     setCurrentPassword(e.target.value);
                     setPasswordError('');
                   }}
-                  className='border-gray-300 pr-10 focus:ring-1 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+                  className='border-gray-200 pr-10 focus:ring-2 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                   placeholder='Enter current password'
                 />
                 <button
@@ -520,7 +591,7 @@ export default function ProfileViewPage() {
                     setNewPassword(e.target.value);
                     setPasswordError('');
                   }}
-                  className='border-gray-300 pr-10 focus:ring-1 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+                  className='border-gray-200 pr-10 focus:ring-2 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                   placeholder='Enter new password'
                 />
                 <button
@@ -549,7 +620,7 @@ export default function ProfileViewPage() {
                     setConfirmPassword(e.target.value);
                     setPasswordError('');
                   }}
-                  className='border-gray-300 pr-10 focus:ring-1 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+                  className='border-gray-200 pr-10 focus:ring-2 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                   placeholder='Confirm new password'
                 />
                 <button
@@ -567,7 +638,7 @@ export default function ProfileViewPage() {
             </div>
 
             {passwordError && (
-              <p className='rounded bg-red-50 p-2 text-sm font-medium text-red-600 dark:bg-red-900/20'>
+              <p className='rounded-lg bg-red-50 p-3 text-sm font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400'>
                 {passwordError}
               </p>
             )}
@@ -593,9 +664,9 @@ export default function ProfileViewPage() {
 
       {/* Profile Update Modal */}
       <Dialog open={isProfileModalOpen} onOpenChange={setIsProfileModalOpen}>
-        <DialogContent className='rounded-lg bg-white sm:max-w-md dark:bg-gray-800'>
+        <DialogContent className='rounded-2xl bg-white sm:max-w-md dark:bg-gray-800'>
           <DialogHeader>
-            <DialogTitle className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
+            <DialogTitle className='text-2xl font-semibold text-gray-900 dark:text-gray-100'>
               Edit Profile
             </DialogTitle>
           </DialogHeader>
@@ -615,7 +686,7 @@ export default function ProfileViewPage() {
                   setName(e.target.value);
                   setProfileError('');
                 }}
-                className='border-gray-300 focus:ring-1 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+                className='border-gray-200 focus:ring-2 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                 placeholder='Enter your name'
               />
             </div>
@@ -635,7 +706,7 @@ export default function ProfileViewPage() {
                   setEmail(e.target.value);
                   setProfileError('');
                 }}
-                className='border-gray-300 focus:ring-1 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+                className='border-gray-200 focus:ring-2 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                 placeholder='Enter your email'
               />
             </div>
@@ -655,19 +726,14 @@ export default function ProfileViewPage() {
                   setPhone(e.target.value);
                   setProfileError('');
                 }}
-                className='border-gray-300 focus:ring-1 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
+                className='border-gray-200 focus:ring-2 focus:ring-blue-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                 placeholder='Enter your phone number'
               />
             </div>
 
-            <div className='rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20'>
-              <p className='text-sm text-blue-700 dark:text-blue-300'>
-                <strong>Note:</strong> Store and showroom assignments can only be changed by administrators.
-              </p>
-            </div>
 
             {profileError && (
-              <p className='rounded bg-red-50 p-2 text-sm font-medium text-red-600 dark:bg-red-900/20'>
+              <p className='rounded-lg bg-red-50 p-3 text-sm font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400'>
                 {profileError}
               </p>
             )}
