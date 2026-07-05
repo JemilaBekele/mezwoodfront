@@ -1118,6 +1118,7 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="min-w-50">Product</TableHead>
                       <TableHead className="min-w-50">Description</TableHead>
                       <TableHead>Size</TableHead>
                       <TableHead>Quantity</TableHead>
@@ -1133,6 +1134,8 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                       
                       return (
                         <TableRow key={item.id || index}>
+                                                  <TableCell>{item.item?.name || ''}</TableCell>
+
                           <TableCell>
                             <div className="space-y-1">
                               <p className="font-medium">{item.description}</p>

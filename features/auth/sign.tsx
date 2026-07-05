@@ -348,7 +348,7 @@ export default function SignInViewPage() {
         </div>
 
         <p className="login-copyright">
-          © {new Date().getFullYear()} ikiz curtain Management. All rights reserved.
+          © {new Date().getFullYear()} Rosewood Management. All rights reserved.
         </p>
       </div>
 
