@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { toast } from 'sonner';
 
 import { getItemId } from '@/service/item';
@@ -19,13 +19,15 @@ type TItemViewPageProps = {
   itemId: string;
 };
 
+type ItemFormInitialData = ComponentProps<typeof ItemForm>['initialData'];
+
 export default function ItemViewPage({
   itemId
 }: TItemViewPageProps) {
   const [loading, setLoading] = useState(true);
   const [pageTitle, setPageTitle] = useState('Create New Item');
 
-  const [item, setItem] = useState<IItem | null>(null);
+  const [item, setItem] = useState<ItemFormInitialData>(null);
 
   const [categories, setCategories] = useState<any[]>([]);
   const [sizes, setSizes] = useState<any[]>([]);
@@ -53,17 +55,17 @@ export default function ItemViewPage({
           const data = await getItemId(itemId);
 
           if (data) {
-            const formattedItem: IItem = {
+            const formattedItem = {
               ...data,
               imageUrl:
                 typeof data.imageUrl === 'string'
                   ? normalizeImagePath(data.imageUrl)
                   : undefined
-            };
+            } as ItemFormInitialData;
 
             setItem(formattedItem);
             setPageTitle(
-              `Edit Item: ${formattedItem.name || formattedItem.id}`
+              `Edit Item`
             );
           }
         }
