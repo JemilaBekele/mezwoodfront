@@ -2,11 +2,14 @@ import { IMaterial } from "./material";
 import { IProductCategory, IProductType, ISize } from "./productConfiguration";
 
 export interface IItem {
+  itemMaterials: boolean;
   id: string;
   name: string;
 
   price: number;
   imageUrl?: string;
+    itemImages?: IItemImage[];
+
   color?: string;
 
   // ✅ Relations (IDs)
@@ -26,7 +29,15 @@ export interface IItem {
   updatedAt: string;
 }
 
+export interface IItemImage {
+  id: string;
+  imageUrl: string;
+  itemId: string;
 
+
+  createdAt: string;
+  updatedAt: string;
+}
 export interface IItemMaterial {
   id: string;
 

@@ -71,7 +71,7 @@ export const getAllItems = async (params?: {
 // Get all items (server-side / authenticated)
 export const getItems = async () => {
   try {
-    const response = await axiosInstance.get<ItemsResponse>(`/items/get/all`);
+    const response = await axiosInstance.get<any>(`/items/get/all`);
     return response.data.items;
   } catch (error) {
     throw error;

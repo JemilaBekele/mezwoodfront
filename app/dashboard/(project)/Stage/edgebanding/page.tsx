@@ -48,11 +48,17 @@ export default async function PurchasePage(props: pageProps) {
               className={cn(buttonVariants(), 'text-xs md:text-sm')}
             >
               Finished Edge Banding Work Projects
-            </Link>                         </PermissionGuard>
+            </Link>            
+            
+                <Link
+              href={`/dashboard/Stage/stageallocation?stage=EDGE_BANDING`}
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+Calendar            </Link> 
+                         </PermissionGuard>
   
         </div>
         <Separator />
-                <StageAllocationCalendar stage="EDGE_BANDING" />
 
         <UserTableAction />
 

@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { normalizeImagePath } from '@/lib/norm';
 import { AlertModal } from '@/components/modal/alert-modal';
 import { useRouter } from 'next/dist/client/components/navigation';
-import { IconEdit, IconEye, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconEye, IconTrash, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
@@ -65,20 +65,84 @@ interface ItemCardProps {
   onSelectItem: (item: ExtendedItem) => void;
 }
 
-
 export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Carousel state for card
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+  
+  // Carousel state for modal
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+  
   // State for delete modal
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const imageUrl = imageError ? '/placeholder-image.jpg' : normalizeImagePath(item.imageUrl);
+  // Get all images (main + additional)
+  const getAllImages = useMemo(() => {
+    const images: string[] = [];
+    
+    // Add main image first
+    if (item.imageUrl) {
+      images.push(normalizeImagePath(item.imageUrl) || item.imageUrl);
+    }
+    
+    // Add additional images
+    if (item.itemImages && item.itemImages.length > 0) {
+      item.itemImages.forEach(img => {
+        const normalized = normalizeImagePath(img.imageUrl) || img.imageUrl;
+        if (normalized) {
+          images.push(normalized);
+        }
+      });
+    }
+    
+    return images;
+  }, [item.imageUrl, item.itemImages]);
+
+  const allImages = getAllImages;
+  const hasMultipleImages = allImages.length > 1;
+
+  // Auto-rotate carousel on card
+  useEffect(() => {
+    if (!isHovering || !hasMultipleImages) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [isHovering, hasMultipleImages, allImages.length]);
+
+  const currentImage = allImages[currentImageIndex] || '/placeholder-image.jpg';
   const formattedPrice = formatPrice(item.price);
   const stockDetails = item.stockDetails;
   const totalStock = stockDetails?.totalQuantity || item.stock || 0;
+
+  // Handle carousel navigation
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
+
+  // Handle modal carousel navigation
+  const nextModalImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setModalImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
+  const prevModalImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setModalImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
 
   // Handle Delete Confirmation
   const onConfirmDelete = async () => {
@@ -102,6 +166,12 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
     return 'text-green-600 dark:text-green-400';
   };
 
+  // Open modal with carousel
+  const openModal = () => {
+    setIsModalOpen(true);
+    setModalImageIndex(currentImageIndex);
+  };
+
   return (
     <>
       {/* Delete confirmation Modal */}
@@ -114,18 +184,72 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
 
       <Card
         className="group flex h-full w-full flex-col cursor-pointer overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
         onClick={() => onSelectItem(item)}
       >
         <CardHeader className="relative p-0">
           <div className="relative aspect-video w-full overflow-hidden bg-gray-50 dark:bg-gray-800">
-            <Image
-              src={imageUrl || '/placeholder-image.jpg'}
-              alt={item.name}
-              fill
-              className="object-contain p-2 transition-transform duration-500 group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              onError={() => setImageError(true)}
-            />
+            {/* Image Carousel */}
+            <div 
+              className="relative w-full h-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                openModal();
+              }}
+            >
+              <Image
+                src={currentImage}
+                alt={item.name}
+                fill
+                className="object-contain p-2 transition-transform duration-500 group-hover:scale-105"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                onError={() => setImageError(true)}
+              />
+              
+              {/* Image counter badge */}
+              {hasMultipleImages && (
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                  {currentImageIndex + 1} / {allImages.length}
+                </div>
+              )}
+              
+              {/* Navigation arrows - only show on hover */}
+              {hasMultipleImages && isHovering && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                    aria-label="Previous image"
+                  >
+                    <IconChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                    aria-label="Next image"
+                  >
+                    <IconChevronRight className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+              
+              {/* Dot indicators */}
+              {hasMultipleImages && (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                  {allImages.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${
+                        index === currentImageIndex
+                          ? 'bg-white w-3'
+                          : 'bg-white/50'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
 
@@ -157,63 +281,60 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
           {/* Store and Showroom Stock Details - Directly on Card */}
           {stockDetails && (
             <div className="mt-3 space-y-2">
-              {/* Store Stock Badges */}
-                                          <div className="flex justify-between text-xs pt-1 border-t border-gray-100 dark:border-gray-800">
-
-              {stockDetails.stores && stockDetails.stores.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    📦 Store Stock:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {stockDetails.stores.slice(0, 3).map((store: any) => (
-                      <span
-                        key={store.storeId}
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                          store.quantity > 0
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                        }`}
-                      >
-                        {store.storeName.split(' ')[0]}: {store.quantity}
-                      </span>
-                    ))}
-                    {stockDetails.stores.length > 3 && (
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                        +{stockDetails.stores.length - 3} more
-                      </span>
-                    )}
+              <div className="flex justify-between text-xs pt-1 border-t border-gray-100 dark:border-gray-800">
+                {stockDetails.stores && stockDetails.stores.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      📦 Store Stock:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {stockDetails.stores.slice(0, 3).map((store: any) => (
+                        <span
+                          key={store.storeId}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                            store.quantity > 0
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                          }`}
+                        >
+                          {store.storeName.split(' ')[0]}: {store.quantity}
+                        </span>
+                      ))}
+                      {stockDetails.stores.length > 3 && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                          +{stockDetails.stores.length - 3} more
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Showroom Stock Badges */}
-              {stockDetails.showrooms && stockDetails.showrooms.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    🏢 Showroom Stock:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {stockDetails.showrooms.slice(0, 3).map((showroom: any) => (
-                      <span
-                        key={showroom.showroomId}
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                          showroom.quantity > 0
-                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                        }`}
-                      >
-                        {showroom.showroomName.split(' ')[0]}: {showroom.quantity}
-                      </span>
-                    ))}
-                    {stockDetails.showrooms.length > 3 && (
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                        +{stockDetails.showrooms.length - 3} more
-                      </span>
-                    )}
+                {stockDetails.showrooms && stockDetails.showrooms.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      🏢 Showroom Stock:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {stockDetails.showrooms.slice(0, 3).map((showroom: any) => (
+                        <span
+                          key={showroom.showroomId}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                            showroom.quantity > 0
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                          }`}
+                        >
+                          {showroom.showroomName.split(' ')[0]}: {showroom.quantity}
+                        </span>
+                      ))}
+                      {stockDetails.showrooms.length > 3 && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                          +{stockDetails.showrooms.length - 3} more
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
               </div>
 
               {/* Summary Line */}
@@ -241,48 +362,46 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
 
           {/* Action Buttons Row */}
           <div className="flex w-full gap-2">
-            {/* View Page Button */}
-
-                      <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.VIEW.name}>
-
-            <button
-              className="flex flex-1 items-center justify-center rounded-lg bg-gray-100 px-2 py-1.5 text-[12px] font-medium text-gray-900 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-              onClick={(e) => {
-                e.stopPropagation(); // Prevents onSelectItem from firing
-                router.push(`/dashboard/Item/view?id=${item.id}`);
-              }}
-            >
-              <IconEye className="mr-1 h-4 w-4" /> View
-            </button></PermissionGuard>
-                      <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.UPDATE.name}>
-
-            {/* Update/Edit Button */}
-        <button
-  className="flex flex-1 items-center justify-center rounded-lg bg-blue-600 px-2 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700"
-  onClick={(e) => {
-    e.stopPropagation();
-    router.push(`/dashboard/Item/${item.id}`);
-  }}
->
-  <IconEdit className="mr-1 h-4 w-4" /> Edit
-</button></PermissionGuard>
-                      <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.DELETE.name}>
-
-            {/* Delete Button */}
-            <button
-              className="flex items-center justify-center rounded-lg bg-red-100 px-2 py-1.5 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-              onClick={(e) => {
-                e.stopPropagation(); // Prevents onSelectItem from firing
-                setOpenDeleteModal(true);
-              }}
-            >
-              <IconTrash className="h-4 w-4" />
-            </button></PermissionGuard>
+            <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.VIEW.name}>
+              <button
+                className="flex flex-1 items-center justify-center rounded-lg bg-gray-100 px-2 py-1.5 text-[12px] font-medium text-gray-900 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/dashboard/Item/view?id=${item.id}`);
+                }}
+              >
+                <IconEye className="mr-1 h-4 w-4" /> View
+              </button>
+            </PermissionGuard>
+            
+            <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.UPDATE.name}>
+              <button
+                className="flex flex-1 items-center justify-center rounded-lg bg-blue-600 px-2 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-blue-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/dashboard/Item/${item.id}`);
+                }}
+              >
+                <IconEdit className="mr-1 h-4 w-4" /> Edit
+              </button>
+            </PermissionGuard>
+            
+            <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.DELETE.name}>
+              <button
+                className="flex items-center justify-center rounded-lg bg-red-100 px-2 py-1.5 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenDeleteModal(true);
+                }}
+              >
+                <IconTrash className="h-4 w-4" />
+              </button>
+            </PermissionGuard>
           </div>
         </CardFooter>
       </Card>
 
-      {/* View Modal with Detailed Stock Breakdown (Triggered by clicking the card body) */}
+      {/* View Modal with Carousel and Detailed Stock Breakdown */}
       {isModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 dark:bg-black/90 backdrop-blur-sm"
@@ -302,14 +421,38 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
             </button>
 
             <div className="relative bg-white dark:bg-gray-900 rounded-lg overflow-hidden max-h-[90vh] overflow-y-auto">
+              {/* Modal Image Carousel */}
               <div className="relative aspect-video w-full bg-gray-900 dark:bg-black">
                 <Image
-                  src={imageUrl || '/placeholder-image.jpg'}
+                  src={allImages[modalImageIndex] || '/placeholder-image.jpg'}
                   alt={item.name}
                   fill
                   className="object-contain"
                   sizes="90vw"
                 />
+                
+                {/* Modal Navigation Arrows */}
+                {allImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevModalImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                    >
+                      <IconChevronLeft className="h-6 w-6" />
+                    </button>
+                    <button
+                      onClick={nextModalImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                    >
+                      <IconChevronRight className="h-6 w-6" />
+                    </button>
+                  </>
+                )}
+                
+                {/* Modal Image Counter */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-sm px-3 py-1 rounded-full">
+                  {modalImageIndex + 1} / {allImages.length}
+                </div>
               </div>
 
               <div className="p-4 bg-white dark:bg-gray-900">

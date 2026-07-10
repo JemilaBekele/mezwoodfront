@@ -11,9 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Plus, Search, Upload, X, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Search, Upload, X, AlertCircle, Image as ImageIcon } from 'lucide-react';
 
-import { IItem, IItemMaterial} from '@/models/item';
+import { IItem, IItemMaterial, IItemImage } from '@/models/item';
 import { IMaterial } from '@/models/material';
 import { createItem, updateItem } from '@/service/item';
 import { getMaterials } from '@/service/material';
@@ -38,6 +38,13 @@ interface MaterialSelection {
   materialColor?: string;
   quantity: number;
   note?: string;
+}
+
+interface ImageFileWithPreview {
+  file?: File;
+  url: string;
+  isExisting: boolean;
+  id?: string; // For existing images
 }
 
 // Validation schema
@@ -92,6 +99,7 @@ export default function ItemForm({
   // Refs for scrollable areas
   const materialsTableRef = useRef<HTMLDivElement>(null);
   const formContainerRef = useRef<HTMLFormElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Item fields
   const [name, setName] = useState(initialData?.name || '');
@@ -106,14 +114,19 @@ export default function ItemForm({
   // Track if user manually edited the color
   const [isColorManuallyEdited, setIsColorManuallyEdited] = useState(false);
   
-  const [imageUrl, setImageUrl] = useState<string>(initialData?.imageUrl || '');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>(() => {
+  // Main image state
+  const [mainImageUrl, setMainImageUrl] = useState<string>(initialData?.imageUrl || '');
+  const [mainImageFile, setMainImageFile] = useState<File | null>(null);
+  const [mainImagePreview, setMainImagePreview] = useState<string>(() => {
     if (initialData?.imageUrl) {
       return normalizeImagePath(initialData.imageUrl) || '';
     }
     return '';
   });
+  
+  // Additional images state
+  const [additionalImages, setAdditionalImages] = useState<ImageFileWithPreview[]>([]);
+  const [imagesToDelete, setImagesToDelete] = useState<string[]>([]);
   
   // Material selections
   const [selectedMaterials, setSelectedMaterials] = useState<MaterialSelection[]>([]);
@@ -130,6 +143,18 @@ export default function ItemForm({
   const selectedCategory = categories.find(c => c.id === categoryId);
   const selectedSize = sizes.find(s => s.id === sizeId);
   const selectedType = types.find(t => t.id === typeId);
+
+  // Initialize additional images from initialData
+  useEffect(() => {
+    if (initialData?.itemImages && initialData.itemImages.length > 0) {
+      const existingImages = initialData.itemImages.map(img => ({
+        id: img.id,
+        url: normalizeImagePath(img.imageUrl) || img.imageUrl,
+        isExisting: true,
+      }));
+      setAdditionalImages(existingImages);
+    }
+  }, [initialData]);
 
   // Auto-generate product name based on selections (without color)
   useEffect(() => {
@@ -340,36 +365,35 @@ export default function ItemForm({
     }
   };
 
-  // Initialize selected materials from initialData when editing
-// Initialize selected materials from initialData when editing AND sync colors
-useEffect(() => {
-  if (initialData?.itemMaterials && initialData.itemMaterials.length > 0) {
-    const materialsFromInitial = initialData.itemMaterials.map(im => ({
-      materialId: im.materialId,
-      materialName: im.material?.name,
-      materialColor: im.material?.color,
-      quantity: im.quantity,
-      note: im.note || undefined,
-    }));
-    setSelectedMaterials(materialsFromInitial);
-    
-    // Sync the checkbox selections based on saved product color
-    if (initialData.color) {
-      const savedColors = initialData.color.split(',').map(c => c.trim().toLowerCase());
-      const matchedColors = materialsFromInitial
-        .filter(m => m.materialColor && savedColors.includes(m.materialColor.toLowerCase()))
-        .map(m => m.materialColor as string);
-      const uniqueColors = [...new Set(matchedColors)];
+  // Initialize selected materials from initialData when editing AND sync colors
+  useEffect(() => {
+    if (initialData?.itemMaterials && initialData.itemMaterials.length > 0) {
+      const materialsFromInitial = initialData.itemMaterials.map(im => ({
+        materialId: im.materialId,
+        materialName: im.material?.name,
+        materialColor: im.material?.color,
+        quantity: im.quantity,
+        note: im.note || undefined,
+      }));
+      setSelectedMaterials(materialsFromInitial);
       
-      if (uniqueColors.length > 0) {
-        setSelectedProductColors(uniqueColors);
-      } else if (savedColors.length > 0) {
-        // If no exact matches, still show the saved colors in the color field
-        setSelectedProductColors(savedColors);
+      // Sync the checkbox selections based on saved product color
+      if (initialData.color) {
+        const savedColors = initialData.color.split(',').map(c => c.trim().toLowerCase());
+        const matchedColors = materialsFromInitial
+          .filter(m => m.materialColor && savedColors.includes(m.materialColor.toLowerCase()))
+          .map(m => m.materialColor as string);
+        const uniqueColors = [...new Set(matchedColors)];
+        
+        if (uniqueColors.length > 0) {
+          setSelectedProductColors(uniqueColors);
+        } else if (savedColors.length > 0) {
+          // If no exact matches, still show the saved colors in the color field
+          setSelectedProductColors(savedColors);
+        }
       }
     }
-  }
-}, [initialData]);
+  }, [initialData]);
 
   // Scroll to bottom when new material is added
   useEffect(() => {
@@ -382,14 +406,12 @@ useEffect(() => {
     const nameError = validateName(name);
     const priceError = validatePrice(price);
     const categoryError = validateCategory(categoryId);
-
     const materialsError = validateMaterials(selectedMaterials);
 
     const newErrors = {
       name: nameError,
       price: priceError,
       categoryId: categoryError,
- 
       materials: materialsError,
     };
 
@@ -407,7 +429,8 @@ useEffect(() => {
     return !Object.values(newErrors).some(error => error !== undefined);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Main image handlers
+  const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -422,24 +445,78 @@ useEffect(() => {
         return;
       }
 
-      if (imagePreview && imagePreview.startsWith('blob:')) {
-        URL.revokeObjectURL(imagePreview);
+      if (mainImagePreview && mainImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(mainImagePreview);
       }
 
-      setImageFile(file);
+      setMainImageFile(file);
       const previewUrl = URL.createObjectURL(file);
-      setImagePreview(previewUrl);
-      setImageUrl('');
+      setMainImagePreview(previewUrl);
+      setMainImageUrl('');
     }
   };
 
-  const handleRemoveImage = () => {
-    setImageUrl('');
-    setImageFile(null);
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview);
+  const handleRemoveMainImage = () => {
+    setMainImageUrl('');
+    setMainImageFile(null);
+    if (mainImagePreview && mainImagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(mainImagePreview);
     }
-    setImagePreview('');
+    setMainImagePreview('');
+  };
+
+  // Additional images handlers
+  const handleAdditionalImagesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const maxSize = 5 * 1024 * 1024;
+    const newImages: ImageFileWithPreview[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!validTypes.includes(file.type)) {
+        toast.error(`"${file.name}" is not a valid image file`);
+        continue;
+      }
+      if (file.size > maxSize) {
+        toast.error(`"${file.name}" exceeds 5MB limit`);
+        continue;
+      }
+      const previewUrl = URL.createObjectURL(file);
+      newImages.push({
+        file,
+        url: previewUrl,
+        isExisting: false,
+      });
+    }
+
+    if (newImages.length > 0) {
+      setAdditionalImages(prev => [...prev, ...newImages]);
+      toast.success(`Added ${newImages.length} image(s)`);
+    }
+
+    // Reset input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveAdditionalImage = (index: number) => {
+    const imageToRemove = additionalImages[index];
+    
+    // If it's an existing image, mark for deletion
+    if (imageToRemove.isExisting && imageToRemove.id) {
+      setImagesToDelete(prev => [...prev, imageToRemove.id!]);
+    }
+    
+    // Revoke blob URL if it's a new image
+    if (!imageToRemove.isExisting && imageToRemove.url.startsWith('blob:')) {
+      URL.revokeObjectURL(imageToRemove.url);
+    }
+    
+    setAdditionalImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAddMaterial = () => {
@@ -555,78 +632,89 @@ useEffect(() => {
     router.refresh();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+// In your handleSubmit function, after creating formData
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!validateForm()) return;
 
-    setIsLoading(true);
-    try {
-      let payload: FormData | any;
-      
-      const priceValue = price === '' ? 0 : parseFloat(price);
-      
-      if (imageFile) {
-        const formData = new FormData();
-        formData.append('name', name);
-        formData.append('price', priceValue.toString());
-        if (color) formData.append('color', color);
-        if (categoryId) formData.append('categoryId', categoryId);
-        if (typeId) formData.append('typeId', typeId);
-        if (sizeId) formData.append('sizeId', sizeId);
-        formData.append('image', imageFile);
-        formData.append('materials', JSON.stringify(
-          selectedMaterials.map(m => ({
-            materialId: m.materialId,
-            quantity: m.quantity,
-            note: m.note,
-          }))
-        ));
-        payload = formData;
-      } else {
-        payload = {
-          name,
-          price: priceValue,
-          color: color || undefined,
-          categoryId: categoryId || undefined,
-          typeId: typeId || undefined,
-          sizeId: sizeId || undefined,
-          materials: selectedMaterials.map(m => ({
-            materialId: m.materialId,
-            quantity: m.quantity,
-            note: m.note,
-          })),
-        };
-        
-        if (imageUrl) {
-          payload.imageUrl = imageUrl;
-        }
-      }
-    let response; // Declare response variable outside the blocks
-
-      if (isEdit && initialData?.id) {
-        await updateItem(initialData.id, payload);
-              router.push('/dashboard/Item');
-      router.refresh();
-
-        toast.success('Item updated successfully');
-      } else {
-       response =  await createItem(payload);
-        toast.success('Item created successfully');
-
-
-       
-            // Now response is accessible here
-            router.push(`/dashboard/Item/initial?id=${response?.data?.id}`);
-                  router.refresh();
-
-      }
-
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save item');
-    } finally {
-      setIsLoading(false);
+  setIsLoading(true);
+  try {
+    const priceValue = price === '' ? 0 : parseFloat(price);
+    
+    // Create FormData
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('price', priceValue.toString());
+    if (color) formData.append('color', color);
+    if (categoryId) formData.append('categoryId', categoryId);
+    if (typeId) formData.append('typeId', typeId);
+    if (sizeId) formData.append('sizeId', sizeId);
+    
+    // Main image
+    if (mainImageFile) {
+      console.log('Adding main image:', mainImageFile.name, mainImageFile.size);
+      formData.append('image', mainImageFile);
+    } else if (mainImageUrl === null || mainImageUrl === '') {
+      formData.append('imageUrl', 'null');
     }
-  };
+    
+    // Additional images
+    const newImageFiles = additionalImages.filter(img => !img.isExisting);
+    console.log('New additional images:', newImageFiles.length);
+    newImageFiles.forEach((img, index) => {
+      if (img.file) {
+        console.log(`Adding additional image ${index + 1}:`, img.file.name, img.file.size);
+        formData.append('images', img.file);
+      }
+    });
+    
+    // Images to delete
+    if (imagesToDelete.length > 0) {
+      console.log('Images to delete:', imagesToDelete);
+      formData.append('imagesToDelete', JSON.stringify(imagesToDelete));
+    }
+    
+    // Materials
+    formData.append('materials', JSON.stringify(
+      selectedMaterials.map(m => ({
+        materialId: m.materialId,
+        quantity: m.quantity,
+        note: m.note,
+      }))
+    ));
+
+    // Log all FormData entries for debugging
+    console.log('=== FORMDATA CONTENTS ===');
+    for (const pair of formData.entries()) {
+      if (pair[1] instanceof File) {
+        console.log(`${pair[0]}: File - ${pair[1].name} (${pair[1].size} bytes)`);
+      } else {
+        console.log(`${pair[0]}: ${pair[1]}`);
+      }
+    }
+
+    let response;
+    if (isEdit && initialData?.id) {
+      // Make sure you're passing the FormData correctly
+      console.log('Updating item with ID:', initialData.id);
+      await updateItem(initialData.id, formData);
+      router.push('/dashboard/Item');
+      router.refresh();
+      toast.success('Item updated successfully');
+    } else {
+      response = await createItem(formData);
+      toast.success('Item created successfully');
+      router.push(`/dashboard/Item/initial?id=${response?.data?.id}`);
+      router.refresh();
+    }
+
+  } catch (error: any) {
+    console.error('Submit error:', error);
+    toast.error(error.message || 'Failed to save item');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Get available materials (not already selected)
   const availableMaterials = materials.filter(
@@ -658,16 +746,16 @@ useEffect(() => {
     size.name.toLowerCase().includes(sizeSearch.toLowerCase())
   );
 
-  // Safe image source getter
-  const getSafeImageSource = () => {
-    if (!imagePreview) return null;
-    if (imagePreview.startsWith('blob:') || imagePreview.startsWith('http')) {
-      return imagePreview;
+  // Safe image source getter for main image
+  const getSafeMainImageSource = () => {
+    if (!mainImagePreview) return null;
+    if (mainImagePreview.startsWith('blob:') || mainImagePreview.startsWith('http')) {
+      return mainImagePreview;
     }
-    return normalizeImagePath(imagePreview);
+    return normalizeImagePath(mainImagePreview);
   };
 
-  const safeImageSrc = getSafeImageSource();
+  const safeMainImageSrc = getSafeMainImageSource();
 
   return (
     <div>
@@ -682,10 +770,10 @@ useEffect(() => {
           <form onSubmit={handleSubmit} className="space-y-6" ref={formContainerRef}>
             {/* Product Information Section */}
             <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+              <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
                 Product Information
               </h3>
-                {/* Category, Size, Type Selection */}
+              {/* Category, Size, Type Selection */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {/* Category */}
                 <div className="space-y-2">
@@ -726,9 +814,7 @@ useEffect(() => {
                       )}
                     </SelectContent>
                   </Select>
-              
-                                     <ProductCategoryModal/>
-
+                  <ProductCategoryModal/>
                 </div>
 
                 {/* Size */}
@@ -747,7 +833,7 @@ useEffect(() => {
                     }}
                     disabled={!categoryId}
                   >
-                    <SelectTrigger >
+                    <SelectTrigger>
                       <SelectValue placeholder={categoryId ? "Select size" : "Select category first"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -773,9 +859,7 @@ useEffect(() => {
                       )}
                     </SelectContent>
                   </Select>
-               
-                        <SizeModal/>
-
+                  <SizeModal/>
                 </div>
 
                 {/* Type */}
@@ -794,7 +878,7 @@ useEffect(() => {
                     }}
                     disabled={!sizeId}
                   >
-                    <SelectTrigger >
+                    <SelectTrigger>
                       <SelectValue placeholder={sizeId ? "Select type" : "Select size first"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -824,9 +908,7 @@ useEffect(() => {
                       )}
                     </SelectContent>
                   </Select>
-               
-                        <ProductTypeModal/>
-
+                  <ProductTypeModal/>
                 </div>
               </div>
     
@@ -843,7 +925,6 @@ useEffect(() => {
                     onBlur={() => handleBlur('name')}
                     className={errors.name && touched.name ? 'border-red-500' : ''}
                   />
-                 
                 </div>
 
                 {/* Price */}
@@ -858,7 +939,6 @@ useEffect(() => {
                     onBlur={() => handleBlur('price')}
                     className={errors.price && touched.price ? 'border-red-500' : ''}
                   />
-                
                   <p className="text-xs text-gray-500">
                     Leave empty to set price as 0
                   </p>
@@ -890,56 +970,123 @@ useEffect(() => {
                 </div>
               </div>
 
-            
-
-              {/* Product Image */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Product Image</label>
+              {/* Product Images Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                  Product Images
+                </h3>
                 
-                {safeImageSrc && (
-                  <div className="relative inline-block">
-                    <div className="relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-lg border">
-                      <Image
-                        src={safeImageSrc}
-                        alt="Product preview"
-                        fill
-                        className="object-cover"
-                        onError={() => {
-                          console.error('Failed to load image:', safeImageSrc);
-                          toast.error('Failed to load image');
-                        }}
-                      />
+                {/* Main Image */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Main Image</label>
+                  
+                  {safeMainImageSrc && (
+                    <div className="relative inline-block">
+                      <div className="relative h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-lg border">
+                        <Image
+                          src={safeMainImageSrc}
+                          alt="Main product image"
+                          fill
+                          className="object-cover"
+                          onError={() => {
+                            console.error('Failed to load image:', safeMainImageSrc);
+                            toast.error('Failed to load image');
+                          }}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -right-2 -top-2 h-5 w-5 sm:h-6 sm:w-6"
+                        onClick={handleRemoveMainImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -right-2 -top-2 h-5 w-5 sm:h-6 sm:w-6"
-                      onClick={handleRemoveImage}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
+                  )}
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <div>
                     <input
                       type="file"
-                      id="image-upload"
+                      id="main-image-upload"
                       accept="image/jpeg,image/png,image/webp,image/gif"
-                      onChange={handleImageUpload}
+                      onChange={handleMainImageUpload}
                       className="hidden"
                     />
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => document.getElementById('image-upload')?.click()}
+                      onClick={() => document.getElementById('main-image-upload')?.click()}
                       className="w-full sm:w-auto"
                     >
                       <Upload className="mr-2 h-4 w-4" />
-                      Upload Image
+                      {safeMainImageSrc ? 'Change Main Image' : 'Upload Main Image'}
                     </Button>
+                  </div>
+                </div>
+
+                {/* Additional Images */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Additional Images</label>
+                  
+                  {/* Image grid */}
+                  {additionalImages.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {additionalImages.map((image, index) => (
+                        <div key={image.isExisting ? image.id : index} className="relative">
+                          <div className="relative h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-lg border">
+                            <Image
+                              src={image.url}
+                              alt={`Additional image ${index + 1}`}
+                              fill
+                              className="object-cover"
+                              onError={() => {
+                                console.error('Failed to load additional image:', image.url);
+                              }}
+                            />
+                            {image.isExisting && (
+                              <div className="absolute top-0 right-0 bg-green-500 text-white text-xs px-1 rounded-bl">
+                                saved
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute -right-2 -top-2 h-5 w-5 sm:h-6 sm:w-6"
+                            onClick={() => handleRemoveAdditionalImage(index)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div>
+                    <input
+                      type="file"
+                      ref={imageInputRef}
+                      id="additional-images-upload"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={handleAdditionalImagesUpload}
+                      multiple
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('additional-images-upload')?.click()}
+                      className="w-full sm:w-auto"
+                    >
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      Add Additional Images
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-1">
+                      You can upload multiple images at once
+                    </p>
                   </div>
                 </div>
               </div>

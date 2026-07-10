@@ -47,11 +47,11 @@ export default async function PurchasePage(props: pageProps) {
             >
               Finished Purchase stage
             </Link>  
+              
                                   </PermissionGuard>
    
         </div>
         <Separator />
-                <StageAllocationCalendar stage="PURCHASING" />
 
         <UserTableAction />
 

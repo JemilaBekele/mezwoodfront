@@ -47,13 +47,18 @@ export default async function PurchasePage(props: pageProps) {
               className={cn(buttonVariants(), 'text-xs md:text-sm')}
             >
               Finished Metal Work Projects
-            </Link>                      </PermissionGuard>
+            </Link>                   
+                <Link
+              href={`/dashboard/Stage/stageallocation?stage=METAL_WORKS`}
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+Calendar            </Link> 
+               </PermissionGuard>
 
 
         </div>
         
         <Separator />
-                <StageAllocationCalendar stage="METAL_WORKS" />
 
         <UserTableAction />
 

@@ -16,6 +16,7 @@ export default function MetalworkProjectListingPage() {
       try {
         setLoading(true);
         const result = await getMetalWorkProjects({ status: 'not-finished' });
+        console.log('Fetched metalwork projects:', result.projects); // Log the fetched projects
         setProjects(result.projects);
         setError(null);
       } catch (err) {
@@ -52,7 +53,7 @@ export default function MetalworkProjectListingPage() {
     <StageProjectListing
       projects={projects}
       projectColumns={projectColumns}
-      stageName="Metalwork"
+      stageName="Metal Works"  // Changed from "Metalwork" to "Metal Works"
       emptyStateMessages={{
         today: 'No metalwork projects due today',
         tomorrow: 'No metalwork projects due tomorrow',

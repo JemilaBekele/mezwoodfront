@@ -72,7 +72,6 @@ const calculateStageProgress = (stage: any) => {
 const ProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [project, setProject] = useState<IProject | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isUpdateStageModalOpen, setIsUpdateStageModalOpen] = useState(false);
   const [history, setHistory] = useState<IScheduleHistory[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [modeBusy, setModeBusy] = useState(false);
@@ -1079,19 +1078,21 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30">
-                              <TableHead className="font-semibold">Description</TableHead>
+                                                          <TableHead className="font-semibold">Item</TableHead>
+
                               <TableHead className="font-semibold text-right">Qty</TableHead>
                               <TableHead className="font-semibold text-right">Unit Price</TableHead>
                               <TableHead className="font-semibold text-right">Amount</TableHead>
+
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {project.invoice.items.slice(0, 5).map((item, index) => (
                               <TableRow key={index} className="hover:bg-muted/20">
-                                <TableCell className="max-w-xs truncate text-sm">{item.description}</TableCell>
-                                <TableCell className="text-right tabular-nums text-sm">{item.quantity}</TableCell>
-                                <TableCell className="text-right tabular-nums text-sm">{formatCurrency(item.unitPrice)}</TableCell>
-                                <TableCell className="text-right tabular-nums text-sm font-medium">{formatCurrency(item.amount)}</TableCell>
+                               <TableCell className="">{item.item?.name}</TableCell>
+                               <TableCell className="text-right tabular-nums text-sm">{item.quantity}</TableCell>
+                               <TableCell className="text-right tabular-nums text-sm">{formatCurrency(item.unitPrice)}</TableCell>
+                               <TableCell className="text-right tabular-nums text-sm font-medium">{formatCurrency(item.amount)}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

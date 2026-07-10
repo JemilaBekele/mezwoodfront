@@ -1,13 +1,18 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/error-boundaries */
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { DataTable } from '@/components/ui/table/newdatatable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import {
-  AlertCircle,
-  Check,
+  Calendar,
+  CalendarDays,
+  CalendarClock,
   Layers,
+  Check,
   X,
   FolderOpen,
   Gauge,
@@ -22,20 +27,21 @@ import {
   CheckCircle,
   Signal,
   BarChart3,
-  LayoutGrid,
-  HardDrive,
-  TrendingUp,
-} from "lucide-react";
-import { DataTable } from "@/components/ui/table/newdatatable";
-import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
-import { useTableQueryParams } from "@/hooks/use-table-query-params";
-import { getProjects } from "@/service/Project";
-import { projectColumns } from "./tables/columns";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { IProject, ProjectStatus, DesignStatus, DifficultyLevel } from "@/models/Projects";
+  AlertCircle,
+} from 'lucide-react';
+import { IProject, ProjectStatus, DesignStatus, DifficultyLevel } from '@/models/Projects';
+import { useMemo, useCallback, useState } from 'react';
 
-type ProjectListingPageProps = object;
+interface StageProjectListingProps {
+  projects: IProject[];
+  projectColumns: any;
+  stageName: string;
+  emptyStateMessages?: {
+    today?: string;
+    tomorrow?: string;
+    other?: string;
+  };
+}
 
 // ─── Compact Status Pill ────────────────────────────────────────
 function StatusPill({
@@ -122,85 +128,54 @@ const DIFFICULTY_CONFIG: Record<DifficultyLevel, { label: string; icon: React.Co
   HARD: { label: "Hard", icon: Signal, color: "red" },
 };
 
-// ─── Tab Config ──────────────────────────────────────────────────
-const TAB_CONFIG = {
-  status: {
-    label: "Project Status",
-    icon: FolderOpen,
-    filter: "status",
-    config: PROJECT_STATUS_CONFIG,
-    getDisplayText: (value: string) => 
-      PROJECT_STATUS_CONFIG[value as ProjectStatus]?.label || value || "Unknown",
-  },
-  design: {
-    label: "Design Status",
-    icon: PenTool,
-    filter: "designStatus",
-    config: DESIGN_STATUS_CONFIG,
-    getDisplayText: (value: string) => 
-      DESIGN_STATUS_CONFIG[value as DesignStatus]?.label || value || "None",
-  },
-  difficulty: {
-    label: "Difficulty",
-    icon: BarChart3,
-    filter: "difficulty",
-    config: DIFFICULTY_CONFIG,
-    getDisplayText: (value: string) => 
-      DIFFICULTY_CONFIG[value as DifficultyLevel]?.label || value || "None",
-  },
-} as const;
+// ─── Helper Functions ──────────────────────────────────────────
+function isToday(date: Date): boolean {
+  const today = new Date();
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
+}
 
-// ─── Main Listing ───────────────────────────────────────────────
-export default function ProjectListingPage({}: ProjectListingPageProps) {
-  const { page, search, limit } = useTableQueryParams();
+function isTomorrow(date: Date): boolean {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return (
+    date.getDate() === tomorrow.getDate() &&
+    date.getMonth() === tomorrow.getMonth() &&
+    date.getFullYear() === tomorrow.getFullYear()
+  );
+}
+
+function sortByDeliveryDate(projects: IProject[]): IProject[] {
+  return [...projects].sort((a, b) => {
+    const dateA = a.calculatedDelivery ? new Date(a.calculatedDelivery).getTime() : Infinity;
+    const dateB = b.calculatedDelivery ? new Date(b.calculatedDelivery).getTime() : Infinity;
+    return dateA - dateB;
+  });
+}
+
+// ─── Main Component ─────────────────────────────────────────────
+export function StageProjectListing({
+  projects,
+  projectColumns,
+  stageName,
+  emptyStateMessages = {
+    today: 'No projects due today',
+    tomorrow: 'No projects due tomorrow',
+    other: 'No other projects found'
+  }
+}: StageProjectListingProps) {
   const searchParams = useSearchParams();
-  const statusFilter = searchParams.get("status") || "all";
-  const designStatusFilter = searchParams.get("designStatus") || "all";
-  const difficultyFilter = searchParams.get("difficulty") || "all";
+  const page = Number(searchParams.get('page') || 1);
+  const search = searchParams.get('q') || '';
+  const limit = Number(searchParams.get('limit') || 10);
+  const statusFilter = searchParams.get('status') || 'all';
+  const designStatusFilter = searchParams.get('designStatus') || 'all';
+  const difficultyFilter = searchParams.get('difficulty') || 'all';
 
-  const [projects, setProjects] = useState<IProject[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"status" | "design" | "difficulty">("status");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadProjects = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await getProjects({
-          page,
-          limit,
-          search,
-        });
-
-        if (cancelled) return;
-
-        setProjects(response.projects || []);
-        setTotalCount(response.totalCount || 0);
-      } catch (err) {
-        console.error("Error loading projects:", err);
-
-        if (!cancelled) {
-          setError("Error loading projects. Please try again later.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadProjects();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [page, limit, search]);
 
   // ── Helpers ──────────────────────────────────────────────────
   const getStatusDisplayText = useCallback((status: string): string => {
@@ -217,16 +192,14 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
 
   const buildQueryStringLocal = useCallback(
     (params: { status?: string; designStatus?: string; difficulty?: string; page?: string }) => {
-      const urlParams = new URLSearchParams();
-      if (search) urlParams.set("q", search);
-      urlParams.set("page", params.page || "1");
-      urlParams.set("limit", limit.toString());
-      urlParams.set("status", params.status || statusFilter);
-      urlParams.set("designStatus", params.designStatus || designStatusFilter);
-      urlParams.set("difficulty", params.difficulty || difficultyFilter);
+      const urlParams = new URLSearchParams(searchParams.toString());
+      if (params.status !== undefined) urlParams.set('status', params.status);
+      if (params.designStatus !== undefined) urlParams.set('designStatus', params.designStatus);
+      if (params.difficulty !== undefined) urlParams.set('difficulty', params.difficulty);
+      if (params.page) urlParams.set('page', params.page);
       return `?${urlParams.toString()}`;
     },
-    [search, limit, statusFilter, designStatusFilter, difficultyFilter]
+    [searchParams]
   );
 
   const buildFilterUrl = useCallback(
@@ -238,83 +211,96 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     [buildQueryStringLocal]
   );
 
-  // ── Loading & Error ──────────────────────────────────────────
-  if (loading) {
-    return <DataTableSkeleton columnCount={8} rowCount={8} filterCount={3} />;
-  }
+  // ── Filter Projects ──────────────────────────────────────────
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) => {
+      // Search filter
+      if (search) {
+        const s = search.toLowerCase();
+        const match =
+          project.invoice?.piNumber?.toLowerCase().includes(s) ||
+          project.customer?.name?.toLowerCase().includes(s) ||
+          getStatusDisplayText(project.status).toLowerCase().includes(s) ||
+          getDesignStatusDisplayText(project.designStatus || '').toLowerCase().includes(s) ||
+          getDifficultyDisplayText(project.difficulty).toLowerCase().includes(s);
+        if (!match) return false;
+      }
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/40 dark:bg-red-950/20">
-        <AlertCircle className="h-4 w-4 text-red-500" />
-        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-      </div>
+      // Status filter
+      if (statusFilter !== "all" && project.status !== statusFilter) return false;
+
+      // Design status filter
+      if (designStatusFilter !== "all" && project.designStatus !== designStatusFilter) return false;
+
+      // Difficulty filter
+      if (difficultyFilter !== "all" && project.difficulty !== difficultyFilter) return false;
+
+      return true;
+    });
+  }, [projects, search, statusFilter, designStatusFilter, difficultyFilter, getStatusDisplayText, getDesignStatusDisplayText, getDifficultyDisplayText]);
+
+  // ── Categorize by Delivery Date ─────────────────────────────
+  const { todayProjects, tomorrowProjects, otherProjects } = useMemo(() => {
+    const todayProjects = sortByDeliveryDate(
+      filteredProjects.filter((project) => project.calculatedDelivery && isToday(new Date(project.calculatedDelivery)))
     );
-  }
 
-  // ── Data ─────────────────────────────────────────────────────
-  const filteredData = projects.filter((project) => {
-    // Search filter
-    if (search) {
-      const s = search.toLowerCase();
-      const match =
-        project.invoice?.piNumber?.toLowerCase().includes(s) ||
-        project.customer?.name?.toLowerCase().includes(s) ||
-        getStatusDisplayText(project.status).toLowerCase().includes(s) ||
-        getDesignStatusDisplayText(project.designStatus || '').toLowerCase().includes(s) ||
-        getDifficultyDisplayText(project.difficulty).toLowerCase().includes(s);
-      if (!match) return false;
-    }
+    const tomorrowProjects = sortByDeliveryDate(
+      filteredProjects.filter((project) => project.calculatedDelivery && isTomorrow(new Date(project.calculatedDelivery)))
+    );
 
-    // Status filter
-    if (statusFilter !== "all" && project.status !== statusFilter) return false;
+    const otherProjects = sortByDeliveryDate(
+      filteredProjects.filter((project) => {
+        if (!project.calculatedDelivery) return true;
+        const deliveryDate = new Date(project.calculatedDelivery);
+        return !isToday(deliveryDate) && !isTomorrow(deliveryDate);
+      })
+    );
 
-    // Design status filter
-    if (designStatusFilter !== "all" && project.designStatus !== designStatusFilter) return false;
+    return { todayProjects, tomorrowProjects, otherProjects };
+  }, [filteredProjects]);
 
-    // Difficulty filter
-    if (difficultyFilter !== "all" && project.difficulty !== difficultyFilter) return false;
+  // ── Counts for Filters ──────────────────────────────────────
+  const statusCounts = useMemo(() => {
+    return Object.keys(PROJECT_STATUS_CONFIG).reduce(
+      (acc, statusKey) => {
+        acc[statusKey as ProjectStatus] = filteredProjects.filter(
+          (p) => p.status === statusKey
+        ).length;
+        return acc;
+      },
+      {} as Record<ProjectStatus, number>
+    );
+  }, [filteredProjects]);
 
-    return true;
-  });
+  const designStatusCounts = useMemo(() => {
+    return Object.keys(DESIGN_STATUS_CONFIG).reduce(
+      (acc, statusKey) => {
+        acc[statusKey as DesignStatus] = filteredProjects.filter(
+          (p) => p.designStatus === statusKey
+        ).length;
+        return acc;
+      },
+      {} as Record<DesignStatus, number>
+    );
+  }, [filteredProjects]);
 
-  // ── Counts ──────────────────────────────────────────────────
-  const statusCounts = Object.keys(PROJECT_STATUS_CONFIG).reduce(
-    (acc, statusKey) => {
-      acc[statusKey as ProjectStatus] = projects.filter(
-        (p) => p.status === statusKey
-      ).length;
-      return acc;
-    },
-    {} as Record<ProjectStatus, number>
-  );
+  const difficultyCounts = useMemo(() => {
+    return Object.keys(DIFFICULTY_CONFIG).reduce(
+      (acc, levelKey) => {
+        acc[levelKey as DifficultyLevel] = filteredProjects.filter(
+          (p) => p.difficulty === levelKey
+        ).length;
+        return acc;
+      },
+      {} as Record<DifficultyLevel, number>
+    );
+  }, [filteredProjects]);
 
-  const designStatusCounts = Object.keys(DESIGN_STATUS_CONFIG).reduce(
-    (acc, statusKey) => {
-      acc[statusKey as DesignStatus] = projects.filter(
-        (p) => p.designStatus === statusKey
-      ).length;
-      return acc;
-    },
-    {} as Record<DesignStatus, number>
-  );
-
-  const difficultyCounts = Object.keys(DIFFICULTY_CONFIG).reduce(
-    (acc, levelKey) => {
-      acc[levelKey as DifficultyLevel] = projects.filter(
-        (p) => p.difficulty === levelKey
-      ).length;
-      return acc;
-    },
-    {} as Record<DifficultyLevel, number>
-  );
-
-  const total = projects.length;
-  const filteredCount = filteredData.length;
-  const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
+  const total = filteredProjects.length;
   const hasFilter = statusFilter !== "all" || designStatusFilter !== "all" || difficultyFilter !== "all";
 
-  // ── Get counts for tab badges ──────────────────────────────
+  // ── Get tab badge ───────────────────────────────────────────
   const getTabBadge = (tabKey: "status" | "design" | "difficulty") => {
     const filterValue = {
       status: statusFilter,
@@ -333,10 +319,58 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     return "";
   };
 
+  // ── Render Table ─────────────────────────────────────────────
+  const renderProjectTable = (projectsList: IProject[], totalItems: number) => {
+    const startIndex = (page - 1) * limit;
+    const paginatedData = projectsList.slice(startIndex, startIndex + limit);
+
+    return (
+      <DataTable
+        data={paginatedData}
+        totalItems={totalItems}
+        columns={projectColumns}
+        currentPage={page}
+        itemsPerPage={limit}
+        searchValue={search}
+        statusFilter={statusFilter}
+        designStatusFilter={designStatusFilter}
+        difficultyFilter={difficultyFilter}
+      />
+    );
+  };
+
   // ── Render ───────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
-      {/* ── Tabs ───────────────────────────────────────────────── */}
+    <div className="space-y-6">
+      {/* ── Stats Cards ────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-blue-500" />
+            <h3 className="font-medium">Today&apos;s Work</h3>
+          </div>
+          <p className="mt-2 text-2xl font-bold">{todayProjects.length}</p>
+          <p className="text-xs text-muted-foreground">Due for delivery today</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-orange-500" />
+            <h3 className="font-medium">Tomorrow&apos;s Work</h3>
+          </div>
+          <p className="mt-2 text-2xl font-bold">{tomorrowProjects.length}</p>
+          <p className="text-xs text-muted-foreground">Due for delivery tomorrow</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-purple-500" />
+            <h3 className="font-medium">Other Projects</h3>
+          </div>
+          <p className="mt-2 text-2xl font-bold">{otherProjects.length}</p>
+          <p className="text-xs text-muted-foreground">Due later</p>
+        </div>
+      </div>
+
+      {/* ── Filter Tabs ────────────────────────────────────────── */}
       <Tabs 
         defaultValue="status" 
         value={activeTab} 
@@ -458,7 +492,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">
-              ({filteredCount} results)
+              ({total} results)
             </span>
           </div>
           <Link
@@ -471,38 +505,47 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
         </div>
       )}
 
-      {/* ── Empty States ──────────────────────────────────────── */}
-      {filteredData.length === 0 && !search && !hasFilter ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
-            <FolderOpen className="h-8 w-8 text-muted-foreground/60" />
-          </div>
-          <h3 className="mt-4 text-lg font-semibold">No projects yet</h3>
-          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Projects will appear here once created from approved proforma invoices.
-          </p>
-        </div>
-      ) : filteredData.length === 0 && (search || hasFilter) ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-          <AlertCircle className="h-8 w-8 text-muted-foreground/40" />
-          <p className="mt-3 text-sm font-medium">No matching projects</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Try adjusting your filters to see more results.
-          </p>
-        </div>
-      ) : (
-        <DataTable
-          data={paginatedData}
-          totalItems={filteredCount}
-          columns={projectColumns}
-          currentPage={page}
-          itemsPerPage={limit}
-          searchValue={search}
-          statusFilter={statusFilter}
-          designStatusFilter={designStatusFilter}
-          difficultyFilter={difficultyFilter}
-        />
-      )}
+      {/* ── Delivery Date Tabs ───────────────────────────────── */}
+      <Tabs defaultValue={todayProjects.length > 0 ? 'today' : tomorrowProjects.length > 0 ? 'tomorrow' : 'other'} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="today">Today ({todayProjects.length})</TabsTrigger>
+          <TabsTrigger value="tomorrow">Tomorrow ({tomorrowProjects.length})</TabsTrigger>
+          <TabsTrigger value="other">Other ({otherProjects.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="today" className="space-y-4">
+          {todayProjects.length === 0 ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed">
+              <Calendar className="mb-2 h-8 w-8 text-muted-foreground" />
+              <p className="text-muted-foreground">{emptyStateMessages.today}</p>
+            </div>
+          ) : (
+            renderProjectTable(todayProjects, todayProjects.length)
+          )}
+        </TabsContent>
+
+        <TabsContent value="tomorrow" className="space-y-4">
+          {tomorrowProjects.length === 0 ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed">
+              <CalendarDays className="mb-2 h-8 w-8 text-muted-foreground" />
+              <p className="text-muted-foreground">{emptyStateMessages.tomorrow}</p>
+            </div>
+          ) : (
+            renderProjectTable(tomorrowProjects, tomorrowProjects.length)
+          )}
+        </TabsContent>
+
+        <TabsContent value="other" className="space-y-4">
+          {otherProjects.length === 0 ? (
+            <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed">
+              <CalendarClock className="mb-2 h-8 w-8 text-muted-foreground" />
+              <p className="text-muted-foreground">{emptyStateMessages.other}</p>
+            </div>
+          ) : (
+            renderProjectTable(otherProjects, otherProjects.length)
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

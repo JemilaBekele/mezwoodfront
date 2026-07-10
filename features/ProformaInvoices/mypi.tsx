@@ -1,3 +1,4 @@
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -24,7 +25,7 @@ import {
 } from "lucide-react";
 import { DataTable } from "@/components/ui/table/newdatatable";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
-import { getAllProformaInvoices } from "@/service/ProformaInvoice";
+import {  getAllProformaInvoicesmy } from "@/service/ProformaInvoice";
 import { proformaInvoiceColumns } from "./tables/columns";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +90,7 @@ function StatusRowHeader({ title, icon: Icon }: { title: string; icon: React.Com
 }
 
 // ─── Main Listing ───────────────────────────────────────────────
-export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPageProps) {
+export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingPageProps) {
   const { page, search, limit, startDate, endDate } = useTableQueryParams();
   const searchParams = useSearchParams();
   const paymentStatusFilter = searchParams.get("paymentStatus") || "all";
@@ -106,7 +107,7 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
         setLoading(true);
         setError(null);
 
-        const { proformaInvoices } = await getAllProformaInvoices({
+        const { proformaInvoices } = await getAllProformaInvoicesmy({
           page,
           limit,
           search,

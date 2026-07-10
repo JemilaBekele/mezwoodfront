@@ -295,7 +295,7 @@ const StageAllocationCalendar: React.FC<{ stage: string; title?: string }> = ({ 
                   key={cell.key}
                   onClick={() => r && setSelectedKey(isSel ? null : cell.key)}
                   className={[
-                    "flex min-h-[64px] flex-col rounded-lg border p-1.5 text-left transition",
+                    "flex min-h-16 flex-col rounded-lg border p-1.5 text-left transition",
                     cell.inMonth ? "" : "opacity-40",
                     isSunday ? "bg-muted/40" : "",
                     isToday ? "ring-2 ring-primary/50" : "",

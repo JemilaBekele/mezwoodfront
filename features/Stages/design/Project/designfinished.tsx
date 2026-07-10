@@ -34,14 +34,14 @@ import {
   Box,
   Download,
   Image as ImageIcon,
-  Plus,
   History,
   FileWarning,
+  CheckCircle,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog } from '@/models/Projects';
-import { getProjectId } from '@/service/Project';
+import { getProjectId, updateProjectDesignStatus } from '@/service/Project';
 import { Separator } from '@/components/ui/separator';
-import { IProformaInvoice, IProformaInvoiceItem, IProformaInvoiceItemImage, IProformaItemMaterial, IProformaInvoiceBank } from '@/models/ProformaInvoice';
+import { IProformaInvoice, } from '@/models/ProformaInvoice';
 import { getProformaInvoiceById } from '@/service/ProformaInvoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -65,12 +65,10 @@ export const normalizeImagePath = (path?: string) => {
   if (normalizedPath.startsWith('http')) {
     return normalizedPath;
   }
-  // Remove any leading slashes to prevent double slashes in URL
   const cleanPath = normalizedPath.replace(/^\/+/, '');
   return `${BACKEND_URL}/${cleanPath}`;
 };
 
-// Define the variant type to match your Badge component
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 
 type ProjectDetailProps = {
@@ -81,6 +79,8 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [project, setProject] = useState<IProject | null>(null);
   const [proformaInvoice, setProformaInvoice] = useState<IProformaInvoice | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updatingDesign, setUpdatingDesign] = useState(false);
+  const [autoFinishTriggered, setAutoFinishTriggered] = useState(false);
   const router = useRouter();
 
   // Filter stages to only show DESIGN stage
@@ -89,7 +89,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     return stages.filter(stage => stage.stage === ProjectStatus.DESIGN);
   };
 
-  // Get design status configuration - NOW INCLUDING INITIATED
+  // Get design status configuration
   const getDesignStatusConfig = (status?: DesignStatus) => {
     const config: Record<DesignStatus, { 
       label: string; 
@@ -150,16 +150,13 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
       if (id) {
         const projectData = await getProjectId(id);
         setProject(projectData);
-        console.log('Fetched project data:', projectData);
 
-        // Fetch proforma invoice if available
         if (projectData.invoice?.id) {
           try {
             const invoice = await getProformaInvoiceById(projectData.invoice.id);
             setProformaInvoice(invoice);
           } catch (error) {
             console.error('Error fetching proforma invoice:', error);
-            // Don't show error to user, just log it
           }
         }
       }
@@ -171,12 +168,103 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     }
   }, [id]);
 
-  // Fetch project data on mount and when id changes
   useEffect(() => {
     fetchProjectData();
   }, [fetchProjectData]);
 
-  // Status badge configuration - simplified for design team
+  /* =========================
+      UPDATE DESIGN STATUS
+  ========================= */
+  const handleDesignUpdate = async (stage: DesignStatus) => {
+    if (!project) return;
+
+    const confirmChange = window.confirm(
+      `Are you sure you want to change design status to "${stage.replace('_', ' ')}"?`
+    );
+
+    if (!confirmChange) return;
+
+    try {
+      setUpdatingDesign(true);
+      await updateProjectDesignStatus(project.id, stage);
+      await fetchProjectData();
+      toast.success(`Design status updated to ${stage.replace('_', ' ')} successfully`);
+    } catch (error: any) {
+      console.error(error.message);
+      toast.error(error.message || 'Failed to update design status');
+    } finally {
+      setUpdatingDesign(false);
+    }
+  };
+
+  // Auto-finish design when work units mismatch
+  useEffect(() => {
+    const shouldAutoFinishDesign = () => {
+      if (!project) return false;
+      
+      // Don't auto-finish if already triggered
+      if (autoFinishTriggered) {
+        console.log('Auto-finish already triggered, skipping');
+        return false;
+      }
+
+      const designStages = getDesignStages(project.stages);
+      if (designStages.length === 0) {
+        console.log('No design stages found');
+        return false;
+      }
+
+      // Check if any design stage has work units != actual work units
+      // This is the primary validation - regardless of design status
+      const hasMismatch = designStages.some(stage => 
+        stage.workUnits !== undefined && 
+        stage.actualWorkUnits !== undefined && 
+        stage.workUnits !== stage.actualWorkUnits &&
+        stage.actualWorkUnits !== null &&
+        stage.actualWorkUnits > 0 // Only auto-finish if actual work units are set
+      );
+
+      console.log('Work unit mismatch check:', { 
+        hasMismatch, 
+        designStages,
+        designStatus: project.designStatus 
+      });
+      
+      return hasMismatch;
+    };
+
+    if (project && !loading && !updatingDesign && !autoFinishTriggered) {
+      const shouldAutoFinish = shouldAutoFinishDesign();
+      console.log('Auto-finish check:', { 
+        shouldAutoFinish, 
+        designStatus: project.designStatus,
+        autoFinishTriggered 
+      });
+      
+      if (shouldAutoFinish) {
+        setAutoFinishTriggered(true);
+        
+        const autoFinish = async () => {
+          try {
+            setUpdatingDesign(true);
+            console.log('Auto-finishing design due to work unit mismatch...');
+            await updateProjectDesignStatus(project.id, DesignStatus.FINISHED);
+            await fetchProjectData();
+        
+            setAutoFinishTriggered(false);
+          } catch (error: any) {
+            setAutoFinishTriggered(false);
+           
+          } finally {
+            setUpdatingDesign(false);
+          }
+        };
+        autoFinish();
+      }
+    }
+  }, [project, loading, autoFinishTriggered, updatingDesign, fetchProjectData]);
+
+  // Status badge configuration
   const getStatusConfig = (status: ProjectStatus) => {
     const config: Record<ProjectStatus, { 
       label: string; 
@@ -290,11 +378,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     return config[difficulty];
   };
 
-  // Calculate total materials for an item
-  const getItemMaterialsTotal = (item: IProformaInvoiceItem) => {
-    if (!item.materials || item.materials.length === 0) return 0;
-    return item.materials.reduce((total, material) => total + material.quantity, 0);
-  };
+
 
   // Group project logs by date
   const getGroupedLogs = (logs?: IProjectLog[]) => {
@@ -316,10 +400,12 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const groupedLogs = getGroupedLogs(project?.projectLogs);
   const hasLogs = project?.projectLogs && project.projectLogs.length > 0;
   
-  // Get project status config for design stage
   const projectStatusConfig = project ? getStatusConfig(project.status) : null;
   const difficultyConfig = project ? getDifficultyConfig(project.difficulty) : null;
   const designStatusConfig = project?.designStatus ? getDesignStatusConfig(project.designStatus) : null;
+
+
+
 
   // Loading state
   if (loading) {
@@ -403,32 +489,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {designStatusConfig ? (
-                <>
-                  <Badge variant={designStatusConfig.variant} className="px-3 py-1 text-sm">
-                    {designStatusConfig.label}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {designStatusConfig.description}
-                  </p>
-                  {project.designFinished && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Finished: {formatDate(project.designFinished)}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Badge variant="secondary" className="px-3 py-1 text-sm">
-                    Not Started
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Design work has not begun yet
-                  </p>
-                </>
-              )}
-            </div>
+        
           </CardContent>
         </Card>
       </div>
@@ -450,6 +511,9 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   const stageConfig = getStatusConfig(stage.stage);
                   const isActive = stage.status === 'ACTIVE' || stage.status === 'IN_PROGRESS';
                   const isCompleted = stage.status === 'COMPLETED';
+                  const hasMismatch = stage.workUnits !== undefined && 
+                                      stage.actualWorkUnits !== undefined && 
+                                      stage.workUnits !== stage.actualWorkUnits;
                   
                   return (
                     <div key={stage.id} className="space-y-6">
@@ -460,7 +524,11 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                             isCompleted ? 'bg-green-100' : 
                             isActive ? 'bg-blue-100' : 'bg-gray-100'
                           }`}>
-                            {stageConfig && <stageConfig.icon className={`h-6 w-6 ${stageConfig.color}`} />}
+                            {isCompleted ? (
+                              <CheckCircle className="h-6 w-6 text-green-600" />
+                            ) : (
+                              stageConfig && <stageConfig.icon className={`h-6 w-6 ${stageConfig.color}`} />
+                            )}
                           </div>
                           <div>
                             <h3 className="text-lg font-semibold">{stageConfig?.label || 'Design'}</h3>
@@ -468,13 +536,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                           </div>
                         </div>
                         <Badge
-                          variant={
-                            isCompleted
-                              ? 'default'
-                              : isActive
-                              ? 'outline'
-                              : 'secondary'
-                          }
+                          variant={isCompleted ? 'default' : isActive ? 'outline' : 'secondary'}
                           className={`px-3 py-1 ${
                             isCompleted ? 'bg-green-500' : 
                             isActive ? 'border-blue-500 text-blue-700' : ''
@@ -484,6 +546,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                            isActive ? 'In Progress' : 'Pending'}
                         </Badge>
                       </div>
+
 
                       {/* Stage Details Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -498,8 +561,24 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-sm">Work Units</span>
-                                <span className="font-semibold">{stage.workUnits || 0}</span>
+                                <span className={`font-semibold ${hasMismatch ? 'text-amber-600' : 'text-green-600'}`}>
+                                  {stage.workUnits || 0}
+                                </span>
                               </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm">Actual Units</span>
+                                <span className={`font-semibold ${hasMismatch ? 'text-amber-600' : 'text-green-600'}`}>
+                                  {stage.actualWorkUnits || 0}
+                                </span>
+                              </div>
+                              {hasMismatch && (
+                                <div className="flex justify-between items-center text-xs text-amber-600">
+                                  <span>Difference</span>
+                                  <span className="font-medium">
+                                    {Math.abs((stage.actualWorkUnits || 0) - (stage.workUnits || 0))} units
+                                  </span>
+                                </div>
+                              )}
                               <div className="flex justify-between items-center">
                                 <span className="text-sm">Scheduling</span>
                                 <Badge variant="outline" className="text-xs">
@@ -569,9 +648,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
           </CardContent>
         </Card>
 
-    
-
-        {/* Proforma Invoice Card - With Images */}
+        {/* Proforma Invoice Card */}
         {proformaInvoice && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -579,7 +656,6 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                 <FileText className="h-5 w-5" />
                 Proforma Invoice Information
               </CardTitle>
-              {/* Update Button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -591,7 +667,6 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">PI Number</p>
@@ -605,7 +680,6 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                 </div>
               </div>
 
-              {/* Tabs for organizing content */}
               <Tabs defaultValue="items" className="w-full">
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="items">Items</TabsTrigger>
@@ -614,66 +688,9 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   <TabsTrigger value="attachments">Attachments</TabsTrigger>
                 </TabsList>
 
-                {/* Items Tab */}
                 <TabsContent value="items" className="space-y-4 mt-4">
                   {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
                     <div className="space-y-4">
-                      {/* Mobile View */}
-                      <div className="space-y-4 md:hidden">
-                        {proformaInvoice.items.map((item) => (
-                          <div key={item.id} className="border rounded-lg p-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-semibold text-base">{item.description}</h4>
-                                {item.size && item.size !== "" && (
-                                  <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                                )}
-                                {item.additionalDescription && item.additionalDescription !== "" && (
-                                  <p className="text-sm text-muted-foreground mt-1">{item.additionalDescription}</p>
-                                )}
-                              </div>
-                              <Badge variant="outline">Qty: {item.quantity}</Badge>
-                            </div>
-
-                            {/* Item Images Preview */}
-                            {item.images && item.images.length > 0 && (
-                              <div className="mt-3">
-                                <p className="text-xs text-muted-foreground mb-2">Item Images:</p>
-                                <div className="flex gap-2 flex-wrap">
-                                  {item.images.slice(0, 3).map((img) => (
-                                    <div key={img.id} className="relative w-16 h-16 rounded-md overflow-hidden border">
-                                      <Image
-                                        src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                        alt="Item"
-                                        fill
-                                        className="object-cover"
-                                      />
-                                    </div>
-                                  ))}
-                                  {item.images.length > 3 && (
-                                    <div className="w-16 h-16 rounded-md bg-muted flex items-center justify-center">
-                                      <Plus className="h-4 w-4" />
-                                      <span className="text-xs">+{item.images.length - 3}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Materials Count */}
-                            {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">
-                                  {item.proformaItemMaterials.length} material(s) • {getItemMaterialsTotal(item)} total units
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Desktop View */}
                       <div className="hidden md:block">
                         <Table>
                           <TableHeader>
@@ -681,6 +698,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                               <TableHead>Description</TableHead>
                               <TableHead>Size</TableHead>
                               <TableHead>Quantity</TableHead>
+
                               <TableHead>Images</TableHead>
                               <TableHead>Materials</TableHead>
                             </TableRow>
@@ -746,13 +764,11 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   )}
                 </TabsContent>
 
-                {/* Materials Tab */}
                 <TabsContent value="materials" className="space-y-4 mt-4">
                   {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
                     <div className="space-y-4">
                       {proformaInvoice.items.map((item) => {
                         if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
-                        
                         return (
                           <div key={item.id} className="border rounded-lg overflow-hidden">
                             <div className="bg-muted/30 p-3 border-b">
@@ -769,7 +785,8 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                     <TableHead>Color</TableHead>
                                     <TableHead>Size</TableHead>
                                     <TableHead>Quantity</TableHead>
-                                    <TableHead>Additional Qty</TableHead>
+                                                                                                <TableHead>Additional Quantity</TableHead>
+
                                     <TableHead>Note</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -790,10 +807,11 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                       <TableCell>
                                         <Badge variant="outline">{material.quantity} units</Badge>
                                       </TableCell>
-                                      <TableCell>
-                                        <Badge variant="outline">{material?.additionalQuantity || 0} units</Badge>
+                                       <TableCell>
+                                        <Badge variant="outline">{material.additionalQuantity} units</Badge>
                                       </TableCell>
                                       <TableCell>
+
                                         {material.note && material.note !== "" ? (
                                           <p className="text-sm line-clamp-2">{material.note}</p>
                                         ) : (
@@ -817,13 +835,11 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   )}
                 </TabsContent>
 
-                {/* Images Tab - New Tab for Item Images */}
                 <TabsContent value="images" className="space-y-4 mt-4">
                   {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
                     <div className="space-y-6">
                       {proformaInvoice.items.map((item) => {
                         if (!item.images || item.images.length === 0) return null;
-                        
                         return (
                           <div key={item.id} className="border rounded-lg overflow-hidden">
                             <div className="bg-muted/30 p-3 border-b">
@@ -864,7 +880,6 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   )}
                 </TabsContent>
 
-                {/* Attachments Tab */}
                 <TabsContent value="attachments" className="space-y-4 mt-4">
                   {proformaInvoice.attachments && proformaInvoice.attachments.length > 0 ? (
                     <div className="grid grid-cols-1 gap-3">
@@ -924,7 +939,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
           </Card>
         )}
 
-        {/* Customer Information Card - Limited View */}
+        {/* Customer Information Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -952,7 +967,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
           </CardContent>
         </Card>
 
-        {/* Project Timeline Summary - Limited View */}
+        {/* Project Timeline Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1015,7 +1030,8 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             </div>
           </CardContent>
         </Card>
-            {/* Project Logs Card */}
+
+        {/* Project Logs Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1041,7 +1057,7 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                     <div className="space-y-3 pl-4">
                       {logs.map((log, index) => (
                         <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors">
-                          <div className="flex-shrink-0 mt-0.5">
+                          <div className="shrink-0 mt-0.5">
                             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
                               <FileWarning className="h-4 w-4 text-blue-600" />
                             </div>

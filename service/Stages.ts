@@ -377,7 +377,6 @@ export const getdesignProjects = async (params?: {
   sortOrder?: 'asc' | 'desc';
 }) => {
   try {
-    console.log("hiiiiiiiiiiiiiii")
     const response = await axiosInstance.get<MetalWorkProjectsResponse>(
       `stage/design-projects`,
       {

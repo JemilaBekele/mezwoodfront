@@ -1108,27 +1108,7 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
           </div>
         )}
 
-        {/* Hours Input (optional) */}
-        <div>
-          <Label htmlFor={`hours-${stage.id}`} className="text-sm font-medium">
-            Hours worked (Optional)
-          </Label>
-          <Input
-            id={`hours-${stage.id}`}
-            type="text"
-            inputMode="decimal"
-            placeholder="e.g. 4.5"
-            value={workLogFormData[stage.id]?.hours || ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === '' || /^\d*\.?\d*$/.test(v)) {
-                handleWorkLogInputChange(stage.id, 'hours', v);
-              }
-            }}
-            className="mt-1"
-            disabled={addingWorkLog === stage.id}
-          />
-        </div>
+      
 
         {/* Note Input */}
         <div>

@@ -52,7 +52,7 @@ export default function NotFinishingProjectListingPage() {
     <StageProjectListing
       projects={projects}
       projectColumns={projectColumns}
-      stageName="Not Finishing"
+      stageName="Finishing"
       emptyStateMessages={{
         today: 'No not finishing projects due today',
         tomorrow: 'No not finishing projects due tomorrow',

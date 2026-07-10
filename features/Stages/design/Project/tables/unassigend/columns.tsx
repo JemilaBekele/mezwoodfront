@@ -128,38 +128,7 @@ export const unassignedProjectColumns = (
     enableColumnFilter: true
   },
  
-    {
-    accessorKey: 'calculatedDelivery',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Calculated Delivery' />
-    ),
-    cell: ({ cell }) => {
-      const date = cell.getValue<Date | null>();
-      return (
-        <div className='flex items-center gap-1 text-sm text-muted-foreground'>
-          <CalendarDays className='h-4 w-4' />
-          {date ? new Date(date).toLocaleDateString() : '-'}
-        </div>
-      );
-    },
-    enableColumnFilter: false 
-  },
-  {
-  accessorKey: 'totalDays',
-  header: ({ column }) => (
-    <DataTableColumnHeader column={column} title="Total Days" />
-  ),
-  cell: ({ cell }) => {
-    const value = cell.getValue<number | null>();
 
-    return (
-      <div className="flex items-center gap-1 text-sm font-medium">
-        {value ?? 0}
-      </div>
-    );
-  },
-  enableColumnFilter: false,
-},
 
   {
     accessorKey: 'createdAt',

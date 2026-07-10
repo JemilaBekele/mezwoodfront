@@ -43,10 +43,15 @@ export default async function PurchasePage(props: pageProps) {
               className={cn(buttonVariants(), 'text-xs md:text-sm')}
             >
               Finished Design stage
-            </Link>  
+            </Link> 
+                <Link
+              href={`/dashboard/Stage/stageallocation?stage=DESIGN`}
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+Calendar            </Link>  
         </div>
         <Separator />
-                <StageAllocationCalendar stage="DESIGN" />
+      
 
         <UserTableAction />
 

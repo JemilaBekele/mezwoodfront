@@ -64,22 +64,7 @@ export const projectColumns: ColumnDef<IProject>[] = [
     },
     enableColumnFilter: true
   },
-  {
-    accessorKey: 'difficulty',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Difficulty' />
-    ),
-    cell: ({ cell }) => {
-      const difficulty = cell.getValue<DifficultyLevel>();
-      return (
-        <div className='flex items-center gap-2 capitalize'>
-          <Layers className='h-4 w-4 text-muted-foreground' />
-          {difficulty?.toLowerCase() || 'easy'}
-        </div>
-      );
-    },
-    enableColumnFilter: true
-  },
+
  
     {
     accessorKey: 'calculatedDelivery',
@@ -97,23 +82,6 @@ export const projectColumns: ColumnDef<IProject>[] = [
     },
     enableColumnFilter: false 
   },
-  {
-  accessorKey: 'totalDays',
-  header: ({ column }) => (
-    <DataTableColumnHeader column={column} title="Total Days" />
-  ),
-  cell: ({ cell }) => {
-    const value = cell.getValue<number | null>();
-
-    return (
-      <div className="flex items-center gap-1 text-sm font-medium">
-        {value ?? 0}
-      </div>
-    );
-  },
-  enableColumnFilter: false,
-},
-
   {
     accessorKey: 'createdAt',
     header: ({ column }) => (

@@ -26,7 +26,6 @@ import { getMaterials, getMaterialStockById } from '@/service/material';
 import { getItems } from '@/service/item';
 import { normalizeImagePath } from '@/lib/norm';
 import { Badge } from '@/components/ui/badge';
-import MaterialModal from '@/features/material/modal';
 
 interface ProformaInvoiceFormValues {
   customerId: string;
@@ -551,7 +550,7 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
     
     toast.success('Materials updated successfully');
     
-router.push(`/dashboard/Stage/Design/mydesign/finish`);
+router.back(); // Navigate back to the previous page
     router.refresh();
   } catch (error: any) {
     console.error('Error in onSubmit:', error);

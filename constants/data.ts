@@ -79,6 +79,13 @@ export const navItems: NavItem[] = [
         shortcut: ['ps', 'ps'],
         permission: 'VIEW_ALL_PROFORMA'
       },
+        {
+        title: 'MY Proforma Invoice',
+        url: '/dashboard/ProformaInvoice/my',
+        icon: 'fileText',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_PROFORMA'
+      },
       {
         title: 'Project',
         url: '/dashboard/Project',

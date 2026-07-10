@@ -510,7 +510,20 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     };
     return config[status];
   };
+const formatDescription = (text: string, limit = 80) => {
+  if (text.length <= limit) return text;
 
+  const firstLine = text.slice(0, limit);
+  const secondLine = text.slice(limit);
+
+  return (
+    <>
+      {firstLine}
+      <br />
+      {secondLine}
+    </>
+  );
+};
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -522,6 +535,9 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
   // Handle create project button click
   const handleCreateProject = () => {
     router.push(`/dashboard/ProformaInvoice/Project?id=${id}`);
+  };
+    const handleCreateDeliveryEstimation = () => {
+    router.push(`/dashboard/ProformaInvoice/deliveryestimation?piId=${id}`);
   };
 
   // Loading state
@@ -730,6 +746,17 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
               Create Project
             </Button>
           )}          </PermissionGuard>
+
+
+                <Button 
+              variant="default" 
+              size="sm"
+              onClick={handleCreateDeliveryEstimation}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Create Delivery Estimation
+            </Button>
 
         </div>
       </div>
@@ -1119,13 +1146,14 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                   <TableHeader>
                     <TableRow>
                       <TableHead className="min-w-50">Product</TableHead>
-                      <TableHead className="min-w-50">Description</TableHead>
                       <TableHead>Size</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Unit Price</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Materials</TableHead>
                       <TableHead className="min-w-37.5">Images</TableHead>
+                                            <TableHead className="min-w-50">Description</TableHead>
+
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1136,18 +1164,6 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                         <TableRow key={item.id || index}>
                                                   <TableCell>{item.item?.name || ''}</TableCell>
 
-                          <TableCell>
-                            <div className="space-y-1">
-                              <p className="font-medium">{item.description}</p>
-                              {item.additionalDescription && (
-                                <div className="text-xs text-muted-foreground">
-                                  <p className="line-clamp-1">
-                                    {item.additionalDescription}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
                           <TableCell>{item.size || 'N/A'}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{formatCurrency(item.unitPrice)}</TableCell>
@@ -1207,6 +1223,23 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                               </div>
                             )}
                           </TableCell>
+                          <TableCell className="max-w-65">
+  <div className="space-y-1">
+   <TableCell className="max-w-[300px]">
+  <p className="break-words">
+    {formatDescription(item.description)}
+  </p>
+</TableCell>
+
+    {item.additionalDescription && (
+      <div className="text-xs text-muted-foreground">
+  <p className="break-words">
+    {formatDescription(item.additionalDescription)}
+        </p>
+      </div>
+    )}
+  </div>
+</TableCell>
                         </TableRow>
                       );
                     })}
@@ -1283,7 +1316,7 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                           <CardTitle className="text-sm flex items-center justify-between">
                             <span className="flex items-center gap-2">
                               <Package className="h-4 w-4" />
-                              {item.description}
+                              {item.item?.name}
                               {item.size && (
                                 <Badge variant="outline" className="ml-2">
                                   Size: {item.size}

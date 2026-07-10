@@ -48,11 +48,16 @@ export default async function PurchasePage(props: pageProps) {
               className={cn(buttonVariants(), 'text-xs md:text-sm')}
             >
               Finished painting  Projects
-            </Link>                        </PermissionGuard>
+            </Link>     
+                <Link
+              href={`/dashboard/Stage/stageallocation?stage=PAINTING`}
+              className={cn(buttonVariants(), 'text-xs md:text-sm')}
+            >
+Calendar            </Link> 
+                               </PermissionGuard>
        
         </div>
         <Separator />
-                <StageAllocationCalendar stage="PAINTING" />
 
         <UserTableAction />
 

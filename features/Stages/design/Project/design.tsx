@@ -37,9 +37,12 @@ import {
   Plus,
   History,
   FileWarning,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog } from '@/models/Projects';
-import { getProjectId } from '@/service/Project';
+import { getProjectId, updateProjectDesignStatus } from '@/service/Project';
 import { Separator } from '@/components/ui/separator';
 import { IProformaInvoice, IProformaInvoiceItem, IProformaInvoiceItemImage, IProformaItemMaterial, IProformaInvoiceBank } from '@/models/ProformaInvoice';
 import { getProformaInvoiceById } from '@/service/ProformaInvoice';
@@ -55,6 +58,7 @@ import {
 } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { getMaterialStockById } from '@/service/StockCorrection';
 
 // Helper function for image URLs
 const BACKEND_URL = 'http://localhost:5000';
@@ -75,12 +79,33 @@ type BadgeVariant = React.ComponentProps<typeof Badge>['variant'];
 
 type ProjectDetailProps = {
   id?: string;
+  reload?: () => Promise<void>;
 };
+
+// Interface for material stock check result
+interface MaterialStockCheck {
+  materialId: string;
+  materialName: string;
+  color: string;
+  size: string;
+  requiredQuantity: number;
+  alreadyIssued: number;
+  remainingNeeded: number;
+  availableStock: number;
+  shortfall: number;
+  unit: string;
+  itemDescription: string;
+  isAvailable: boolean;
+}
 
 const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [project, setProject] = useState<IProject | null>(null);
   const [proformaInvoice, setProformaInvoice] = useState<IProformaInvoice | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [materialStockChecks, setMaterialStockChecks] = useState<MaterialStockCheck[]>([]);
+  const [isCheckingStock, setIsCheckingStock] = useState(false);
+  const [allMaterialsAvailable, setAllMaterialsAvailable] = useState(false);
   const router = useRouter();
 
   // Filter stages to only show DESIGN stage
@@ -144,6 +169,146 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     return status ? config[status] : null;
   };
 
+  // Check material stock availability
+  const checkMaterialStock = async () => {
+    if (!proformaInvoice?.items) return;
+
+    setIsCheckingStock(true);
+    const checks: MaterialStockCheck[] = [];
+
+    try {
+      // Extract all materials from all items
+      const allMaterials: IProformaItemMaterial[] = [];
+      proformaInvoice.items.forEach(item => {
+        if (item.proformaItemMaterials && item.proformaItemMaterials.length > 0) {
+          allMaterials.push(...item.proformaItemMaterials);
+        }
+      });
+
+      if (allMaterials.length === 0) {
+        toast.info('No materials found in this project');
+        setAllMaterialsAvailable(false);
+        setIsCheckingStock(false);
+        return;
+      }
+
+      // Check stock for each material
+      for (const material of allMaterials) {
+        try {
+          // Get stock data for this material
+          const stockData = await getMaterialStockById(material.materialId);
+          const availableStock = stockData?.totalQuantity || 0;
+          
+          const alreadyIssued = material.givenquantity || 0;
+          // Total required = quantity + additionalQuantity
+          const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
+          const remainingNeeded = totalRequired - alreadyIssued;
+          
+          // Calculate shortfall (if stock is less than remaining needed)
+          const shortfall = remainingNeeded > availableStock ? remainingNeeded - availableStock : 0;
+          
+          checks.push({
+            materialId: material.materialId,
+            materialName: material.material?.name || 'Unknown Material',
+            color: material.material?.color || 'N/A',
+            size: material.material?.size || 'N/A',
+            requiredQuantity: totalRequired,
+            alreadyIssued: alreadyIssued,
+            remainingNeeded: remainingNeeded,
+            availableStock: availableStock,
+            shortfall: shortfall,
+            unit: 'units',
+            itemDescription: material.note || 'N/A',
+            isAvailable: shortfall === 0,
+          });
+        } catch (error) {
+          console.error(`Error fetching stock for material ${material.materialId}:`, error);
+          checks.push({
+            materialId: material.materialId,
+            materialName: material.material?.name || 'Unknown Material',
+            color: material.material?.color || 'N/A',
+            size: material.material?.size || 'N/A',
+            requiredQuantity: 0,
+            alreadyIssued: 0,
+            remainingNeeded: 0,
+            availableStock: 0,
+            shortfall: 0,
+            unit: 'units',
+            itemDescription: 'Error fetching stock',
+            isAvailable: false,
+          });
+        }
+      }
+
+      setMaterialStockChecks(checks);
+      
+      // Check if all materials are available
+      const allAvailable = checks.every(check => check.isAvailable);
+      setAllMaterialsAvailable(allAvailable);
+      
+      if (allAvailable) {
+        toast.success('All materials are available in stock!');
+      } else {
+        const shortfallCount = checks.filter(check => !check.isAvailable).length;
+        toast.warning(`${shortfallCount} material(s) have stock shortfall`);
+      }
+    } catch (error) {
+      console.error('Error checking material stock:', error);
+      toast.error('Failed to check material stock');
+    } finally {
+      setIsCheckingStock(false);
+    }
+  };
+
+  // Update design status with stock validation
+  const handleDesignUpdate = async (stage: DesignStatus) => {
+    // If trying to finish design, check if all materials are available
+    if (stage === DesignStatus.FINISHED) {
+      // Check stock first if not already checked
+      if (materialStockChecks.length === 0) {
+        await checkMaterialStock();
+      }
+      
+      // If materials are not all available, prevent finishing
+      if (!allMaterialsAvailable) {
+        const shortfallItems = materialStockChecks.filter(check => !check.isAvailable);
+        toast.error(
+          `Cannot finish design. ${shortfallItems.length} material(s) have stock shortfall. ` +
+          `Please ensure all materials are available in stock.`,
+          { duration: 5000 }
+        );
+        return;
+      }
+    }
+
+    const confirmChange = window.confirm(
+      `Are you sure you want to change stage to "${stage.replace('_', ' ')}"?`
+    );
+
+    if (!confirmChange) return;
+
+    try {
+      setUpdating(true);
+
+      await updateProjectDesignStatus(id!, stage);
+
+      // Refresh data
+      await fetchProjectData();
+      
+      toast.success(`Design status updated to ${stage.replace('_', ' ')} successfully!`);
+
+ 
+        
+        router.refresh(); // fallback
+      
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update design status');
+      console.error(error.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   // Fetch project data and associated proforma invoice
   const fetchProjectData = React.useCallback(async () => {
     try {
@@ -175,6 +340,14 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   useEffect(() => {
     fetchProjectData();
   }, [fetchProjectData]);
+
+  // Check material stock when proforma invoice loads
+  useEffect(() => {
+    if (proformaInvoice?.items) {
+      // Auto-check stock when invoice loads
+      checkMaterialStock();
+    }
+  }, [proformaInvoice]);
 
   // Status badge configuration - simplified for design team
   const getStatusConfig = (status: ProjectStatus) => {
@@ -339,10 +512,13 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     );
   }
 
+  // Check if design can be finished
+  const canFinishDesign = allMaterialsAvailable && project.designStatus !== DesignStatus.FINISHED;
+
   return (
     <div className="space-y-6">
       {/* Project Overview Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {/* Status Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -431,6 +607,73 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Material Availability Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Package className="h-4 w-4 text-green-500" />
+              <span>Material Availability</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {isCheckingStock ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Checking stock...</span>
+                </div>
+              ) : materialStockChecks.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    {allMaterialsAvailable ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="text-sm font-medium text-green-600">All available</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-sm font-medium text-red-600">
+                          {materialStockChecks.filter(c => !c.isAvailable).length} shortfall(s)
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={checkMaterialStock}
+                    disabled={isCheckingStock}
+                    className="w-full"
+                  >
+                    {isCheckingStock ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-2" />
+                    )}
+                    Check Stock
+                  </Button>
+                </>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={checkMaterialStock}
+                  disabled={isCheckingStock}
+                  className="w-full"
+                >
+                  {isCheckingStock ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                  ) : (
+                    <Package className="h-3 w-3 mr-2" />
+                  )}
+                  Check Material Stock
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content - Design Stage Focus */}
@@ -438,10 +681,71 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
         {/* Design Stage Card */}
         <Card className="border-blue-200 shadow-md">
           <CardHeader className="bg-blue-50 border-b border-blue-100">
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-blue-600" />
-              <span className="text-blue-900">Design Stage Details</span>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-blue-600" />
+                <span className="text-blue-900">Design Stage Details</span>
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                {/* Update Status Buttons */}
+                {project.designStatus !== DesignStatus.FINISHED && (
+                  <>
+                    {/* Design Status Update Buttons */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDesignUpdate(DesignStatus.MODELING)}
+                      disabled={updating}
+                    >
+                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Modeling
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDesignUpdate(DesignStatus.DRAFTING)}
+                      disabled={updating}
+                    >
+                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Drafting
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDesignUpdate(DesignStatus.CUTLIST)}
+                      disabled={updating}
+                    >
+                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Cutlist
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDesignUpdate(DesignStatus.BOQ)}
+                      disabled={updating}
+                    >
+                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      BOQ
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className={!canFinishDesign ? 'opacity-50 cursor-not-allowed' : ''}
+                      onClick={() => handleDesignUpdate(DesignStatus.FINISHED)}
+                      disabled={updating || !canFinishDesign}
+                      title={!canFinishDesign ? 'All materials must be available in stock to finish design' : ''}
+                    >
+                      {updating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                      )}
+                      Finish Design
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             {hasDesignStage ? (
@@ -569,7 +873,62 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
           </CardContent>
         </Card>
 
-    
+        {/* Material Stock Details Card */}
+        {materialStockChecks.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Material Stock Status
+                <Badge variant={allMaterialsAvailable ? 'default' : 'destructive'} className="ml-2">
+                  {allMaterialsAvailable ? 'All Available' : `${materialStockChecks.filter(c => !c.isAvailable).length} Shortfalls`}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Color</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead>Already Issued</TableHead>
+                    <TableHead>Remaining Needed</TableHead>
+                    <TableHead>Available Stock</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {materialStockChecks.map((check) => (
+                    <TableRow key={check.materialId}>
+                      <TableCell className="font-medium">{check.materialName}</TableCell>
+                      <TableCell>{check.color}</TableCell>
+                      <TableCell>{check.size}</TableCell>
+                      <TableCell>{check.requiredQuantity}</TableCell>
+                      <TableCell>{check.alreadyIssued}</TableCell>
+                      <TableCell>{check.remainingNeeded}</TableCell>
+                      <TableCell>{check.availableStock}</TableCell>
+                      <TableCell>
+                        {check.isAvailable ? (
+                          <Badge variant="default" className="bg-green-500">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Available
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Shortfall: {check.shortfall}
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Proforma Invoice Card - With Images */}
         {proformaInvoice && (
@@ -1015,7 +1374,8 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             </div>
           </CardContent>
         </Card>
-            {/* Project Logs Card */}
+
+        {/* Project Logs Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -153,33 +153,72 @@ export default function ProformaInvoiceForm({
   }
 
   // Initialize item images from initial data
-  useEffect(() => {
-    if (initialData?.items) {
-      const newImagesMap = new Map<number, ImageFileWithPreview[]>();
+// Initialize hierarchical selections from existing items when editing
+useEffect(() => {
+  // Only run when we have initialData with items AND the items list is loaded
+  if (initialData?.items && initialData.items.length > 0 && items.length > 0) {
+    const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
+    
+    initialData.items.forEach((item, index) => {
+      // The item data is nested in the 'item' property from the backend
+      // Or we can find it in the items list by itemId
+      let fullItem = item.item; // Direct from backend
       
-      initialData.items.forEach((item, index) => {
-        if (item.images && item.images.length > 0) {
-          const images: ImageFileWithPreview[] = item.images.map(img => ({
-            preview: normalizeImagePath(img.imageUrl) || img.imageUrl,
-            isExisting: true,
-            existingUrl: img.imageUrl
-          }));
-          newImagesMap.set(index, images);
-        }
+      // If not found directly, try to find by itemId in the items list
+      if (!fullItem && item.itemId) {
+        fullItem = items.find(i => i.id === item.itemId);
+      }
+      
+      if (fullItem) {
+        // Set the hierarchical selection with the item's data
+        newHierarchicalSelections.set(index, {
+          categoryId: fullItem.categoryId || '',
+          sizeId: fullItem.sizeId || '',
+          typeId: fullItem.typeId || '',
+          selectedItem: fullItem
+        });
         
-        // Store itemId if exists
-        if (item.itemId) {
-          setSelectedItemIds(prev => {
+        // Set the selected item ID
+        setSelectedItemIds(prev => {
+          const newMap = new Map(prev);
+          newMap.set(index, fullItem.id);
+          return newMap;
+        });
+        
+        // Auto-fill price if available
+        if (fullItem.price && fullItem.price > 0) {
+          setPriceAutoFilled(prev => {
             const newMap = new Map(prev);
-            newMap.set(index, item.itemId!);
+            newMap.set(index, true);
             return newMap;
           });
         }
-      });
-      
-      setItemImages(newImagesMap);
-    }
-  }, [initialData]);
+        
+        // Ensure materials are set from the item's materials if not already set
+        const currentMaterials = form.getValues(`items.${index}.materials`);
+
+        if (!currentMaterials?.length) {
+          const materialsList = Array.isArray(fullItem.itemMaterials)
+            ? fullItem.itemMaterials.map((im: any) => ({
+                id: '',
+                itemId: item.id || '',
+                materialId: im.materialId,
+                quantity: im.quantity ?? 1,
+                note: im.note ?? '',
+                materialIssues: [],
+              }))
+            : [];
+
+          if (materialsList.length > 0) {
+            form.setValue(`items.${index}.materials`, materialsList);
+          }
+        }
+      }
+    });
+    
+    setHierarchicalSelections(newHierarchicalSelections);
+  }
+}, [initialData, items, form]);
 
   // Fetch customers, materials, items, categories, sizes, types on component mount
   useEffect(() => {
@@ -245,16 +284,17 @@ export default function ProformaInvoiceForm({
   );
 
   // Material options
-  const materialOptions: SelectOption[] = useMemo(
-    () => [
-      { value: '', label: 'Select a material' },
-      ...materials.map((material) => ({
-        value: material.id,
-        label: `${material.name} (${material.color} )`
-      }))
-    ],
-    [materials]
-  );
+// Material options - Fixed to show all materials
+const materialOptions: SelectOption[] = useMemo(() => {
+  if (!materials || materials.length === 0) {
+    return [];
+  }
+  
+  return materials.map((material) => ({
+    value: material.id,
+    label: `${material.name}${material.color ? ` (${material.color})` : ''}`
+  }));
+}, [materials]);
 
   // Filter sizes based on selected category
   useEffect(() => {
@@ -740,6 +780,15 @@ const handleItemSelect = (itemIndex: number, selectedItem: any) => {
   };
 
   const onSubmit = async (data: ProformaInvoiceFormValues) => {
+      if (!initialData?.id) {
+    const confirmed = window.confirm(
+      "Are you sure you want to create this Proforma Invoice?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+  }
     try {
       setIsLoading(true);
 
@@ -1083,9 +1132,9 @@ useEffect(() => {
                           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
                             {itemIndex + 1}
                           </span>
-                          <span className="text-sm font-medium">
-                            {form.watch(`items.${itemIndex}.description`) || 'New Item'}
-                          </span>
+                          {/* <span className="text-sm font-medium">
+                            {form.watch(`items.${itemIndex}.item.name`) || 'New Item'}
+                          </span> */}
                         </div>
                         <Button
                           type="button"
@@ -1263,44 +1312,64 @@ useEffect(() => {
 />
 
   {/* Unit Price */}
-  <FormField
-    control={form.control}
-    name={`items.${itemIndex}.unitPrice`}
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel className="flex items-center gap-2 text-xs">
-          Unit Price
-          {priceAutoFilled.get(itemIndex) && (
-            <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-              Auto
-            </Badge>
-          )}
-        </FormLabel>
-        <FormControl>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            {...field}
-            onChange={(e) => {
-              field.onChange(parseFloat(e.target.value) || 0);
-              calculateItemAmount(itemIndex);
-              if (priceAutoFilled.get(itemIndex)) {
-                setPriceAutoFilled(prev => {
-                  const newMap = new Map(prev);
-                  newMap.delete(itemIndex);
-                  return newMap;
-                });
-              }
-            }}
-            className={priceAutoFilled.get(itemIndex) ? "border-green-300 focus-visible:ring-green-500" : ""}
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
+<FormField
+  control={form.control}
+  name={`items.${itemIndex}.unitPrice`}
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel className="flex items-center gap-2 text-xs">
+        Unit Price
+        {priceAutoFilled.get(itemIndex) && (
+          <Badge
+            variant="secondary"
+            className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+          >
+            Auto
+          </Badge>
+        )}
+      </FormLabel>
+
+      <FormControl>
+        <Input
+          type="text"
+          inputMode="decimal"
+          placeholder="0.00"
+          value={
+            field.value
+              ? Number(field.value).toLocaleString("en-US", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })
+              : ""
+          }
+          onChange={(e) => {
+            // Remove commas before saving
+            const raw = e.target.value.replace(/,/g, "");
+            const value = parseFloat(raw) || 0;
+
+            field.onChange(value);
+            calculateItemAmount(itemIndex);
+
+            if (priceAutoFilled.get(itemIndex)) {
+              setPriceAutoFilled((prev) => {
+                const newMap = new Map(prev);
+                newMap.delete(itemIndex);
+                return newMap;
+              });
+            }
+          }}
+          className={
+            priceAutoFilled.get(itemIndex)
+              ? "border-green-300 focus-visible:ring-green-500"
+              : ""
+          }
+        />
+      </FormControl>
+
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 
   {/* Amount */}
   <FormField
@@ -1386,16 +1455,18 @@ useEffect(() => {
                           <div className="space-y-3">
                             {form.watch(`items.${itemIndex}.materials`)?.map((material, materialIndex) => (
                               <div key={materialIndex} className="grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12">
-                                <div className="md:col-span-5">
-                                  <FormLabel>Material</FormLabel>
-                                  <Select
-                                    options={materialOptions}
-                                    value={materialOptions.find((option: { value: string; }) => option.value === material.materialId)}
-                                    onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
-                                    placeholder="Select material"
-                                    styles={isDark ? darkStyles : {}}
-                                  />
-                                </div>
+                             <div className="md:col-span-5">
+  <FormLabel>Material</FormLabel>
+  <Select
+    options={materialOptions}
+    value={materialOptions.find((option) => option.value === material.materialId) || null}
+    onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
+    placeholder="Select material"
+    isSearchable
+    styles={isDark ? darkStyles : {}}
+    noOptionsMessage={() => "No materials available"}
+  />
+</div>
 
                                 <div className="md:col-span-2">
                                   <FormLabel>Quantity</FormLabel>

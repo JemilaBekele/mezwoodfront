@@ -18,7 +18,7 @@ export default async function ProformaInvoiceViewPage({
     try {
       const data = await getProformaInvoiceId(invoiceId);
       invoice = data as IProformaInvoice | null;
-
+console.log("megarga",invoice)
       if (invoice) {
         pageTitle = `Edit Proforma Invoice: ${invoice.piNumber}`;
       }

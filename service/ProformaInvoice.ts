@@ -36,6 +36,48 @@ interface ProformaInvoiceResponse {
 /* =========================
    GET ALL (Client-side)
 ========================= */
+
+// mypiinvoices
+export const getAllProformaInvoicesmy = async ({
+  page = 1,
+  limit = 10,
+  search = '',
+  status,
+  customerId,
+  sortBy = 'createdAt',
+  sortOrder = 'desc'
+}: GetProformaInvoiceParams = {}, ) => {
+  try {
+
+    const response = await axiosInstance.get<ProformaInvoicesResponse>(
+      `/proforma-invoices/mypiinvoices`,
+      {
+        params: {
+          page,
+          limit,
+          search,
+          status,
+          customerId,
+          sortBy,
+          sortOrder
+        }
+      }
+    );
+    const invoices = response.data.invoices ?? [];
+    return {
+      proformaInvoices: invoices,
+      count:invoices.length,
+      success: response.data.success
+    };
+  } catch (error) {
+    console.error('Error fetching proforma invoices:', error);
+    return {
+      proformaInvoices: [],
+      totalCount: 0,
+      success: false
+    };
+  }
+};
 export const getAllProformaInvoices = async ({
   page = 1,
   limit = 10,
@@ -62,7 +104,6 @@ export const getAllProformaInvoices = async ({
       }
     );
     const invoices = response.data.invoices ?? [];
-
     return {
       proformaInvoices: invoices,
       count:invoices.length,
