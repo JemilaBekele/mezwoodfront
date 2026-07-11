@@ -1201,26 +1201,20 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Description</TableHead>
+                            <TableHead>Item</TableHead>
                             <TableHead>Size</TableHead>
                             <TableHead>Quantity</TableHead>
                             <TableHead>Materials</TableHead>
+                           <TableHead>Description</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {proformaInvoice.items.map((item) => (
                             <TableRow key={item.id}>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <p className="font-medium">{item.description}</p>
-                                  {item.additionalDescription && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {item.additionalDescription}
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>{item.size || 'N/A'}</TableCell>
+                                                                                       <TableCell>{item.item?.name || 'N/A'}</TableCell>
+                              
+                          
+                              <TableCell>{item.size || ''}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>
                                 {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
@@ -1231,6 +1225,16 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                                 ) : (
                                   'No materials'
                                 )}
+                              </TableCell>
+                                  <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-medium">{item.description}</p>
+                                  {item.additionalDescription && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.additionalDescription}
+                                    </p>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1254,7 +1258,7 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                         return (
                           <div key={item.id} className="border rounded-lg overflow-hidden">
                             <div className="bg-muted/30 p-3 border-b">
-                              <h4 className="font-semibold">{item.description}</h4>
+                              <h4 className="font-semibold">{item.item?.name || ''}</h4>
                               {item.size && <p className="text-sm text-muted-foreground">Size: {item.size}</p>}
                             </div>
                             <div className="p-3">

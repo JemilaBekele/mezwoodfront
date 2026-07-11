@@ -490,7 +490,7 @@ export const getpurchasingProjects = async (params?: {
         }
       }
     );
-
+console.log('Response from getpurchasingProjects:', response?.data);
     const projects = response?.data?.projects ?? [];
 
     return {

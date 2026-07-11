@@ -29,8 +29,6 @@ import {
   
   Hammer,
   Box,
-  Calendar,
-  TrendingUp,
   Filter,
   Download,
   TreePine,

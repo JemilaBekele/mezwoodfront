@@ -943,25 +943,19 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Description</TableHead>
+                            <TableHead>Items</TableHead>
                             <TableHead>Size</TableHead>
                             <TableHead>Quantity</TableHead>
                             <TableHead>Materials</TableHead>
+                            <TableHead>Description</TableHead>
+
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {proformaInvoice.items.map((item) => (
                             <TableRow key={item.id}>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <p className="font-medium">{item.description}</p>
-                                  {item.additionalDescription && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {item.additionalDescription}
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
+                                                         <TableCell>{item.item?.name || 'N/A'}</TableCell>
+
                               <TableCell>{item.size || 'N/A'}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>
@@ -973,6 +967,16 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                 ) : (
                                   'No materials'
                                 )}
+                              </TableCell>
+                                 <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-medium">{item.description}</p>
+                                  {item.additionalDescription && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.additionalDescription}
+                                    </p>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -996,7 +1000,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
         return (
           <div key={item.id} className="border rounded-lg overflow-hidden">
             <div className="bg-muted/30 p-3 border-b">
-              <h4 className="font-semibold">{item.description}</h4>
+                              <h4 className="font-semibold">{item.item?.name || ''}</h4>
               {item.size && <p className="text-sm text-muted-foreground">Size: {item.size}</p>}
             </div>
             <div className="p-3 overflow-x-auto">

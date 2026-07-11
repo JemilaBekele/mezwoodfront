@@ -1,55 +1,93 @@
-/* eslint-disable react-hooks/error-boundaries */
-import { searchParamsCache } from '@/lib/searchparams';
-import { projectColumns } from './tables/columns';
-import { DataTable } from '@/components/ui/table/data-table';
-import {  getpurchasingProjects } from '@/service/Stages';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
 
-type ProjectListingPageProps = object;
+import { useEffect, useState } from "react";
+import { DataTable } from "@/components/ui/table/data-table";
+import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
+import { useTableQueryParams } from "@/hooks/use-table-query-params";
+import { getpurchasingProjects } from "@/service/Stages";
+import { projectColumns } from "./tables/columns";
 
-export default async function PurchaseProjectListingPage({}: ProjectListingPageProps) {
-  // ────────────────────────────────────────────────────────────────
-  // Query-string inputs
-  // ────────────────────────────────────────────────────────────────
-  const page = Number(searchParamsCache.get('page') || 1);
-  const search = searchParamsCache.get('q') || '';
-  const limit = Number(searchParamsCache.get('limit') || 10);
+type PurchaseProjectListingPageProps = object;
 
-  try {
-    // Fetch projects
-    const { projects, totalCount } = await getpurchasingProjects({
-        status: 'not-finished'
-      });
-    // ────────────────────────────────────────────────────────────────
-    // Client-side search filter (safe fallback)
-    // ────────────────────────────────────────────────────────────────
-    const filteredData = projects.filter((project) => {
-      const searchLower = search.toLowerCase();
-      return (
-        project.invoice?.piNumber?.toLowerCase().includes(searchLower) ||
-        project.customer?.name?.toLowerCase().includes(searchLower)
-      );
-    });
+export default function PurchaseProjectListingPage(
+  {}: PurchaseProjectListingPageProps
+) {
+  const { page, search, limit } = useTableQueryParams();
 
-    // ────────────────────────────────────────────────────────────────
-    // Client-side pagination fallback
-    // ────────────────────────────────────────────────────────────────
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedData = filteredData.slice(startIndex, endIndex);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProjects = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await getpurchasingProjects({
+          status: "not-finished",
+        });
+
+        if (cancelled) return;
+
+        setProjects(response.projects || []);
+        setTotalCount(response.totalCount || 0);
+      } catch (err) {
+        console.error(err);
+
+        if (!cancelled) {
+          setError("Error loading projects. Please try again later.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadProjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
     return (
-      <DataTable
-        data={paginatedData}
-        totalItems={totalCount ?? 0}
-        columns={projectColumns}
+      <DataTableSkeleton
+        columnCount={6}
+        rowCount={8}
+        filterCount={2}
       />
     );
-  } catch (error) {
-    console.error('Error loading projects:', error);
-    return (
-      <div className="p-4 text-red-500">
-        Error loading projects. Please try again later.
-      </div>
-    );
   }
+
+  if (error) {
+    return <div className="p-4 text-red-500">{error}</div>;
+  }
+
+  const filteredData = projects.filter((project) => {
+    const searchLower = search.toLowerCase();
+
+    return (
+      project.invoice?.piNumber?.toLowerCase().includes(searchLower) ||
+      project.customer?.name?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const paginatedData = filteredData.slice(startIndex, endIndex);
+
+  return (
+    <DataTable
+      data={paginatedData}
+      totalItems={totalCount}
+      columns={projectColumns}
+    />
+  );
 }
