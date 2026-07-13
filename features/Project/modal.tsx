@@ -27,15 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Card,
@@ -44,7 +36,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { 
@@ -189,6 +180,7 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
     capacityDays: 1,
     timeTaken: 0,
     isNew: true,
+    workUnits: 0, // Default value for new stages
   };
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
@@ -445,10 +437,11 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
       const startDateTime = stage.startDate;
       
       const isTempStage = !stage.id || stage.isNew || stage.id.startsWith('temp-');
-      const dataToSend = {
+      
+      // Prepare data based on whether it's a new stage or update
+      const dataToSend: any = {
         projectId: project.id,
         stageName: stage.stage,
-        newQuantity: stage.workUnits || 0,
         allowOverCapacity: false,
         customDates: {
           startDate: startDateTime?.toISOString(),
@@ -458,6 +451,11 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
         manualOverride: true, // FORCE manual override to use custom dates
         isNewStage: isTempStage,
       };
+
+      // Only include workUnits for NEW stages (create operation)
+      if (isTempStage || stage.isNew) {
+        dataToSend.newQuantity = stage.workUnits || 0;
+      }
 
       await updateProjectStage(dataToSend);
       toast.success(stage.isNew ? 'Stage added successfully' : 'Stage updated successfully');
@@ -500,6 +498,13 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
       toast.error('Please enter valid time took');
       return false;
     }
+
+    // Validate work units for new stages
+    if (stage.isNew && (!stage.workUnits || stage.workUnits <= 0)) {
+      toast.error('Please enter the number of work units for the new stage');
+      return false;
+    }
+
     const endDateTime = approximateEndDate(stage);
 
     // Validate capacity before updating
@@ -530,7 +535,7 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
       toast.error('You do not have permission to add stages');
       return;
     }
-    setForm({ ...emptyStage });
+    setForm({ ...emptyStage, workUnits: 0 });
     setFormMode('add');
     setFormOpen(true);
   };
@@ -545,7 +550,9 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
       toast.error('Cannot edit a finished/completed stage');
       return;
     }
-    setForm({ ...stage, isNew: false });
+    // Remove workUnits from edit mode as they shouldn't be editable
+    const { workUnits, ...stageWithoutWorkUnits } = stage;
+    setForm({ ...stageWithoutWorkUnits, isNew: false });
     setFormMode('edit');
     setFormOpen(true);
   };
@@ -725,109 +732,133 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
   };
 
   // Shared form fields for the add/edit dialog
-  const renderStageFormFields = () => (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className="text-xs">Stage Type</Label>
-        {formMode === 'edit' ? (
-          <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm font-medium">
-            {getStageDisplayName(form.stage)}
+  const renderStageFormFields = () => {
+    const isAddMode = formMode === 'add';
+    
+    return (
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Stage Type</Label>
+          {formMode === 'edit' ? (
+            <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm font-medium">
+              {getStageDisplayName(form.stage)}
+            </div>
+          ) : (
+            <Select value={form.stage} onValueChange={(value: ProjectStatus) => updateForm({ stage: value })}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select stage" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableStages
+                  .filter((status) => !existingStageValues.includes(status.value))
+                  .map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        {/* Work Units - ONLY shown in ADD mode */}
+        {isAddMode && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">
+              Work Units <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              type="number"
+              min="1"
+              placeholder="Enter number of work units"
+              value={form.workUnits || ''}
+              onChange={(e) => updateForm({ workUnits: parseInt(e.target.value, 10) || 0 })}
+              className="h-9"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              The estimated amount of work required for this stage
+            </p>
           </div>
-        ) : (
-          <Select value={form.stage} onValueChange={(value: ProjectStatus) => updateForm({ stage: value })}>
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Select stage" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableStages
-                .filter((status) => !existingStageValues.includes(status.value))
-                .map((status) => (
-                  <SelectItem key={status.value} value={status.value}>
-                    {status.label}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
         )}
-      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Start Date</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  'h-9 w-full justify-start text-left text-xs font-normal',
-                  !form.startDate && 'text-muted-foreground'
-                )}
-              >
-                <CalendarIcon className="mr-1.5 h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">
-                  {form.startDate && !isNaN(form.startDate.getTime())
-                    ? safeFormatDateTime(form.startDate)
-                    : 'Pick date'}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={form.startDate || undefined}
-                onSelect={(date) => updateForm({ startDate: withDatePart(form.startDate, date) })}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Start Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'h-9 w-full justify-start text-left text-xs font-normal',
+                    !form.startDate && 'text-muted-foreground'
+                  )}
+                >
+                  <CalendarIcon className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    {form.startDate && !isNaN(form.startDate.getTime())
+                      ? safeFormatDateTime(form.startDate)
+                      : 'Pick date'}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={form.startDate || undefined}
+                  onSelect={(date) => updateForm({ startDate: withDatePart(form.startDate, date) })}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Start Time</Label>
+            <Input
+              type="time"
+              value={timeInputValue(form.startDate)}
+              onChange={(e) => updateForm({ startDate: withTimePart(form.startDate, e.target.value) })}
+              className="h-9"
+            />
+          </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Start Time</Label>
-          <Input
-            type="time"
-            value={timeInputValue(form.startDate)}
-            onChange={(e) => updateForm({ startDate: withTimePart(form.startDate, e.target.value) })}
-            className="h-9"
-          />
+          <Label className="text-xs">Time Took</Label>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min="0"
+              value={timeParts(form.timeTaken).hours}
+              onChange={(e) =>
+                updateForm({ timeTaken: (parseInt(e.target.value, 10) || 0) * 60 + timeParts(form.timeTaken).minutes })
+              }
+              className="h-9 w-16"
+            />
+            <span className="text-xs text-muted-foreground">hr</span>
+            <Input
+              type="number"
+              min="0"
+              max="59"
+              value={timeParts(form.timeTaken).minutes}
+              onChange={(e) =>
+                updateForm({
+                  timeTaken: timeParts(form.timeTaken).hours * 60 + Math.min(59, parseInt(e.target.value, 10) || 0),
+                })
+              }
+              className="h-9 w-16"
+            />
+            <span className="text-xs text-muted-foreground">min</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-xs">
+          <span className="text-muted-foreground">Calculated end</span>
+          <span className="font-medium tabular-nums">{safeFormatDateTime(approximateEndDate(form))}</span>
         </div>
       </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs">Time Took</Label>
-        <div className="flex items-center gap-1.5">
-          <Input
-            type="number"
-            min="0"
-            value={timeParts(form.timeTaken).hours}
-            onChange={(e) =>
-              updateForm({ timeTaken: (parseInt(e.target.value, 10) || 0) * 60 + timeParts(form.timeTaken).minutes })
-            }
-            className="h-9 w-16"
-          />
-          <span className="text-xs text-muted-foreground">hr</span>
-          <Input
-            type="number"
-            min="0"
-            max="59"
-            value={timeParts(form.timeTaken).minutes}
-            onChange={(e) =>
-              updateForm({
-                timeTaken: timeParts(form.timeTaken).hours * 60 + Math.min(59, parseInt(e.target.value, 10) || 0),
-              })
-            }
-            className="h-9 w-16"
-          />
-          <span className="text-xs text-muted-foreground">min</span>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-xs">
-        <span className="text-muted-foreground">Calculated end</span>
-        <span className="font-medium tabular-nums">{safeFormatDateTime(approximateEndDate(form))}</span>
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -969,11 +1000,13 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base">{formMode === 'add' ? 'Add New Stage' : `Edit ${getStageDisplayName(form.stage)}`}</DialogTitle>
+            <DialogTitle className="text-base">
+              {formMode === 'add' ? 'Add New Stage' : `Edit ${getStageDisplayName(form.stage)}`}
+            </DialogTitle>
             <DialogDescription className="text-xs">
               {formMode === 'add'
-                ? 'Only stages not already present can be added.'
-                : 'Update the schedule and logged time. The backend will confirm the final end date.'}
+                ? 'Enter the stage details and estimated work units.'
+                : 'Update the schedule and logged time. Work units cannot be modified after creation.'}
             </DialogDescription>
           </DialogHeader>
           {renderStageFormFields()}
@@ -981,7 +1014,7 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
             <Button variant="outline" size="sm" onClick={() => setFormOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSaveForm} disabled={saving || !form.startDate || !form.stage}>
+            <Button size="sm" onClick={handleSaveForm} disabled={saving || !form.startDate || !form.stage || (formMode === 'add' && (!form.workUnits || form.workUnits <= 0))}>
               {saving ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
               ) : formMode === 'add' ? (
