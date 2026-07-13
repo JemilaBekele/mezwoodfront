@@ -238,19 +238,18 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
           5: { cellWidth: 32, halign: 'right' },
         },
         margin: { left: 10, right: 10 },
-      didParseCell: (data) => {
-  // Add data.section === 'body' check so it skips the header row
-  if (data.section === 'body' && data.column.index === 2) {
-    const item = itemsWithImages[data.row.index];
-    if (item && item.loadedImage) {
-      const text = data.cell.text.join(' ');
-      const textLines = doc.splitTextToSize(text, data.column.width);
-      const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
-      
-      data.cell.styles.minCellHeight = calculatedTextHeight + 40; 
-    }
-  }
-},
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            const item = itemsWithImages[data.row.index];
+            if (item && item.loadedImage) {
+              const text = data.cell.text.join(' ');
+              const textLines = doc.splitTextToSize(text, data.column.width);
+              const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
+              
+              data.cell.styles.minCellHeight = calculatedTextHeight + 40; 
+            }
+          }
+        },
         willDrawCell: (data) => {
           doc.setDrawColor(0, 0, 0);
           if (data.section === 'head') {
@@ -265,14 +264,14 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
         didDrawCell: (data) => {
           if (data.section === 'body' && data.column.index === 2) {
             const item = itemsWithImages[data.row.index];
-            if (item.loadedImage) {
+            // Added safety guard 'item &&' here to prevent the crash
+            if (item && item.loadedImage) {
               const textLines = data.cell.text || [];
               const textHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
               
               const paddingBelowText = 3; 
               const imageY = data.cell.y + textHeight + paddingBelowText;
 
-              // Anchor image perfectly within cell content spacing boundaries
               doc.addImage(item.loadedImage, 'JPEG', data.cell.x, imageY, 60, 36);
             }
           }
