@@ -17,8 +17,8 @@ interface ICompany {
   email?: string;
   phone?: string;
   address?: string;
-  addressTow?: string; // Matching schema
-  tiktok?: string;     // Matching schema
+  addressTow?: string;
+  tiktok?: string;
   logo?: string | File;
   socials?: string;
 }
@@ -153,7 +153,6 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       doc.setTextColor(0, 0, 0);
       doc.text(company.name || 'Rosewood Custom Furniture PLC', 69, 18);
       
-      // Localized Title text element
       doc.setFontSize(16);
       doc.text('', 69, 27);
       
@@ -166,7 +165,6 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
 
-      // Custom simulated TikTok brand placement circle mapping
       doc.setDrawColor(255, 255, 255);
       doc.setLineWidth(0.3);
       doc.circle(17, yPosition + 5, 2, 'D');
@@ -178,7 +176,6 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       doc.text(`+ ${company.phone || '251 905 84 85 86'}`, 22, yPosition + 13);
       doc.text(company.email || 'rosewoodcf@gmail.com', 22, yPosition + 20);
 
-      // Locations (Right Column Layout)
       doc.text(company.address || 'Ayat round about road to tafo', 105, yPosition + 6);
       doc.text(company.addressTow || 'Ayertena round about infront of Shewa supermarket', 105, yPosition + 13, { maxWidth: 90 });
 
@@ -195,7 +192,7 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       yPosition += 2;
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.8);
-      doc.line(10, yPosition, 200, yPosition); // Thick black horizontal break line
+      doc.line(10, yPosition, 200, yPosition);
 
       yPosition += 5;
       doc.setFont('helvetica', 'bold');
@@ -244,7 +241,13 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
         didParseCell: (data) => {
           if (data.section === 'body' && data.column.index === 2) {
             if (itemsWithImages[data.row.index].loadedImage) {
-              data.cell.styles.minCellHeight = 52; // Enforce vertical grid spatial boundary for images
+              // Dynamically determine textual wrapped line count using cell widths
+              const text = data.cell.text.join(' ');
+              const textLines = doc.splitTextToSize(text, data.column.width);
+              const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
+              
+              // Base image height is 36mm + 4mm structural padding margins
+              data.cell.styles.minCellHeight = calculatedTextHeight + 40; 
             }
           }
         },
@@ -259,27 +262,21 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
             doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
           }
         },
-     didDrawCell: (data) => {
-  if (data.section === 'body' && data.column.index === 2) {
-    const item = itemsWithImages[data.row.index];
-    if (item.loadedImage) {
-      // 1. Get the text lines that jsPDF-AutoTable calculated for this cell
-      const textLines = data.cell.text || [];
-      
-      // 2. Calculate how much height the text took up 
-      // (Font size 11 approx = 4mm per line depending on line spacing)
-      const textHeight = textLines.length * (data.cell.styles.fontSize / 2.5);
-      
-      // 3. Add padding to place the image comfortably below the text
-      const paddingBelowText = 3; 
-      const imageY = data.cell.y + textHeight + paddingBelowText;
+        didDrawCell: (data) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            const item = itemsWithImages[data.row.index];
+            if (item.loadedImage) {
+              const textLines = data.cell.text || [];
+              const textHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
+              
+              const paddingBelowText = 3; 
+              const imageY = data.cell.y + textHeight + paddingBelowText;
 
-      // 4. Draw the image using the dynamically calculated Y coordinate
-      // Also adjust the width/height to fit cleanly within the cell dimensions if needed
-      doc.addImage(item.loadedImage, 'JPEG', data.cell.x + 2, imageY, 55, 33);
-    }
-  }
-},
+              // Anchor image perfectly within cell content spacing boundaries
+              doc.addImage(item.loadedImage, 'JPEG', data.cell.x, imageY, 60, 36);
+            }
+          }
+        },
       });
 
       yPosition = (doc as any).lastAutoTable.finalY + 12;
@@ -294,7 +291,6 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       const vatValue = invoice.vat || (subtotalValue * 0.15);
       const grandTotalValue = invoice.total || (subtotalValue + vatValue);
 
-      // Left side structural alignment: Prepared By mapping
       doc.setFontSize(10.5);
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
@@ -302,16 +298,14 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       doc.text(`Prepared by : ${preparerName}`, 12, yPosition + 6);
       doc.text(`${invoice.preparedBy?.phone || '0905 848586'}`, 12, yPosition + 13);
 
-      // Right side structural alignment: Calculation summaries
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bolditalic');
       doc.text('Sub Total', 135, yPosition);
       
-      doc.setTextColor(100, 100, 100); // Muted rendering style matching original VAT rows
+      doc.setTextColor(100, 100, 100);
       doc.text('15 % VAT', 135, yPosition + 8);
       doc.text('Grand Total', 135, yPosition + 16);
 
-      // Value positioning maps
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text(formatCurrency(subtotalValue), 200, yPosition, { align: 'right' });
@@ -320,7 +314,6 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       doc.text(formatCurrency(vatValue), 200, yPosition + 8, { align: 'right' });
       doc.text(formatCurrency(grandTotalValue), 200, yPosition + 16, { align: 'right' });
 
-      // Save routine output execution trigger
       doc.save(`Proforma_Invoice_${invoice.piNumber || 'export'}.pdf`);
       toast.success('PDF downloaded successfully');
     } catch (error) {
