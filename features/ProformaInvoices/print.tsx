@@ -260,15 +260,27 @@ export const ProformaInvoicePrinter: React.FC<PDFGeneratorProps> = ({
             doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
           }
         },
-        didDrawCell: (data) => {
-          if (data.section === 'body' && data.column.index === 2) {
-            const item = itemsWithImages[data.row.index];
-            if (item.loadedImage) {
-              // Exact placement properties to replicate preview spacing
-              doc.addImage(item.loadedImage, 'JPEG', data.cell.x, data.cell.y + 10, 60, 36);
-            }
-          }
-        },
+    didDrawCell: (data) => {
+  if (data.section === 'body' && data.column.index === 2) {
+    const item = itemsWithImages[data.row.index];
+    if (item.loadedImage) {
+      // 1. Get the text lines that jsPDF-AutoTable calculated for this cell
+      const textLines = data.cell.text || [];
+      
+      // 2. Calculate how much height the text took up 
+      // (Font size 11 approx = 4mm per line depending on line spacing)
+      const textHeight = textLines.length * (data.cell.styles.fontSize / 2.5);
+      
+      // 3. Add padding to place the image comfortably below the text
+      const paddingBelowText = 3; 
+      const imageY = data.cell.y + textHeight + paddingBelowText;
+
+      // 4. Draw the image using the dynamically calculated Y coordinate
+      // Also adjust the width/height to fit cleanly within the cell dimensions if needed
+      doc.addImage(item.loadedImage, 'JPEG', data.cell.x + 2, imageY, 55, 33);
+    }
+  }
+},
       });
 
       yPosition = (doc as any).lastAutoTable.finalY + 12;
