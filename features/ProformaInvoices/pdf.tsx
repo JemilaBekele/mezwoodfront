@@ -238,19 +238,19 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
           5: { cellWidth: 32, halign: 'right' },
         },
         margin: { left: 10, right: 10 },
-        didParseCell: (data) => {
-          if (data.section === 'body' && data.column.index === 2) {
-            if (itemsWithImages[data.row.index].loadedImage) {
-              // Dynamically determine textual wrapped line count using cell widths
-              const text = data.cell.text.join(' ');
-              const textLines = doc.splitTextToSize(text, data.column.width);
-              const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
-              
-              // Base image height is 36mm + 4mm structural padding margins
-              data.cell.styles.minCellHeight = calculatedTextHeight + 40; 
-            }
-          }
-        },
+      didParseCell: (data) => {
+  // Add data.section === 'body' check so it skips the header row
+  if (data.section === 'body' && data.column.index === 2) {
+    const item = itemsWithImages[data.row.index];
+    if (item && item.loadedImage) {
+      const text = data.cell.text.join(' ');
+      const textLines = doc.splitTextToSize(text, data.column.width);
+      const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
+      
+      data.cell.styles.minCellHeight = calculatedTextHeight + 40; 
+    }
+  }
+},
         willDrawCell: (data) => {
           doc.setDrawColor(0, 0, 0);
           if (data.section === 'head') {
