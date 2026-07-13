@@ -66,6 +66,14 @@ interface HierarchicalSelection {
   selectedItem: any | null;
 }
 
+interface ImageFileWithPreview {
+  file?: File;
+  preview: string;
+  isExisting: boolean;
+  existingUrl?: string;
+  id?: string; // For existing images that have an ID
+}
+
 export default function ProformaInvoiceForm({
   initialData,
   pageTitle
@@ -89,7 +97,7 @@ export default function ProformaInvoiceForm({
   const [filteredSizes, setFilteredSizes] = useState<Map<number, ISize[]>>(new Map());
   const [filteredTypes, setFilteredTypes] = useState<Map<number, IProductType[]>>(new Map());
   const [filteredItems, setFilteredItems] = useState<Map<number, any[]>>(new Map());
-    const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
 
   // Track hierarchical selection per item row
   const [hierarchicalSelections, setHierarchicalSelections] = useState<Map<number, HierarchicalSelection>>(new Map());
@@ -145,80 +153,109 @@ export default function ProformaInvoiceForm({
     name: 'items'
   });
 
-  interface ImageFileWithPreview {
-    file?: File;
-    preview: string;
-    isExisting?: boolean;
-    existingUrl?: string;
-  }
-
-  // Initialize item images from initial data
-// Initialize hierarchical selections from existing items when editing
+  // ✅ NEW: Initialize item images from initial data
+  // ✅ NEW: Initialize item images from initial data
 useEffect(() => {
-  // Only run when we have initialData with items AND the items list is loaded
-  if (initialData?.items && initialData.items.length > 0 && items.length > 0) {
-    const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
+  if (initialData?.items && initialData.items.length > 0) {
+    const newItemImages = new Map<number, ImageFileWithPreview[]>();
     
     initialData.items.forEach((item, index) => {
-      // The item data is nested in the 'item' property from the backend
-      // Or we can find it in the items list by itemId
-      let fullItem = item.item; // Direct from backend
-      
-      // If not found directly, try to find by itemId in the items list
-      if (!fullItem && item.itemId) {
-        fullItem = items.find(i => i.id === item.itemId);
-      }
-      
-      if (fullItem) {
-        // Set the hierarchical selection with the item's data
-        newHierarchicalSelections.set(index, {
-          categoryId: fullItem.categoryId || '',
-          sizeId: fullItem.sizeId || '',
-          typeId: fullItem.typeId || '',
-          selectedItem: fullItem
-        });
+      if (item.images && item.images.length > 0) {
+        const imagePreviews = item.images
+          .map((img: any) => {
+            // Use the normalizeImagePath helper to get the full URL
+            const normalizedUrl = normalizeImagePath(img.imageUrl);
+            
+            // ✅ Skip images that don't have a valid URL
+            if (!normalizedUrl) {
+              return null;
+            }
+            
+            return {
+              preview: normalizedUrl, // ✅ Now guaranteed to be a string
+              isExisting: true,
+              existingUrl: img.imageUrl, // Store the original path
+              id: img.id // Store the image ID if available
+            } as ImageFileWithPreview;
+          })
+          .filter((img): img is ImageFileWithPreview => img !== null); // ✅ Filter out null values
         
-        // Set the selected item ID
-        setSelectedItemIds(prev => {
-          const newMap = new Map(prev);
-          newMap.set(index, fullItem.id);
-          return newMap;
-        });
-        
-        // Auto-fill price if available
-        if (fullItem.price && fullItem.price > 0) {
-          setPriceAutoFilled(prev => {
-            const newMap = new Map(prev);
-            newMap.set(index, true);
-            return newMap;
-          });
-        }
-        
-        // Ensure materials are set from the item's materials if not already set
-        const currentMaterials = form.getValues(`items.${index}.materials`);
-
-        if (!currentMaterials?.length) {
-          const materialsList = Array.isArray(fullItem.itemMaterials)
-            ? fullItem.itemMaterials.map((im: any) => ({
-                id: '',
-                itemId: item.id || '',
-                materialId: im.materialId,
-                quantity: im.quantity ?? 1,
-                note: im.note ?? '',
-                materialIssues: [],
-              }))
-            : [];
-
-          if (materialsList.length > 0) {
-            form.setValue(`items.${index}.materials`, materialsList);
-          }
+        if (imagePreviews.length > 0) {
+          newItemImages.set(index, imagePreviews);
         }
       }
     });
     
-    setHierarchicalSelections(newHierarchicalSelections);
+    setItemImages(newItemImages);
   }
-}, [initialData, items, form]);
+}, [initialData]);
+
+  // Initialize hierarchical selections from existing items when editing
+  useEffect(() => {
+    // Only run when we have initialData with items AND the items list is loaded
+    if (initialData?.items && initialData.items.length > 0 && items.length > 0) {
+      const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
+      
+      initialData.items.forEach((item, index) => {
+        // The item data is nested in the 'item' property from the backend
+        // Or we can find it in the items list by itemId
+        let fullItem = item.item; // Direct from backend
+        
+        // If not found directly, try to find by itemId in the items list
+        if (!fullItem && item.itemId) {
+          fullItem = items.find(i => i.id === item.itemId);
+        }
+        
+        if (fullItem) {
+          // Set the hierarchical selection with the item's data
+          newHierarchicalSelections.set(index, {
+            categoryId: fullItem.categoryId || '',
+            sizeId: fullItem.sizeId || '',
+            typeId: fullItem.typeId || '',
+            selectedItem: fullItem
+          });
+          
+          // Set the selected item ID
+          setSelectedItemIds(prev => {
+            const newMap = new Map(prev);
+            newMap.set(index, fullItem.id);
+            return newMap;
+          });
+          
+          // Auto-fill price if available
+          if (fullItem.price && fullItem.price > 0) {
+            setPriceAutoFilled(prev => {
+              const newMap = new Map(prev);
+              newMap.set(index, true);
+              return newMap;
+            });
+          }
+          
+          // Ensure materials are set from the item's materials if not already set
+          const currentMaterials = form.getValues(`items.${index}.materials`);
+
+          if (!currentMaterials?.length) {
+            const materialsList = Array.isArray(fullItem.itemMaterials)
+              ? fullItem.itemMaterials.map((im: any) => ({
+                  id: '',
+                  itemId: item.id || '',
+                  materialId: im.materialId,
+                  quantity: im.quantity ?? 1,
+                  note: im.note ?? '',
+                  materialIssues: [],
+                }))
+              : [];
+
+            if (materialsList.length > 0) {
+              form.setValue(`items.${index}.materials`, materialsList);
+            }
+          }
+        }
+      });
+      
+      setHierarchicalSelections(newHierarchicalSelections);
+    }
+  }, [initialData, items, form]);
 
   // Fetch customers, materials, items, categories, sizes, types on component mount
   useEffect(() => {
@@ -284,17 +321,16 @@ useEffect(() => {
   );
 
   // Material options
-// Material options - Fixed to show all materials
-const materialOptions: SelectOption[] = useMemo(() => {
-  if (!materials || materials.length === 0) {
-    return [];
-  }
-  
-  return materials.map((material) => ({
-    value: material.id,
-    label: `${material.name}${material.color ? ` (${material.color})` : ''}`
-  }));
-}, [materials]);
+  const materialOptions: SelectOption[] = useMemo(() => {
+    if (!materials || materials.length === 0) {
+      return [];
+    }
+    
+    return materials.map((material) => ({
+      value: material.id,
+      label: `${material.name}${material.color ? ` (${material.color})` : ''}`
+    }));
+  }, [materials]);
 
   // Filter sizes based on selected category
   useEffect(() => {
@@ -329,37 +365,37 @@ const materialOptions: SelectOption[] = useMemo(() => {
   }, [types, hierarchicalSelections]);
 
   // Filter items based on selected category, size, AND type
-useEffect(() => {
-  if (items.length > 0) {
-    const newFilteredItems = new Map<number, any[]>();
-    hierarchicalSelections.forEach((selection, itemIndex) => {
-      const { categoryId, sizeId, typeId } = selection;
-      
-      // Only filter if we have at least category selected
-      if (categoryId) {
-        let filtered = items;
+  useEffect(() => {
+    if (items.length > 0) {
+      const newFilteredItems = new Map<number, any[]>();
+      hierarchicalSelections.forEach((selection, itemIndex) => {
+        const { categoryId, sizeId, typeId } = selection;
         
-        // Filter by category (items have categoryId)
-        filtered = filtered.filter(item => item.categoryId === categoryId);
-        
-        // Filter by size if selected
-        if (sizeId) {
-          filtered = filtered.filter(item => item.sizeId === sizeId);
+        // Only filter if we have at least category selected
+        if (categoryId) {
+          let filtered = items;
+          
+          // Filter by category (items have categoryId)
+          filtered = filtered.filter(item => item.categoryId === categoryId);
+          
+          // Filter by size if selected
+          if (sizeId) {
+            filtered = filtered.filter(item => item.sizeId === sizeId);
+          }
+          
+          // Filter by type if selected
+          if (typeId) {
+            filtered = filtered.filter(item => item.typeId === typeId);
+          }
+          
+          newFilteredItems.set(itemIndex, filtered);
+        } else {
+          newFilteredItems.set(itemIndex, []);
         }
-        
-        // Filter by type if selected
-        if (typeId) {
-          filtered = filtered.filter(item => item.typeId === typeId);
-        }
-        
-        newFilteredItems.set(itemIndex, filtered);
-      } else {
-        newFilteredItems.set(itemIndex, []);
-      }
-    });
-    setFilteredItems(newFilteredItems);
-  }
-}, [items, hierarchicalSelections]);
+      });
+      setFilteredItems(newFilteredItems);
+    }
+  }, [items, hierarchicalSelections]);
 
   const handleCategoryChange = (itemIndex: number, categoryId: string) => {
     const category = categories.find(c => c.id === categoryId);
@@ -491,102 +527,100 @@ useEffect(() => {
     });
   };
 
-const handleItemSelect = (itemIndex: number, selectedItem: any) => {
-  const currentSelection = getCurrentSelection(itemIndex);
-  
-  // Validate that the selected item matches all hierarchical selections
-  if (currentSelection.categoryId && selectedItem.categoryId !== currentSelection.categoryId) {
-    toast.error('Selected item does not match the selected category');
-    return;
-  }
-  
-  if (currentSelection.sizeId && selectedItem.sizeId !== currentSelection.sizeId) {
-    toast.error('Selected item does not match the selected size');
-    return;
-  }
-  
-  if (currentSelection.typeId && selectedItem.typeId !== currentSelection.typeId) {
-    toast.error('Selected item does not match the selected type');
-    return;
-  }
+  const handleItemSelect = (itemIndex: number, selectedItem: any) => {
+    const currentSelection = getCurrentSelection(itemIndex);
+    
+    // Validate that the selected item matches all hierarchical selections
+    if (currentSelection.categoryId && selectedItem.categoryId !== currentSelection.categoryId) {
+      toast.error('Selected item does not match the selected category');
+      return;
+    }
+    
+    if (currentSelection.sizeId && selectedItem.sizeId !== currentSelection.sizeId) {
+      toast.error('Selected item does not match the selected size');
+      return;
+    }
+    
+    if (currentSelection.typeId && selectedItem.typeId !== currentSelection.typeId) {
+      toast.error('Selected item does not match the selected type');
+      return;
+    }
 
-  // Update hierarchical selection
-  setHierarchicalSelections(prev => {
-    const newMap = new Map(prev);
-    const existing = newMap.get(itemIndex) || {
-      categoryId: '',
-      sizeId: '',
-      typeId: '',
-      selectedItem: null
-    };
-    newMap.set(itemIndex, {
-      ...existing,
-      selectedItem: selectedItem
-    });
-    return newMap;
-  });
-
-  setSelectedItemIds(prev => {
-    const newMap = new Map(prev);
-    newMap.set(itemIndex, selectedItem.id);
-    return newMap;
-  });
-  
-  form.setValue(`items.${itemIndex}.itemId`, selectedItem.id);
-  form.setValue(`items.${itemIndex}.description`, selectedItem.name);
-  
-  // REMOVE THIS LINE - Don't auto-fill size
-  // form.setValue(`items.${itemIndex}.size`, selectedItem.size || '');
-  
-  // Auto-fill price
-  if (selectedItem.price && selectedItem.price > 0) {
-    form.setValue(`items.${itemIndex}.unitPrice`, selectedItem.price);
-    setPriceAutoFilled(prev => {
+    // Update hierarchical selection
+    setHierarchicalSelections(prev => {
       const newMap = new Map(prev);
-      newMap.set(itemIndex, true);
+      const existing = newMap.get(itemIndex) || {
+        categoryId: '',
+        sizeId: '',
+        typeId: '',
+        selectedItem: null
+      };
+      newMap.set(itemIndex, {
+        ...existing,
+        selectedItem: selectedItem
+      });
       return newMap;
     });
-    calculateItemAmount(itemIndex);
-    toast.success(`Price ${formatCurrency(selectedItem.price)} applied`);
-  }
-  
-  // Auto-fill image
-  if (selectedItem.imageUrl) {
-    const normalizedImageUrl = normalizeImagePath(selectedItem.imageUrl);
-    if (normalizedImageUrl) {
-      const newImage: ImageFileWithPreview = {
-        preview: normalizedImageUrl,
-        isExisting: true,
-        existingUrl: selectedItem.imageUrl
-      };
-      
-      setItemImages(prev => {
+
+    setSelectedItemIds(prev => {
+      const newMap = new Map(prev);
+      newMap.set(itemIndex, selectedItem.id);
+      return newMap;
+    });
+    
+    form.setValue(`items.${itemIndex}.itemId`, selectedItem.id);
+    form.setValue(`items.${itemIndex}.description`, selectedItem.name);
+    
+    // Auto-fill price
+    if (selectedItem.price && selectedItem.price > 0) {
+      form.setValue(`items.${itemIndex}.unitPrice`, selectedItem.price);
+      setPriceAutoFilled(prev => {
         const newMap = new Map(prev);
-        const currentImages = newMap.get(itemIndex) || [];
-        newMap.set(itemIndex, [...currentImages, newImage]);
+        newMap.set(itemIndex, true);
         return newMap;
       });
-      
-      toast.success(`Image from item added`);
+      calculateItemAmount(itemIndex);
+      toast.success(`Price ${formatCurrency(selectedItem.price)} applied`);
     }
-  }
-  
-  // Auto-fill materials
-  if (selectedItem.itemMaterials && selectedItem.itemMaterials.length > 0) {
-    const materialsList = selectedItem.itemMaterials.map((im: { materialId: any; quantity: any; note: any; }) => ({
-      id: '',
-      itemId: '',
-      materialId: im.materialId,
-      quantity: im.quantity,
-      note: im.note || ''
-    }));
     
-    form.setValue(`items.${itemIndex}.materials`, materialsList);
-    toast.success(`Added ${materialsList.length} material(s) from item`);
-  } else {
-    form.setValue(`items.${itemIndex}.materials`, []);
-  }
-};
+    // Auto-fill image
+    if (selectedItem.imageUrl) {
+      const normalizedImageUrl = normalizeImagePath(selectedItem.imageUrl);
+      if (normalizedImageUrl) {
+        const newImage: ImageFileWithPreview = {
+          preview: normalizedImageUrl,
+          isExisting: true,
+          existingUrl: selectedItem.imageUrl
+        };
+        
+        setItemImages(prev => {
+          const newMap = new Map(prev);
+          const currentImages = newMap.get(itemIndex) || [];
+          newMap.set(itemIndex, [...currentImages, newImage]);
+          return newMap;
+        });
+        
+        toast.success(`Image from item added`);
+      }
+    }
+    
+    // Auto-fill materials
+    if (selectedItem.itemMaterials && selectedItem.itemMaterials.length > 0) {
+      const materialsList = selectedItem.itemMaterials.map((im: { materialId: any; quantity: any; note: any; }) => ({
+        id: '',
+        itemId: '',
+        materialId: im.materialId,
+        quantity: im.quantity,
+        note: im.note || ''
+      }));
+      
+      form.setValue(`items.${itemIndex}.materials`, materialsList);
+      toast.success(`Added ${materialsList.length} material(s) from item`);
+    } else {
+      form.setValue(`items.${itemIndex}.materials`, []);
+    }
+  };
+
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
@@ -648,6 +682,9 @@ const handleItemSelect = (itemIndex: number, selectedItem: any) => {
       
       return newMap;
     });
+    
+    // Note: If this is an existing image, the backend will need to handle deletion
+    // You might want to track deleted image IDs separately
   };
 
   const removeAttachment = (index: number) => {
@@ -780,15 +817,16 @@ const handleItemSelect = (itemIndex: number, selectedItem: any) => {
   };
 
   const onSubmit = async (data: ProformaInvoiceFormValues) => {
-      if (!initialData?.id) {
-    const confirmed = window.confirm(
-      "Are you sure you want to create this Proforma Invoice?"
-    );
+    if (!initialData?.id) {
+      const confirmed = window.confirm(
+        "Are you sure you want to create this Proforma Invoice?"
+      );
 
-    if (!confirmed) {
-      return;
+      if (!confirmed) {
+        return;
+      }
     }
-  }
+    
     try {
       setIsLoading(true);
 
@@ -818,7 +856,7 @@ const handleItemSelect = (itemIndex: number, selectedItem: any) => {
         const existingImages = itemImagesData
           .filter(img => img.isExisting && img.existingUrl)
           .map(img => ({
-            id: '',
+            id: img.id || '', // Keep the image ID if it exists
             itemId: item.id || '',
             imageUrl: img.existingUrl!,
             createdAt: new Date().toISOString()
@@ -952,29 +990,31 @@ const handleItemSelect = (itemIndex: number, selectedItem: any) => {
     };
   }, [hierarchicalSelections]);
 
-const handleCustomerCreated = async () => {
-  setShowCustomerModal(false);
+  const handleCustomerCreated = async () => {
+    setShowCustomerModal(false);
 
-  try {
-    const customersData = await getCustomer();
-    setCustomers(customersData || []);
-  } catch {
-    toast.error('Failed to refresh customers');
-  }
-};
-// Add a useEffect to suggest size when item is selected
-useEffect(() => {
-  // For each item field, check if we have a selected item
-  itemFields.forEach((field, index) => {
-    const currentSelection = getCurrentSelection(index);
-    const currentSize = form.getValues(`items.${index}.size`);
-    
-    // If item is selected and size field is empty, suggest from item
-    if (currentSelection.selectedItem?.size && !currentSize) {
-      form.setValue(`items.${index}.size`, currentSelection.selectedItem.size);
+    try {
+      const customersData = await getCustomer();
+      setCustomers(customersData || []);
+    } catch {
+      toast.error('Failed to refresh customers');
     }
-  });
-}, [itemFields, hierarchicalSelections, getCurrentSelection, form]);
+  };
+
+  // Add a useEffect to suggest size when item is selected
+  useEffect(() => {
+    // For each item field, check if we have a selected item
+    itemFields.forEach((field, index) => {
+      const currentSelection = getCurrentSelection(index);
+      const currentSize = form.getValues(`items.${index}.size`);
+      
+      // If item is selected and size field is empty, suggest from item
+      if (currentSelection.selectedItem?.size && !currentSize) {
+        form.setValue(`items.${index}.size`, currentSelection.selectedItem.size);
+      }
+    });
+  }, [itemFields, hierarchicalSelections, getCurrentSelection, form]);
+
   return (
     <>
     <div className="mx-auto w-full space-y-4">
@@ -1132,9 +1172,6 @@ useEffect(() => {
                           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
                             {itemIndex + 1}
                           </span>
-                          {/* <span className="text-sm font-medium">
-                            {form.watch(`items.${itemIndex}.item.name`) || 'New Item'}
-                          </span> */}
                         </div>
                         <Button
                           type="button"
@@ -1210,331 +1247,331 @@ useEffect(() => {
                               />
                             </div>
 
-                         <div>
-  <FormLabel className="text-xs">Item</FormLabel>
-  <Select
-    options={availableItems.map((item: any) => ({
-      value: item.id,
-      label: `${item.name}${item.color ? ` - ${item.color}` : ''}`,
-      item: item
-    }))}
-    value={availableItems.find((item: any) => item.id === currentSelection.selectedItem?.id) ? {
-      value: currentSelection.selectedItem?.id || '',
-      label: currentSelection.selectedItem?.name || ''
-    } : null}
-    onChange={(option: any) => {
-      if (option?.item) {
-        handleItemSelect(itemIndex, option.item);
-      }
-    }}
-    placeholder={
-      !currentSelection.categoryId 
-        ? "Select category first" 
-        : availableItems.length === 0 
-          ? "No items match filters" 
-          : "Select item"
-    }
-    isSearchable
-    isLoading={isFetchingItems}
-    isDisabled={!currentSelection.categoryId}
-    styles={isDark ? darkStyles : {}}
-    noOptionsMessage={() => 
-      currentSelection.categoryId 
-        ? "No items available for these filters" 
-        : "Select a category first"
-    }
-  />
-  {availableItems.length > 0 && (
-    <p className="text-xs text-muted-foreground mt-1">
-      {availableItems.length} item{availableItems.length > 1 ? 's' : ''} available
-    </p>
-  )}
-</div>
+                            <div>
+                              <FormLabel className="text-xs">Item</FormLabel>
+                              <Select
+                                options={availableItems.map((item: any) => ({
+                                  value: item.id,
+                                  label: `${item.name}${item.color ? ` - ${item.color}` : ''}`,
+                                  item: item
+                                }))}
+                                value={availableItems.find((item: any) => item.id === currentSelection.selectedItem?.id) ? {
+                                  value: currentSelection.selectedItem?.id || '',
+                                  label: currentSelection.selectedItem?.name || ''
+                                } : null}
+                                onChange={(option: any) => {
+                                  if (option?.item) {
+                                    handleItemSelect(itemIndex, option.item);
+                                  }
+                                }}
+                                placeholder={
+                                  !currentSelection.categoryId 
+                                    ? "Select category first" 
+                                    : availableItems.length === 0 
+                                      ? "No items match filters" 
+                                      : "Select item"
+                                }
+                                isSearchable
+                                isLoading={isFetchingItems}
+                                isDisabled={!currentSelection.categoryId}
+                                styles={isDark ? darkStyles : {}}
+                                noOptionsMessage={() => 
+                                  currentSelection.categoryId 
+                                    ? "No items available for these filters" 
+                                    : "Select a category first"
+                                }
+                              />
+                              {availableItems.length > 0 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {availableItems.length} item{availableItems.length > 1 ? 's' : ''} available
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
 
                         {/* ── Pricing Row ── */}
-                  {/* ── Pricing Row ── */}
-<div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-  {/* Quantity */}
-  <FormField
-    control={form.control}
-    name={`items.${itemIndex}.quantity`}
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel className="text-xs">Qty</FormLabel>
-        <FormControl>
-          <Input
-            type="number"
-            min="1"
-            placeholder="1"
-            {...field}
-            onChange={(e) => {
-              field.onChange(parseInt(e.target.value) || 1);
-              calculateItemAmount(itemIndex);
-            }}
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-
-  {/* Size - NEW EDITABLE FIELD */}
-<FormField
-  control={form.control}
-  name={`items.${itemIndex}.size`}
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel className="text-xs">
-        Size
-        {field.value && (
-          <Badge variant="secondary" className="ml-1 text-[10px]">
-            Custom
-          </Badge>
-        )}
-      </FormLabel>
-      <FormControl>
-        <Input
-          type="text"
-          placeholder="Enter size (optional)"
-          {...field}
-          value={typeof field.value === 'string' ? field.value : ''} // Ensure it's a string
-          onChange={(e) => {
-            field.onChange(e.target.value);
-          }}
-          className={field.value ? "border-blue-300 focus-visible:ring-blue-500" : ""}
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-
-  {/* Unit Price */}
-<FormField
-  control={form.control}
-  name={`items.${itemIndex}.unitPrice`}
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel className="flex items-center gap-2 text-xs">
-        Unit Price
-        {priceAutoFilled.get(itemIndex) && (
-          <Badge
-            variant="secondary"
-            className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-          >
-            Auto
-          </Badge>
-        )}
-      </FormLabel>
-
-      <FormControl>
-        <Input
-          type="text"
-          inputMode="decimal"
-          placeholder="0.00"
-          value={
-            field.value
-              ? Number(field.value).toLocaleString("en-US", {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 2,
-                })
-              : ""
-          }
-          onChange={(e) => {
-            // Remove commas before saving
-            const raw = e.target.value.replace(/,/g, "");
-            const value = parseFloat(raw) || 0;
-
-            field.onChange(value);
-            calculateItemAmount(itemIndex);
-
-            if (priceAutoFilled.get(itemIndex)) {
-              setPriceAutoFilled((prev) => {
-                const newMap = new Map(prev);
-                newMap.delete(itemIndex);
-                return newMap;
-              });
-            }
-          }}
-          className={
-            priceAutoFilled.get(itemIndex)
-              ? "border-green-300 focus-visible:ring-green-500"
-              : ""
-          }
-        />
-      </FormControl>
-
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-
-  {/* Amount */}
-  <FormField
-    control={form.control}
-    name={`items.${itemIndex}.amount`}
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel className="text-xs">Amount</FormLabel>
-        <FormControl>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            {...field}
-            readOnly
-            className="bg-muted/50 font-semibold"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-</div>
-
-                        {/* ── Descriptions ── */}
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name={`items.${itemIndex}.description`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Description</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder="Item description"
-                                  {...field}
-                                  rows={2}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name={`items.${itemIndex}.additionalDescription`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Additional Description</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder="Extra details about the item"
-                                  {...field}
-                                  rows={2}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        </div>
-
-                      <div className="mt-3 border-t pt-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className="text-xs font-semibold flex items-center gap-1.5">
-                            <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                            Materials
-                          </p>
-                          <div className="flex items-center gap-1.5">
-                            <Button type="button" variant="ghost" size="sm" onClick={refreshMaterials} className="h-6 text-[10px] px-2">
-                              Refresh
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => addMaterialToItem(itemIndex)} className="h-6 gap-1 text-[10px] px-2">
-                              <Plus className="h-3 w-3" />
-                              Add
-                            </Button>
-                          </div>
-                        </div>
-
-                        {(form.watch(`items.${itemIndex}.materials`)?.length || 0) > 0 ? (
-                          <div className="space-y-3">
-                            {form.watch(`items.${itemIndex}.materials`)?.map((material, materialIndex) => (
-                              <div key={materialIndex} className="grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12">
-                             <div className="md:col-span-5">
-  <FormLabel>Material</FormLabel>
-  <Select
-    options={materialOptions}
-    value={materialOptions.find((option) => option.value === material.materialId) || null}
-    onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
-    placeholder="Select material"
-    isSearchable
-    styles={isDark ? darkStyles : {}}
-    noOptionsMessage={() => "No materials available"}
-  />
-</div>
-
-                                <div className="md:col-span-2">
-                                  <FormLabel>Quantity</FormLabel>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                          {/* Quantity */}
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.quantity`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Qty</FormLabel>
+                                <FormControl>
                                   <Input
                                     type="number"
                                     min="1"
-                                    value={material.quantity}
-                                    onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'quantity', parseInt(e.target.value) || 1)}
-                                    placeholder="Qty"
+                                    placeholder="1"
+                                    {...field}
+                                    onChange={(e) => {
+                                      field.onChange(parseInt(e.target.value) || 1);
+                                      calculateItemAmount(itemIndex);
+                                    }}
                                   />
-                                </div>
-
-                                <div className="md:col-span-3">
-                                  <FormLabel>Note</FormLabel>
-                                  <Input
-                                    value={material.note || ''}
-                                    onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'note', e.target.value)}
-                                    placeholder="Optional note"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2 flex items-end">
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => removeMaterialFromItem(itemIndex, materialIndex)}
-                                    className="w-full"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">
-                            No materials — select an item above to auto-fill
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="mt-3 border-t pt-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-semibold flex items-center gap-1.5">
-                            <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                            Images
-                            {(itemImages.get(itemIndex)?.length || 0) > 0 && (
-                              <Badge variant="secondary" className="text-[10px] h-4 px-1">
-                                {itemImages.get(itemIndex)?.length}
-                              </Badge>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
                             )}
-                          </p>
-                          <div>
-                            <input
-                              type="file"
-                              id={`item-images-${itemIndex}`}
-                              accept="image/*"
-                              multiple
-                              onChange={(e) => handleAddItemImage(itemIndex, e)}
-                              className="hidden"
-                            />
-                            <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById(`item-images-${itemIndex}`)?.click()} className="h-6 gap-1 text-[10px] px-2">
-                              <Upload className="h-3 w-3" />
-                              Upload
-                            </Button>
-                          </div>
+                          />
+
+                          {/* Size - EDITABLE FIELD */}
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.size`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">
+                                  Size
+                                  {field.value && (
+                                    <Badge variant="secondary" className="ml-1 text-[10px]">
+                                      Custom
+                                    </Badge>
+                                  )}
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="text"
+                                    placeholder="Enter size (optional)"
+                                    {...field}
+                                    value={typeof field.value === 'string' ? field.value : ''}
+                                    onChange={(e) => {
+                                      field.onChange(e.target.value);
+                                    }}
+                                    className={field.value ? "border-blue-300 focus-visible:ring-blue-500" : ""}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Unit Price */}
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.unitPrice`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="flex items-center gap-2 text-xs">
+                                  Unit Price
+                                  {priceAutoFilled.get(itemIndex) && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                    >
+                                      Auto
+                                    </Badge>
+                                  )}
+                                </FormLabel>
+
+                                <FormControl>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="0.00"
+                                    value={
+                                      field.value
+                                        ? Number(field.value).toLocaleString("en-US", {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 2,
+                                          })
+                                        : ""
+                                    }
+                                    onChange={(e) => {
+                                      const raw = e.target.value.replace(/,/g, "");
+                                      const value = parseFloat(raw) || 0;
+
+                                      field.onChange(value);
+                                      calculateItemAmount(itemIndex);
+
+                                      if (priceAutoFilled.get(itemIndex)) {
+                                        setPriceAutoFilled((prev) => {
+                                          const newMap = new Map(prev);
+                                          newMap.delete(itemIndex);
+                                          return newMap;
+                                        });
+                                      }
+                                    }}
+                                    className={
+                                      priceAutoFilled.get(itemIndex)
+                                        ? "border-green-300 focus-visible:ring-green-500"
+                                        : ""
+                                    }
+                                  />
+                                </FormControl>
+
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Amount */}
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.amount`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Amount</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    {...field}
+                                    readOnly
+                                    className="bg-muted/50 font-semibold"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
+
+                        {/* ── Descriptions ── */}
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.description`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Description</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Item description"
+                                    {...field}
+                                    rows={2}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.additionalDescription`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Additional Description</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Extra details about the item"
+                                    {...field}
+                                    rows={2}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* ── Materials ── */}
+                        <div className="mt-3 border-t pt-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="text-xs font-semibold flex items-center gap-1.5">
+                              <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                              Materials
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <Button type="button" variant="ghost" size="sm" onClick={refreshMaterials} className="h-6 text-[10px] px-2">
+                                Refresh
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" onClick={() => addMaterialToItem(itemIndex)} className="h-6 gap-1 text-[10px] px-2">
+                                <Plus className="h-3 w-3" />
+                                Add
+                              </Button>
+                            </div>
+                          </div>
+
+                          {(form.watch(`items.${itemIndex}.materials`)?.length || 0) > 0 ? (
+                            <div className="space-y-3">
+                              {form.watch(`items.${itemIndex}.materials`)?.map((material, materialIndex) => (
+                                <div key={materialIndex} className="grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12">
+                                  <div className="md:col-span-5">
+                                    <FormLabel>Material</FormLabel>
+                                    <Select
+                                      options={materialOptions}
+                                      value={materialOptions.find((option) => option.value === material.materialId) || null}
+                                      onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
+                                      placeholder="Select material"
+                                      isSearchable
+                                      styles={isDark ? darkStyles : {}}
+                                      noOptionsMessage={() => "No materials available"}
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-2">
+                                    <FormLabel>Quantity</FormLabel>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={material.quantity}
+                                      onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                      placeholder="Qty"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-3">
+                                    <FormLabel>Note</FormLabel>
+                                    <Input
+                                      value={material.note || ''}
+                                      onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'note', e.target.value)}
+                                      placeholder="Optional note"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-2 flex items-end">
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => removeMaterialFromItem(itemIndex, materialIndex)}
+                                      className="w-full"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">
+                              No materials — select an item above to auto-fill
+                            </p>
+                          )}
+                        </div>
+
+                        {/* ── Images ── */}
+                        <div className="mt-3 border-t pt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold flex items-center gap-1.5">
+                              <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                              Images
+                              {(itemImages.get(itemIndex)?.length || 0) > 0 && (
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                  {itemImages.get(itemIndex)?.length}
+                                </Badge>
+                              )}
+                            </p>
+                            <div>
+                              <input
+                                type="file"
+                                id={`item-images-${itemIndex}`}
+                                accept="image/*"
+                                multiple
+                                onChange={(e) => handleAddItemImage(itemIndex, e)}
+                                className="hidden"
+                              />
+                              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById(`item-images-${itemIndex}`)?.click()} className="h-6 gap-1 text-[10px] px-2">
+                                <Upload className="h-3 w-3" />
+                                Upload
+                              </Button>
+                            </div>
+                          </div>
 
                           {(itemImages.get(itemIndex)?.length || 0) > 0 && (
                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
@@ -1553,8 +1590,8 @@ useEffect(() => {
                                     {/* Image Info Badge */}
                                     {image.isExisting && (
                                       <div className="absolute top-1 left-1">
-                                        <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800">
-                                          From Item
+                                        <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                          Existing
                                         </Badge>
                                       </div>
                                     )}
@@ -1582,25 +1619,35 @@ useEffect(() => {
                                     </Button>
                                   </div>
                                   
-                                  {/* Image Name */}
+                                  {/* Image Name for new uploads */}
                                   {!image.isExisting && image.file && (
                                     <p className="text-xs text-muted-foreground mt-1 truncate">
                                       {image.file.name}
+                                    </p>
+                                  )}
+                                  
+                                  {/* Show existing image path for reference */}
+                                  {image.isExisting && (
+                                    <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                                      {image.existingUrl?.split('/').pop() || 'Existing image'}
                                     </p>
                                   )}
                                 </div>
                               ))}
                             </div>
                           )}
+                        </div>
                       </div>
                     </div>
-                  </div>
                   );
                 })}
               </div>
             </CardContent>
           </Card>
 
+          {/* ════════════════════════════════════════════════════════════
+             SECTION 3 — Summary
+             ════════════════════════════════════════════════════════════ */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <CardTitle className="text-sm font-semibold">Summary</CardTitle>
@@ -1634,6 +1681,9 @@ useEffect(() => {
             </CardContent>
           </Card>
 
+          {/* ════════════════════════════════════════════════════════════
+             SECTION 4 — Attachments
+             ════════════════════════════════════════════════════════════ */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <div className="flex items-center gap-2">
@@ -1703,7 +1753,7 @@ useEffect(() => {
             >
               Cancel
             </Button>
-             <Button
+            <Button
               type="submit"
               disabled={isLoading}
               size="sm"
