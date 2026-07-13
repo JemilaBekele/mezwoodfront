@@ -214,6 +214,8 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
         head: [['#', 'Item', 'Item description', 'Unit price', 'Qty/sq', 'Total']],
         body: tableData,
         theme: 'plain',
+        rowPageBreak: 'avoid', // Prevent rows containing images from splitting across pages
+        margin: { left: 10, right: 10, top: 82, bottom: 25 }, // CRITICAL: Sets top buffer limit for dynamic pages
         headStyles: { 
           textColor: TEXT_BROWN, 
           fontStyle: 'bold', 
@@ -234,25 +236,28 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
           4: { cellWidth: 24, halign: 'center' }, 
           5: { cellWidth: 32, halign: 'right' },
         },
-        margin: { left: 10, right: 10, top: 82 }, // Keeps table below headers when breaking pages
         didParseCell: (data) => {
           if (data.section === 'body' && data.column.index === 2) {
             const item = itemsWithImages[data.row.index];
             if (item && item.loadedImage) {
-              // Ensure consistent spatial allocation for image injection heights without breaking
-              data.cell.styles.minCellHeight = 48; 
+              const text = data.cell.text.join(' ');
+              const textLines = doc.splitTextToSize(text, data.column.width);
+              const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
+              
+              // Pad space cleanly to support text layout alongside image dimensions natively
+              data.cell.styles.minCellHeight = calculatedTextHeight + 42; 
             }
           }
         },
         willDrawCell: (data) => {
-          doc.setDrawColor(0, 0, 0);
-          if (data.section === 'head') {
-            doc.setLineWidth(0.8);
-            doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
-            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-          } else if (data.section === 'body') {
+          // Native border handling avoiding unmeasured layout breaks
+          if (data.section === 'head' || data.section === 'body') {
+            doc.setDrawColor(0, 0, 0);
             doc.setLineWidth(0.8);
             doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+            if (data.section === 'head') {
+              doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+            }
           }
         },
         didDrawCell: (data) => {
@@ -261,15 +266,15 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
             if (item && item.loadedImage) {
               const textLines = data.cell.text || [];
               const textHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
-              const imageY = data.cell.y + textHeight + 2;
+              const imageY = data.cell.y + textHeight + 3;
 
-              // Renders image dynamically positioned within bounded scope coordinates
+              // Keep image within the boundaries of column 2
               doc.addImage(item.loadedImage, 'JPEG', data.cell.x, imageY, 55, 33);
             }
           }
         },
         didDrawPage: (data) => {
-          // If autoTable spawns pages dynamically, redraw headers correctly across new indices
+          // When table breaks over to subsequent pages, force the header structure onto them
           if (data.pageNumber > 1) {
             drawPageHeader(doc);
           }
@@ -282,7 +287,7 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       if (yPosition > doc.internal.pageSize.height - 45) {
         doc.addPage();
         drawPageHeader(doc);
-        yPosition = 90; // Align neatly under structural header lines on newly initialized pages
+        yPosition = 90; 
       }
 
       const subtotalValue = invoice.subtotal || totalPrice;
