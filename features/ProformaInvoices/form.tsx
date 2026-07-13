@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -32,7 +33,6 @@ import { getCategories, getSizes, getTypes } from '@/service/productConfiguratio
 import { IProductCategory, IProductType, ISize } from '@/models/productConfiguration';
 import { Modal } from '@/components/ui/modal';
 import CreateCustomerModal from './customer';
-import { IconPlus } from '@tabler/icons-react';
 import { CustomerSelect } from './customermodal';
 
 interface ProformaInvoiceFormValues {
@@ -1757,7 +1757,7 @@ useEffect(() => {
               type="submit"
               disabled={isLoading}
               size="sm"
-              className="min-w-[120px]"
+              className="min-w-30"
             >
               {isLoading
                 ? 'Saving...'

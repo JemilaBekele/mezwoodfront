@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -441,15 +442,6 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return 0;
     return item.proformaItemMaterials.reduce((total, material) => total + material.quantity, 0);
   };
-
-  // Get first image for an item
-  const getFirstImage = (item: IProformaInvoiceItem): IProformaInvoiceItemImage | undefined => {
-    if (item.images && item.images.length > 0) {
-      return item.images[0];
-    }
-    return undefined;
-  };
-
   // Get all images for an item
   const getAllImages = (item: IProformaInvoiceItem): IProformaInvoiceItemImage[] => {
     return item.images || [];
@@ -1225,15 +1217,15 @@ const formatDescription = (text: string, limit = 80) => {
                           </TableCell>
                           <TableCell className="max-w-65">
   <div className="space-y-1">
-   <TableCell className="max-w-[300px]">
-  <p className="break-words">
+   <TableCell className="max-w-75">
+  <p className="wrap-break-word">
     {formatDescription(item.description)}
   </p>
 </TableCell>
 
     {item.additionalDescription && (
       <div className="text-xs text-muted-foreground">
-  <p className="break-words">
+  <p className="wrap-break-word">
     {formatDescription(item.additionalDescription)}
         </p>
       </div>
