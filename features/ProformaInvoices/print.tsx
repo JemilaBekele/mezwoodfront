@@ -115,7 +115,6 @@ export const ProformaInvoicePrinter: React.FC<PDFGeneratorProps> = ({
         unit: 'mm',
         format: 'a4'
       });
-      let yPosition = 12;
 
       // --- PRE-LOAD IMAGES ---
       let logoImage = null;
@@ -137,86 +136,94 @@ export const ProformaInvoicePrinter: React.FC<PDFGeneratorProps> = ({
         })
       );
 
-      // --- HEADER ---
-      if (logoImage) {
-        doc.addImage(logoImage as string, 'JPEG', 15, 10, 42, 24);
-      }
-      
-      // Vertical Brown Divider Line
-      doc.setDrawColor(BRAND_BROWN[0], BRAND_BROWN[1], BRAND_BROWN[2]);
-      doc.setLineWidth(1.2);
-      doc.line(64, 11, 64, 32);
+      // --- REUSABLE HEADER RENDERING FUNCTION (REPEATS ON ALL PAGES) ---
+      const drawPageHeader = (pdfDoc: jsPDF) => {
+        // Logo
+        if (logoImage) {
+          pdfDoc.addImage(logoImage as string, 'JPEG', 15, 10, 42, 24);
+        }
+        
+        // Vertical Divider
+        pdfDoc.setDrawColor(BRAND_BROWN[0], BRAND_BROWN[1], BRAND_BROWN[2]);
+        pdfDoc.setLineWidth(1.2);
+        pdfDoc.line(64, 11, 64, 32);
 
-      // Company Titles
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(21);
-      doc.setTextColor(0, 0, 0);
-      doc.text(company.name || 'Rosewood Custom Furniture PLC', 69, 18);
-      
-      doc.setFontSize(16);
-      doc.text('', 69, 27);
-      
-      yPosition = 36;
+        // Company Title
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setFontSize(21);
+        pdfDoc.setTextColor(0, 0, 0);
+        pdfDoc.text(company.name || 'Rosewood Custom Furniture PLC', 69, 18);
+        
+        // Contact Banner Background
+        pdfDoc.setFillColor(BRAND_BROWN[0], BRAND_BROWN[1], BRAND_BROWN[2]);
+        pdfDoc.rect(10, 36, 190, 24, 'F');
+        pdfDoc.setTextColor(255, 255, 255);
+        pdfDoc.setFontSize(11);
+        pdfDoc.setFont('helvetica', 'normal');
 
-      // --- CONTACT BANNER ---
-      doc.setFillColor(BRAND_BROWN[0], BRAND_BROWN[1], BRAND_BROWN[2]);
-      doc.rect(10, yPosition, 190, 24, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
+        // TikTok Icon circle placeholder
+        pdfDoc.setDrawColor(255, 255, 255);
+        pdfDoc.setLineWidth(0.3);
+        pdfDoc.circle(17, 41, 2, 'D');
+        pdfDoc.setFontSize(8);
+        pdfDoc.text('d', 16.3, 41.7);
+        
+        // Left Banner info
+        pdfDoc.setFontSize(11);
+        pdfDoc.text(company.tiktok || '@rosewood.furniture', 22, 42);
+        pdfDoc.text(`+ ${company.phone || '251 905 84 85 86'}`, 22, 49);
+        pdfDoc.text(company.email || 'rosewoodcf@gmail.com', 22, 56);
 
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.3);
-      doc.circle(17, yPosition + 5, 2, 'D');
-      doc.setFontSize(8);
-      doc.text('d', 16.3, yPosition + 5.7);
-      
-      doc.setFontSize(11);
-      doc.text(company.tiktok || '@rosewood.furniture', 22, yPosition + 6);
-      doc.text(`+ ${company.phone || '251 905 84 85 86'}`, 22, yPosition + 13);
-      doc.text(company.email || 'rosewoodcf@gmail.com', 22, yPosition + 20);
+        // Right Banner Info
+        pdfDoc.text(company.address || 'Ayat round about road to tafo', 105, 42);
+        pdfDoc.text(company.addressTow || 'Ayertena round about infront of Shewa supermarket', 105, 49, { maxWidth: 90 });
 
-      doc.text(company.address || 'Ayat round about road to tafo', 105, yPosition + 6);
-      doc.text(company.addressTow || 'Ayertena round about infront of Shewa supermarket', 105, yPosition + 13, { maxWidth: 90 });
+        // Client Metadata Banner Block
+        const customerData = (invoice as any).customer || {};
+        pdfDoc.setTextColor(0, 0, 0);
+        pdfDoc.setFontSize(11);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.text(`To:${customerData.companyName || customerData.name || 'Amsal Resort (Hosana)'}`, 10, 71);
+        pdfDoc.text(formatDate(invoice.createdAt), 200, 71, { align: 'right' });
+        
+        pdfDoc.setDrawColor(0, 0, 0);
+        pdfDoc.setLineWidth(0.8);
+        pdfDoc.line(10, 73, 200, 73);
 
-      yPosition += 35;
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setTextColor(TEXT_BROWN[0], TEXT_BROWN[1], TEXT_BROWN[2]);
+        pdfDoc.text('PROFORMA INVOCE', 10, 78);
+        pdfDoc.text('To:', 130, 78);
+      };
 
-      // --- CLIENT META BANNER ---
-      const customerData = (invoice as any).customer || {};
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`To:${customerData.companyName || customerData.name || 'Amsal Resort (Hosana)'}`, 10, yPosition);
-      doc.text(formatDate(invoice.createdAt), 200, yPosition, { align: 'right' });
-      
-      yPosition += 2;
-      doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.8);
-      doc.line(10, yPosition, 200, yPosition);
-
-      yPosition += 5;
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(TEXT_BROWN[0], TEXT_BROWN[1], TEXT_BROWN[2]);
-      doc.text('PROFORMA INVOCE', 10, yPosition);
-      doc.text('To:', 130, yPosition);
-      
-      yPosition += 2;
+      // Draw Header on Page 1 initial view
+      drawPageHeader(doc);
 
       // --- AUTO-TABLE SPECIFICATION ---
-      const tableData = itemsWithImages.map((item, index) => [
-        (index + 1).toString(),
-        (item.item?.name || 'ITEM').toUpperCase(),
-        item.description || item.size || 'No description provided',
-        formatCurrency(item.unitPrice),
-        item.quantity.toString(),
-        formatCurrency(item.amount || (item.unitPrice * item.quantity)),
-      ]);
+      const tableData = itemsWithImages.map((item, index) => {
+        const baseDescription = item.description || item.size || 'No description provided';
+        // Append 8 newlines when an image exists so autoTable natively reserves ~36mm of space
+        const descriptionWithSpace = item.loadedImage 
+          ? `${baseDescription}\n\n\n\n\n\n\n\n` 
+          : baseDescription;
+
+        return [
+          (index + 1).toString(),
+          (item.item?.name || 'ITEM').toUpperCase(),
+          descriptionWithSpace,
+          formatCurrency(item.unitPrice),
+          item.quantity.toString(),
+          formatCurrency(item.amount || (item.unitPrice * item.quantity)),
+        ];
+      });
 
       autoTable(doc, {
-        startY: yPosition,
+        startY: 82,
         head: [['#', 'Item', 'Item description', 'Unit price', 'Qty/sq', 'Total']],
         body: tableData,
         theme: 'plain',
+        rowPageBreak: 'avoid', // Ensures rows with images stay intact on a single page
+        margin: { left: 10, right: 10, top: 82, bottom: 25 }, // Ensures clean space for repeating headers
         headStyles: { 
           textColor: TEXT_BROWN, 
           fontStyle: 'bold', 
@@ -237,53 +244,42 @@ export const ProformaInvoicePrinter: React.FC<PDFGeneratorProps> = ({
           4: { cellWidth: 24, halign: 'center' }, 
           5: { cellWidth: 32, halign: 'right' },
         },
-        margin: { left: 10, right: 10 },
-       didParseCell: (data) => {
-  // Add data.section === 'body' check so it skips the header row
-  if (data.section === 'body' && data.column.index === 2) {
-    const item = itemsWithImages[data.row.index];
-    if (item && item.loadedImage) {
-      const text = data.cell.text.join(' ');
-      const textLines = doc.splitTextToSize(text, data.column.width);
-      const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
-      
-      data.cell.styles.minCellHeight = calculatedTextHeight + 40; 
-    }
-  }
-},
-        willDrawCell: (data) => {
-          doc.setDrawColor(0, 0, 0);
-          if (data.section === 'head') {
-            doc.setLineWidth(0.8);
-            doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
-            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-          } else if (data.section === 'body') {
-            doc.setLineWidth(0.8);
-            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-          }
-        },
         didDrawCell: (data) => {
+          // Draw bottom border line for clean table separation
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.8);
+          doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+          if (data.section === 'head') {
+            doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+          }
+
+          // Draw image inside the cleanly reserved newline space
           if (data.section === 'body' && data.column.index === 2) {
             const item = itemsWithImages[data.row.index];
-            if (item.loadedImage) {
-              const textLines = data.cell.text || [];
-              const textHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
-              
-              const paddingBelowText = 3; 
-              const imageY = data.cell.y + textHeight + paddingBelowText;
-
-              doc.addImage(item.loadedImage, 'JPEG', data.cell.x, imageY, 60, 36);
+            if (item && item.loadedImage) {
+              const imageWidth = 55;
+              const imageHeight = 33;
+              // Anchor the image to the bottom of the cell with a 3mm gap above the border line
+              const imageY = data.cell.y + data.cell.height - imageHeight - 3;
+              doc.addImage(item.loadedImage, 'JPEG', data.cell.x, imageY, imageWidth, imageHeight);
             }
           }
         },
+        didDrawPage: (data) => {
+          // Whenever autoTable naturally creates a new page, repeat the header banner precisely
+          if (data.pageNumber > 1) {
+            drawPageHeader(doc);
+          }
+        }
       });
 
-      yPosition = (doc as any).lastAutoTable.finalY + 12;
+      let yPosition = (doc as any).lastAutoTable.finalY + 12;
 
       // --- SIGNATURE AND INVOICE TOTALS SUMMARY ---
       if (yPosition > doc.internal.pageSize.height - 45) {
         doc.addPage();
-        yPosition = 20;
+        drawPageHeader(doc);
+        yPosition = 90; // Align cleanly under the header line on newly created pages
       }
 
       const subtotalValue = invoice.subtotal || totalPrice;
