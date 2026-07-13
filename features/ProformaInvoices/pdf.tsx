@@ -69,7 +69,7 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
   };
 
   const formatDate = (date?: Date | string) => {
-    if (!date) return 'Jan,2026';
+    if (!date) return 'Jul,2026';
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
       year: 'numeric',
@@ -136,7 +136,7 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
         })
       );
 
-      // --- REUSABLE HEADER RENDERING FUNCTION ---
+      // --- REUSABLE HEADER RENDERING FUNCTION (REPEATS ON ALL PAGES) ---
       const drawPageHeader = (pdfDoc: jsPDF) => {
         // Logo
         if (logoImage) {
@@ -171,8 +171,8 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
         // Left Banner info
         pdfDoc.setFontSize(11);
         pdfDoc.text(company.tiktok || '@rosewood.furniture', 22, 42);
-        pdfDoc.text(`+ ${company.phone || '251 905 84 85 86'}`, 22, 49);
-        pdfDoc.text(company.email || 'rosewoodcf@gmail.com', 22, 56);
+        pdfDoc.text(`+ ${company.phone || '0905848586'}`, 22, 49);
+        pdfDoc.text(company.email || 'rosewoodCF@gmail.com', 22, 56);
 
         // Right Banner Info
         pdfDoc.text(company.address || 'Ayat round about road to tafo', 105, 42);
@@ -200,22 +200,30 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       drawPageHeader(doc);
 
       // --- AUTO-TABLE SPECIFICATION ---
-      const tableData = itemsWithImages.map((item, index) => [
-        (index + 1).toString(),
-        (item.item?.name || 'ITEM').toUpperCase(),
-        item.description || item.size || 'No description provided',
-        formatCurrency(item.unitPrice),
-        item.quantity.toString(),
-        formatCurrency(item.amount || (item.unitPrice * item.quantity)),
-      ]);
+      const tableData = itemsWithImages.map((item, index) => {
+        const baseDescription = item.description || item.size || 'No description provided';
+        // Append 8 newlines when an image exists so autoTable natively reserves ~36mm of space
+        const descriptionWithSpace = item.loadedImage 
+          ? `${baseDescription}\n\n\n\n\n\n\n\n` 
+          : baseDescription;
+
+        return [
+          (index + 1).toString(),
+          (item.item?.name || 'ITEM').toUpperCase(),
+          descriptionWithSpace,
+          formatCurrency(item.unitPrice),
+          item.quantity.toString(),
+          formatCurrency(item.amount || (item.unitPrice * item.quantity)),
+        ];
+      });
 
       autoTable(doc, {
         startY: 82,
         head: [['#', 'Item', 'Item description', 'Unit price', 'Qty/sq', 'Total']],
         body: tableData,
         theme: 'plain',
-        rowPageBreak: 'avoid', // Prevent rows containing images from splitting across pages
-        margin: { left: 10, right: 10, top: 82, bottom: 25 }, // CRITICAL: Sets top buffer limit for dynamic pages
+        rowPageBreak: 'avoid', // Ensures rows with images stay intact on a single page
+        margin: { left: 10, right: 10, top: 82, bottom: 25 }, // Ensures clean space for repeating headers
         headStyles: { 
           textColor: TEXT_BROWN, 
           fontStyle: 'bold', 
@@ -236,45 +244,29 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
           4: { cellWidth: 24, halign: 'center' }, 
           5: { cellWidth: 32, halign: 'right' },
         },
-        didParseCell: (data) => {
-          if (data.section === 'body' && data.column.index === 2) {
-            const item = itemsWithImages[data.row.index];
-            if (item && item.loadedImage) {
-              const text = data.cell.text.join(' ');
-              const textLines = doc.splitTextToSize(text, data.column.width);
-              const calculatedTextHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
-              
-              // Pad space cleanly to support text layout alongside image dimensions natively
-              data.cell.styles.minCellHeight = calculatedTextHeight + 42; 
-            }
-          }
-        },
-        willDrawCell: (data) => {
-          // Native border handling avoiding unmeasured layout breaks
-          if (data.section === 'head' || data.section === 'body') {
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(0.8);
-            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-            if (data.section === 'head') {
-              doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
-            }
-          }
-        },
         didDrawCell: (data) => {
+          // Draw bottom border line for clean table separation
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.8);
+          doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+          if (data.section === 'head') {
+            doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+          }
+
+          // Draw image inside the cleanly reserved newline space
           if (data.section === 'body' && data.column.index === 2) {
             const item = itemsWithImages[data.row.index];
             if (item && item.loadedImage) {
-              const textLines = data.cell.text || [];
-              const textHeight = textLines.length * (data.cell.styles.fontSize / 2.3);
-              const imageY = data.cell.y + textHeight + 3;
-
-              // Keep image within the boundaries of column 2
-              doc.addImage(item.loadedImage, 'JPEG', data.cell.x, imageY, 55, 33);
+              const imageWidth = 55;
+              const imageHeight = 33;
+              // Anchor the image to the bottom of the cell with a 3mm gap above the border line
+              const imageY = data.cell.y + data.cell.height - imageHeight - 3;
+              doc.addImage(item.loadedImage, 'JPEG', data.cell.x, imageY, imageWidth, imageHeight);
             }
           }
         },
         didDrawPage: (data) => {
-          // When table breaks over to subsequent pages, force the header structure onto them
+          // Whenever autoTable naturally creates a new page, repeat the header banner precisely
           if (data.pageNumber > 1) {
             drawPageHeader(doc);
           }
@@ -287,7 +279,7 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       if (yPosition > doc.internal.pageSize.height - 45) {
         doc.addPage();
         drawPageHeader(doc);
-        yPosition = 90; 
+        yPosition = 90; // Align cleanly under the header line on newly created pages
       }
 
       const subtotalValue = invoice.subtotal || totalPrice;
