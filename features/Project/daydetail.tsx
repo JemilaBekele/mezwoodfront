@@ -440,7 +440,10 @@ export default function DayDetailPage() {
                                 <div key={a.id} className="day-detail-alloc">
                                   <span className="day-detail-alloc-proj">
                                     {a.projectStage?.project?.invoice?.piNumber || 
-                                     a.projectStage?.project?.customer?.name || "—"}
+                                      "—"}
+                                      <span className="flex day-detail-proj-cust">
+                                  { a.projectStage?.project?.customer?.name || ""}
+                                </span>
                                   </span>
                                   <span className="day-detail-alloc-units cc-mono">{a.allocatedUnits}u · {a.allocatedHours}h</span>
                                   {a.isOverCapacity && <span className="day-detail-alloc-over">OVER</span>}

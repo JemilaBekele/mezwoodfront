@@ -27,7 +27,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Card,
@@ -48,11 +57,12 @@ import {
   ArrowLeft,
   Loader2,
   Lock,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IProject, IProjectStage, ProjectStatus, StageStatus } from '@/models/Projects';
-import { getProjectId, updateProjectStage } from '@/service/Project';
+import { getProjectId, updateProjectStage, deleteProjectStage } from '@/service/Project';
 import { CapacityStage, ICapacityLot, IDailyStageCapacity } from '@/models/CapacityLot';
 import { getCapacitySlots } from '@/service/CapacityLot';
 import { getAllDailyStageCapacities } from '@/service/Category';
@@ -71,7 +81,6 @@ interface StageFormData {
   status?: StageStatus;
   finished?: boolean;
 }
-
 
 interface DateCapacityInfo {
   date: string;
@@ -180,11 +189,17 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
     capacityDays: 1,
     timeTaken: 0,
     isNew: true,
-    workUnits: 0, // Default value for new stages
+    workUnits: 0,
   };
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [form, setForm] = useState<StageFormData>(emptyStage);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [stageToDelete, setStageToDelete] = useState<StageFormData | null>(null);
+  const [deleteDownstream, setDeleteDownstream] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   // Capacity data states
   const [capacityLots, setCapacityLots] = useState<ICapacityLot[]>([]);
@@ -577,35 +592,67 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
     if (ok) setFormOpen(false);
   };
 
-  // Handle remove stage
-  const handleRemoveStage = async (stageId: string) => {
+  // Handle delete stage - open confirmation dialog
+  const handleDeleteClick = (stage: StageFormData) => {
     if (!canEdit) {
       toast.error('You do not have permission to remove stages');
       return;
     }
 
-    const stageToRemove = stages.find(s => s.id === stageId);
-    if (stageToRemove && isStageFinished(stageToRemove)) {
+    if (isStageFinished(stage)) {
       toast.error('Cannot remove a finished/completed stage');
       return;
     }
 
-    const updatedStages = stages.filter(stage => stage.id !== stageId);
-    setStages(updatedStages);
-
-    // Remove validation warnings for this stage
-    setDateValidationWarnings(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(stageId);
-      return newMap;
-    });
-    
-    toast.success('Stage removed successfully');
+    setStageToDelete(stage);
+    setDeleteDownstream(false);
+    setDeleteDialogOpen(true);
   };
 
-  // ==================== TIME TRACKING FUNCTIONS ====================
-  
+  // Perform actual delete
+  const performDelete = async () => {
+    if (!project?.id || !stageToDelete) {
+      toast.error('Missing project or stage information');
+      return;
+    }
 
+    try {
+      setDeleting(true);
+      
+      await deleteProjectStage({
+        projectId: project.id,
+        stageName: stageToDelete.stage,
+        deleteDownstream: deleteDownstream,
+      });
+
+      toast.success(
+        deleteDownstream
+          ? `Stage ${getStageDisplayName(stageToDelete.stage)} and downstream stages deleted successfully`
+          : `Stage ${getStageDisplayName(stageToDelete.stage)} deleted successfully`
+      );
+
+      // Remove validation warnings for this stage
+      if (stageToDelete.id) {
+        setDateValidationWarnings(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(stageToDelete.id!);
+          return newMap;
+        });
+      }
+
+      // Refresh project data
+      await fetchProjectData();
+      
+      // Close dialog
+      setDeleteDialogOpen(false);
+      setStageToDelete(null);
+      setDeleteDownstream(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete stage');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Get existing stage values for filtering
   const existingStageValues = stages.map(stage => stage.stage);
@@ -615,6 +662,15 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
   const inProgressStages = stages.filter(s => s.status === StageStatus.IN_PROGRESS).length;
   const pendingStages = stages.filter(s => (!s.status || s.status !== StageStatus.COMPLETED) && !s.finished).length;
   const totalTimeLogged = stages.reduce((total, stage) => total + (stage.timeTaken || 0), 0);
+
+  // Get downstream stages for the delete warning
+  const getDownstreamStages = (stageId: string): string[] => {
+    const stageIndex = stages.findIndex(s => s.id === stageId);
+    if (stageIndex === -1) return [];
+    return stages
+      .slice(stageIndex + 1)
+      .map(s => getStageDisplayName(s.stage));
+  };
 
   // Render a single stage table row
   const renderStageRow = (
@@ -718,9 +774,11 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={() => handleRemoveStage(stage.id!)}
-                className="h-7 w-7 text-red-600 hover:text-red-700"
-                title="Remove stage"
+                onClick={() => handleDeleteClick(stage)}
+                className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                title="Delete stage"
+                        disabled={(stage.actualWorkUnits ?? 0) > 0}
+
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -888,8 +946,132 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
 
   const canAddStage = canEdit && existingStageValues.length < availableStages.length;
 
-  const stagesTable = (
-    <div className="overflow-x-auto rounded-md border">
+const stagesTable = (
+  <div className="overflow-x-auto rounded-md border">
+    {/* Mobile card view - visible on small screens */}
+    <div className="block sm:hidden divide-y divide-border">
+      {stages.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">
+          No stages found for this project
+        </div>
+      ) : (
+        stages.map((stage) => {
+          const isFinished = isStageFinished(stage);
+          const efficiency = calculateEfficiency(stage);
+          const warnings = dateValidationWarnings.get(stage.id || '');
+          const hasOverCapacity = warnings?.some((w) => w.isOverCapacity) || false;
+          const progress = calculateStageProgress(stage);
+          
+          return (
+            <div key={stage.id} className="p-3 space-y-2">
+              {/* Stage header with status */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">
+                    {getStageDisplayName(stage.stage)}
+                  </span>
+                  {isFinished && <Lock className="h-3 w-3 shrink-0 text-muted-foreground" />}
+                  {hasOverCapacity && !isFinished && (
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-yellow-500" />
+                  )}
+                </div>
+                <Badge
+                  variant={
+                    stage.status === StageStatus.COMPLETED || stage.finished
+                      ? 'default'
+                      : stage.status === StageStatus.IN_PROGRESS
+                        ? 'secondary'
+                        : 'outline'
+                  }
+                  className="h-5 px-1.5 text-[10px] shrink-0"
+                >
+                  {stage.status || (stage.finished ? 'COMPLETED' : 'PENDING')}
+                </Badge>
+              </div>
+
+              {/* Stage details grid */}
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                <div>
+                  <span className="text-muted-foreground">Start:</span>
+                  <span className="ml-1 font-mono text-[10px]">
+                    {safeFormatDateTime(stage.startDate)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">End:</span>
+                  <span className="ml-1 font-mono text-[10px]">
+                    {safeFormatDateTime(approximateEndDate(stage) || stage.endDate)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Time:</span>
+                  <span className="ml-1 font-mono text-[10px]">
+                    {formatMinutes(stage.timeTaken)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Eff.:</span>
+                  <span className="ml-1 font-mono text-[10px]">
+                    {efficiency ? `${efficiency}%` : '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div 
+                      className="h-full rounded-full bg-primary transition-all" 
+                      style={{ width: `${progress}%` }} 
+                    />
+                  </div>
+                  <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+                    {progress}%
+                  </span>
+                </div>
+                {stage.actualWorkUnits !== undefined && stage.workUnits ? (
+                  <div className="text-[10px] text-muted-foreground tabular-nums">
+                    {stage.actualWorkUnits} / {stage.workUnits} units
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-1 pt-1 border-t border-border/50">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => openEditDialog(stage)}
+                  disabled={isFinished || !canEdit}
+                  title={isFinished ? 'Finished stages cannot be edited' : 'Edit stage'}
+                  className="h-7 px-2 text-xs"
+                >
+                  <Edit2 className="h-3.5 w-3.5 mr-1" />
+                  Edit
+                </Button>
+                {canEdit && !isFinished && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeleteClick(stage)}
+                    className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                    title="Delete stage"
+                    disabled={(stage.actualWorkUnits ?? 0) > 0 }
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+
+    {/* Desktop table view - hidden on small screens */}
+    <div className="hidden sm:block">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -923,121 +1105,212 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
         </TableBody>
       </Table>
     </div>
-  );
+  </div>
+);
 
-  return (
-    <div className={embedded ? 'min-w-0 space-y-3' : 'min-w-0 w-full space-y-3'}>
-      {!embedded && (
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-base font-bold tracking-tight">Manage Project Stages</h1>
-                <Badge variant="outline" className="h-5 shrink-0 text-[10px]">{getStageDisplayName(project.status)}</Badge>
-              </div>
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Lock className="h-3 w-3" />
-                Finished stages cannot be edited or removed
-              </p>
+return (
+  <div className={embedded ? 'min-w-0 space-y-3' : 'min-w-0 w-full space-y-3 p-2 sm:p-4'}>
+    {!embedded && (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-sm sm:text-base font-bold tracking-tight">Manage Project Stages</h1>
+              <Badge variant="outline" className="h-5 shrink-0 text-[10px]">{getStageDisplayName(project.status)}</Badge>
             </div>
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3 shrink-0" />
+              <span className="truncate">Finished stages cannot be edited or removed</span>
+            </p>
           </div>
-          {canAddStage && (
-            <Button size="sm" variant="outline" className="h-7 shrink-0 gap-1.5 text-xs" onClick={openAddDialog}>
-              <Plus className="h-3.5 w-3.5" /> Add Stage
+        </div>
+        {canAddStage && (
+          <Button size="sm" variant="outline" className="h-7 shrink-0 gap-1.5 text-xs w-full sm:w-auto" onClick={openAddDialog}>
+            <Plus className="h-3.5 w-3.5" /> Add Stage
+          </Button>
+        )}
+      </div>
+    )}
+
+    {/* Stats strip - responsive grid */}
+    {!embedded && (
+      <div className="grid grid-cols-2 gap-2 xs:grid-cols-3 sm:grid-cols-5">
+        {[
+          { label: 'Total', value: stages.length },
+          { label: 'Completed', value: completedStages, color: 'text-emerald-600' },
+          { label: 'In Progress', value: inProgressStages, color: 'text-blue-600' },
+          { label: 'Pending', value: pendingStages, color: 'text-amber-600' },
+          { label: 'Time Logged', value: formatMinutes(totalTimeLogged) },
+        ].map((stat: any) => (
+          <div key={stat.label} className="rounded-md border bg-card px-2 py-1.5 sm:px-3">
+            <p className="text-[8px] xs:text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate">
+              {stat.label}
+            </p>
+            <p className={`mt-0.5 text-xs sm:text-sm font-bold tabular-nums ${stat.color || ''}`}>
+              {stat.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* Stages Table */}
+    {embedded ? (
+      <>
+        {canAddStage && (
+          <div className="mb-2 flex flex-col xs:flex-row xs:items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              {stages.length} stage{stages.length !== 1 ? 's' : ''}
+            </p>
+            <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs w-full xs:w-auto" onClick={openAddDialog}>
+              <Plus className="h-3 w-3" /> Add Stage
             </Button>
-          )}
-        </div>
-      )}
-
-      {/* Stats strip */}
-      {!embedded && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {[
-            { label: 'Total', value: stages.length },
-            { label: 'Completed', value: completedStages, color: 'text-emerald-600' },
-            { label: 'In Progress', value: inProgressStages, color: 'text-blue-600' },
-            { label: 'Pending', value: pendingStages, color: 'text-amber-600' },
-            { label: 'Time Logged', value: formatMinutes(totalTimeLogged) },
-          ].map((stat: any) => (
-            <div key={stat.label} className="rounded-md border bg-card px-3 py-1.5">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{stat.label}</p>
-              <p className={`mt-0.5 text-sm font-bold tabular-nums ${stat.color || ''}`}>{stat.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-
-      {/* Stages Table */}
-      {embedded ? (
-        <>
-          {canAddStage && (
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">{stages.length} stage{stages.length !== 1 ? 's' : ''}</p>
-              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={openAddDialog}>
-                <Plus className="h-3 w-3" /> Add Stage
-              </Button>
-            </div>
-          )}
+          </div>
+        )}
+        {stagesTable}
+      </>
+    ) : (
+      <Card className="gap-0 py-0">
+        <CardHeader className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2 px-3 py-2">
+          <CardTitle className="text-xs font-semibold">Project Stages</CardTitle>
+          <span className="text-[10px] text-muted-foreground shrink-0">
+            {stages.length} total
+          </span>
+        </CardHeader>
+        <CardContent className="px-2 sm:px-3 pb-3">
           {stagesTable}
-        </>
-      ) : (
-        <Card className="gap-0 py-0">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 px-3 py-2">
-            <CardTitle className="text-xs font-semibold">Project Stages</CardTitle>
-            <span className="text-[10px] text-muted-foreground">{stages.length} total</span>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            {stagesTable}
-          </CardContent>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
+    )}
 
-      {/* Add / Edit Stage Dialog */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base">
-              {formMode === 'add' ? 'Add New Stage' : `Edit ${getStageDisplayName(form.stage)}`}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              {formMode === 'add'
-                ? 'Enter the stage details and estimated work units.'
-                : 'Update the schedule and logged time. Work units cannot be modified after creation.'}
-            </DialogDescription>
-          </DialogHeader>
-          {renderStageFormFields()}
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setFormOpen(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleSaveForm} disabled={saving || !form.startDate || !form.stage || (formMode === 'add' && (!form.workUnits || form.workUnits <= 0))}>
-              {saving ? (
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              ) : formMode === 'add' ? (
-                <Plus className="mr-1.5 h-4 w-4" />
-              ) : (
-                <Save className="mr-1.5 h-4 w-4" />
-              )}
-              {formMode === 'add' ? 'Add Stage' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+    {/* Add / Edit Stage Dialog */}
+    <Dialog open={formOpen} onOpenChange={setFormOpen}>
+      <DialogContent className="sm:max-w-md max-w-[95vw] p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle className="text-sm sm:text-base">
+            {formMode === 'add' ? 'Add New Stage' : `Edit ${getStageDisplayName(form.stage)}`}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            {formMode === 'add'
+              ? 'Enter the stage details and estimated work units.'
+              : 'Update the schedule and logged time. Work units cannot be modified after creation.'}
+          </DialogDescription>
+        </DialogHeader>
+        {renderStageFormFields()}
+        <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+          <Button variant="outline" size="sm" onClick={() => setFormOpen(false)} disabled={saving} className="w-full sm:w-auto">
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleSaveForm} disabled={saving || !form.startDate || !form.stage || (formMode === 'add' && (!form.workUnits || form.workUnits <= 0))} className="w-full sm:w-auto">
+            {saving ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : formMode === 'add' ? (
+              <Plus className="mr-1.5 h-4 w-4" />
+            ) : (
+              <Save className="mr-1.5 h-4 w-4" />
+            )}
+            {formMode === 'add' ? 'Add Stage' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
+    {/* Delete Stage Confirmation Dialog */}
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent className="max-w-[95vw] sm:max-w-lg p-4 sm:p-6">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-sm sm:text-base flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+            Delete Stage
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-xs space-y-2">
+            <p>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold text-foreground">
+                {stageToDelete ? getStageDisplayName(stageToDelete.stage) : ''}
+              </span>
+              ?
+            </p>
+            
+            {stageToDelete && getDownstreamStages(stageToDelete.id || '').length > 0 && (
+              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-950/20">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">
+                      Warning: This stage has downstream stages
+                    </p>
+                    <p className="text-[10px] text-yellow-700 dark:text-yellow-400/80 break-words">
+                      Deleting this stage will affect:{' '}
+                      {getDownstreamStages(stageToDelete.id || '').join(', ')}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="deleteDownstream"
+                        checked={deleteDownstream}
+                        onChange={(e) => setDeleteDownstream(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary shrink-0"
+                      />
+                      <label htmlFor="deleteDownstream" className="text-[10px] font-medium text-yellow-800 dark:text-yellow-300">
+                        Also delete all downstream stages
+                      </label>
+                    </div>
+                    <p className="mt-1 text-[10px] text-yellow-600 dark:text-yellow-400/70">
+                      {deleteDownstream
+                        ? 'All stages after this one will be permanently removed.'
+                        : 'Downstream stages will be rescheduled to fill the gap.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
-      {/* Action Buttons */}
-      {!embedded && (
-        <div className="flex justify-end gap-2 border-t pt-3">
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => router.back()}>Cancel</Button>
-          <Button size="sm" className="h-7 text-xs" variant="secondary" onClick={fetchProjectData}>Refresh</Button>
-        </div>
-      )}
-    </div>
-  );
+            {stageToDelete && getDownstreamStages(stageToDelete.id || '').length === 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                This action cannot be undone. The stage will be permanently removed along with all its capacity allocations.
+              </p>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2">
+          <AlertDialogCancel disabled={deleting} className="w-full sm:w-auto">
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={performDelete}
+            disabled={deleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
+          >
+            {deleting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              'Delete Stage'
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Action Buttons */}
+    {!embedded && (
+      <div className="flex flex-col-reverse xs:flex-row justify-end gap-2 border-t pt-3">
+        <Button variant="outline" size="sm" className="h-7 text-xs w-full xs:w-auto" onClick={() => router.back()}>
+          Cancel
+        </Button>
+        <Button size="sm" className="h-7 text-xs w-full xs:w-auto" variant="secondary" onClick={fetchProjectData}>
+          Refresh
+        </Button>
+      </div>
+    )}
+  </div>
+);
 };
 
 export default ProjectStageUpdatePage;

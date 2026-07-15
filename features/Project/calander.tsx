@@ -748,8 +748,9 @@ const getAvailableProjectsForStage = useCallback((stageType: CapacityStage, sour
           if (allocatedUnits > 0 && !projectMap.has(p.id)) {
             projectMap.set(p.id, {
               id: p.id,
-              label: p.invoice?.piNumber || p.customer?.name || p.name || "Unnamed Project",
-              quantity: allocatedUnits,
+label: p.invoice?.piNumber
+  ? `${p.invoice.piNumber} (${p.customer?.name || ""})`
+  : p.customer?.name || "",              quantity: allocatedUnits,
             });
           }
         }
@@ -774,8 +775,10 @@ const getAvailableProjectsForStage = useCallback((stageType: CapacityStage, sour
           if (!projects.has(p.id)) {
             projects.set(p.id, {
               id: p.id,
-              label: p.invoice?.piNumber || p.customer?.name || "Unnamed",
-              units: 0,
+label: p.invoice?.piNumber
+  ? `${p.invoice.piNumber} (${p.customer?.name || ""})`
+  : p.customer?.name || "",
+                units: 0,
             });
           }
           projects.get(p.id).units += a.allocatedUnits || 0;
@@ -1444,10 +1447,13 @@ const DayModal: React.FC<{
                       <div className="cc-allocs">
                         {allocs.map((a: any) => (
                           <div key={a.id} className="cc-alloc">
-                            <span className="cc-alloc__proj">
-                              {a.projectStage?.project?.invoice?.piNumber || 
-                               a.projectStage?.project?.customer?.name || "—"}
-                            </span>
+                                <span className="day-detail-alloc-proj">
+                                    {a.projectStage?.project?.invoice?.piNumber || 
+                                      "—"}
+                                      <span className="flex day-detail-proj-cust">
+                                  { a.projectStage?.project?.customer?.name || ""}
+                                </span>
+                                  </span>
                             <span className="cc-alloc__u cc-mono">{a.allocatedUnits}u · {a.allocatedHours}h</span>
                             {a.isOverCapacity && <span className="cc-alloc__over">OVER</span>}
                           </div>
@@ -1708,10 +1714,14 @@ const Ledger: React.FC<{
                   ) : (
                     allocs.map((a: any) => (
                       <div key={a.id} className="cc-alloc cc-alloc--wide">
-                        <span className="cc-alloc__proj">
-                          {a.projectStage?.project?.invoice?.piNumber || 
-                           a.projectStage?.project?.customer?.name || "—"}
-                        </span>
+                          <span className="day-detail-alloc-proj">
+                                    {a.projectStage?.project?.invoice?.piNumber || 
+                                      "—"}
+                                      <span className="flex day-detail-proj-cust">
+                                  { a.projectStage?.project?.customer?.name || ""}
+                                </span>
+                                                                  </span>
+
                         <span className="cc-alloc__u cc-mono">
                           {a.allocatedUnits} units · {a.allocatedHours} h
                         </span>

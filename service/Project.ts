@@ -468,7 +468,30 @@ export const updateProjectStage = async (
     throw error;
   }
 };
+export const deleteProjectStage = async (
+  data: {
+    projectId: string;
+    stageName: string;
+    deleteDownstream?: boolean;
+  }
+): Promise<any> => {
+  try {
+    const response = await axiosInstance.delete(
+      `projects/stage/delete/spe`,
+      {
+        data,
+      }
+    );
 
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+
+    throw error;
+  }
+};
 /**
  * ============================================
  * SET SCHEDULE MODE (AUTO | MANUAL | LOCKED)
