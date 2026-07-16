@@ -58,7 +58,6 @@ import {
   Loader2,
   Lock,
   AlertTriangle,
-  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IProject, IProjectStage, ProjectStatus, StageStatus } from '@/models/Projects';
@@ -1243,7 +1242,7 @@ return (
                     <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">
                       Warning: This stage has downstream stages
                     </p>
-                    <p className="text-[10px] text-yellow-700 dark:text-yellow-400/80 break-words">
+                    <p className="text-[10px] text-yellow-700 dark:text-yellow-400/80 wrap-break-word">
                       Deleting this stage will affect:{' '}
                       {getDownstreamStages(stageToDelete.id || '').join(', ')}
                     </p>

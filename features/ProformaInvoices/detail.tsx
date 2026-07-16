@@ -845,7 +845,7 @@ const formatDescription = (text: string, limit = 80) => {
                             <p className="text-sm font-medium">Name</p>
                           </div>
                           <p className="text-muted-foreground text-sm">
-                            {selectedCustomer.name || 'N/A'}
+                            {selectedCustomer.name || ''}
                           </p>
                         </div>
                         {selectedCustomer.companyName && (
@@ -1156,7 +1156,7 @@ const formatDescription = (text: string, limit = 80) => {
                         <TableRow key={item.id || index}>
                                                   <TableCell>{item.item?.name || ''}</TableCell>
 
-                          <TableCell>{item.size || 'N/A'}</TableCell>
+                          <TableCell>{item.size || ''}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{formatCurrency(item.unitPrice)}</TableCell>
                           <TableCell className="font-semibold">
@@ -1333,14 +1333,14 @@ const formatDescription = (text: string, limit = 80) => {
                                 <TableRow key={material.id}>
                                   <TableCell>
                                     <p className="font-medium">
-                                      {material.material?.name || 'N/A'}
+                                      {material.material?.name || ''}
                                     </p>
                                   </TableCell>
                                   <TableCell>
-                                    {material.material?.color || 'N/A'}
+                                    {material.material?.color || ''}
                                   </TableCell>
                                   <TableCell>
-                                    {material.material?.size || 'N/A'}
+                                    {material.material?.size || ''}
                                   </TableCell>
                                   <TableCell>
                                     <Badge variant="outline">{material.quantity} units</Badge>
@@ -1542,18 +1542,25 @@ const formatDescription = (text: string, limit = 80) => {
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="amount">Amount</Label>
-                          <Input
-                            id="amount"
-                            type="number"
-                            value={paymentData.amountPaid}
-                            onChange={(e) =>
-                              setPaymentData({
-                                ...paymentData,
-                                amountPaid: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                            placeholder="Enter payment amount"
-                          />
+                     <Input
+  id="amount"
+  type="text"
+  value={
+    paymentData.amountPaid
+      ? paymentData.amountPaid.toLocaleString("")
+      : ""
+  }
+  onChange={(e) => {
+    // Remove commas and any non-numeric characters except decimal point
+    const rawValue = e.target.value.replace(/,/g, "").replace(/[^\d.]/g, "");
+
+    setPaymentData({
+      ...paymentData,
+      amountPaid: parseFloat(rawValue) || 0,
+    });
+  }}
+  placeholder="Enter payment amount"
+/>
                           <p className="text-xs text-muted-foreground">
                             Balance due: {formatCurrency(invoice.balance)}
                           </p>

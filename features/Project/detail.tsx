@@ -54,7 +54,7 @@ type ProjectDetailProps = {
 
 // Helper function to format minutes to readable time
 const formatMinutes = (minutes?: number) => {
-  if (!minutes && minutes !== 0) return 'N/A';
+  if (!minutes && minutes !== 0) return 'shrink-0';
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   if (hours === 0) return `${mins} min`;
@@ -454,7 +454,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                   {project.customer.name?.charAt(0) || '?'}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{project.customer.name || 'N/A'}</p>
+                  <p className="truncate text-sm font-semibold">{project.customer.name || 'shrink-0'}</p>
                   {project.customer.companyName && (
                     <p className="truncate text-xs text-muted-foreground">{project.customer.companyName}</p>
                   )}
@@ -692,7 +692,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                   {/* Vertical Step Tracker */}
                   <div className="relative pl-8">
                     {/* Vertical line */}
-                    <div className="absolute left-[15px] top-2 h-[calc(100%-16px)] w-px bg-border" />
+                    <div className="absolute left-3.75 top-2 h-[calc(100%-16px)] w-px bg-border" />
 
                     {project.stages!.map((stage, index) => {
                       const stageConfig = getStatusConfig(stage.stage);
@@ -1023,7 +1023,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                     {/* Left: Details */}
                     <div className="md:col-span-3 space-y-3">
                       {[
-                        { label: 'Invoice #', value: project.invoice.piNumber || 'N/A', mono: true },
+                        { label: 'Invoice #', value: project.invoice.piNumber || 'shrink-0', mono: true },
                         { label: 'Status', value: project.invoice.status, badge: true },
                         { label: 'Subtotal', value: formatCurrency(project.invoice.subtotal) },
                         { label: 'VAT (16%)', value: formatCurrency(project.invoice.vat) },

@@ -56,7 +56,7 @@ const getPaidByDisplay = (banks?: any[]): {
 } => {
   if (!banks || banks.length === 0) {
     return { 
-      display: <span className="text-sm text-muted-foreground">N/A</span>, 
+      display: <span className="text-sm text-muted-foreground"></span>, 
       allMethods: [], 
       count: 0 
     };
@@ -88,7 +88,7 @@ const getPaidByDisplay = (banks?: any[]): {
 
   if (totalCount === 0) {
     return { 
-      display: <span className="text-sm text-muted-foreground">N/A</span>, 
+      display: <span className="text-sm text-muted-foreground"></span>, 
       allMethods: [], 
       count: 0 
     };

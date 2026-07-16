@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatDateEth, formatMinutes, formatTimeEth, formatTimeGregorian } from '@/lib/format';
 import { toast } from 'sonner';
 import {
   Calendar,
@@ -40,11 +40,12 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  Package2,
 } from 'lucide-react';
-import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog } from '@/models/Projects';
+import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog, StageStatus, WorkShift } from '@/models/Projects';
 import { getProjectId, updateProjectDesignStatus } from '@/service/Project';
 import { Separator } from '@/components/ui/separator';
-import { IProformaInvoice, IProformaInvoiceItem, IProformaInvoiceItemImage, IProformaItemMaterial, IProformaInvoiceBank } from '@/models/ProformaInvoice';
+import { IProformaInvoice} from '@/models/ProformaInvoice';
 import { getProformaInvoiceById } from '@/service/ProformaInvoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -159,20 +160,15 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   };
 
   // Check material stock availability
-  const checkMaterialStock = async () => {
+  const checkMaterialStock = useCallback(async () => {
     if (!proformaInvoice?.items) return;
 
     setIsCheckingStock(true);
-    const checks: MaterialStockCheck[] = [];
+    const checks = [] as MaterialStockCheck[];
 
     try {
       // Extract all materials from all items
-      const allMaterials: IProformaItemMaterial[] = [];
-      proformaInvoice.items.forEach(item => {
-        if (item.proformaItemMaterials && item.proformaItemMaterials.length > 0) {
-          allMaterials.push(...item.proformaItemMaterials);
-        }
-      });
+      const allMaterials = proformaInvoice.items.flatMap(item => item.proformaItemMaterials ?? []);
 
       if (allMaterials.length === 0) {
         toast.info('No materials found in this project');
@@ -247,7 +243,7 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     } finally {
       setIsCheckingStock(false);
     }
-  };
+  }, [proformaInvoice]);
 
   // Update design status with stock validation
   const handleDesignUpdate = async (stage: DesignStatus) => {
@@ -335,7 +331,7 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
       // Auto-check stock when invoice loads
       checkMaterialStock();
     }
-  }, [proformaInvoice]);
+  }, [checkMaterialStock, proformaInvoice]);
 
   // Status badge configuration - simplified for design team
   const getStatusConfig = (status: ProjectStatus) => {
@@ -451,11 +447,7 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     return config[difficulty];
   };
 
-  // Calculate total materials for an item
-  const getItemMaterialsTotal = (item: IProformaInvoiceItem) => {
-    if (!item.materials || item.materials.length === 0) return 0;
-    return item.materials.reduce((total, material) => total + material.quantity, 0);
-  };
+  
 
   // Group project logs by date
   const getGroupedLogs = (logs?: IProjectLog[]) => {
@@ -516,6 +508,37 @@ const formatDescription = (text: string, limit = 80) => {
     </>
   );
 };
+const calculateStageProgress = (stage: any) => {
+  if (!stage.workUnits || stage.workUnits === 0) return 0;
+  const actualUnits = stage.actualWorkUnits || 0;
+  return Math.round((actualUnits / stage.workUnits) * 100);
+};
+  const hasStages = project.stages && project.stages.length > 0;
+  const getStageStatusConfig = (status: StageStatus) => {
+    const config: Record<StageStatus, { label: string; variant: BadgeVariant; color: string }> = {
+      [StageStatus.ACTIVE]: {
+        label: 'Active',
+        variant: 'default',
+        color: 'text-blue-500',
+      },
+      [StageStatus.IN_PROGRESS]: {
+        label: 'In Progress',
+        variant: 'outline',
+        color: 'text-yellow-500',
+      },
+      [StageStatus.COMPLETED]: {
+        label: 'Completed',
+        variant: 'default',
+        color: 'text-green-500',
+      },
+      [StageStatus.CANCELLED]: {
+        label: 'Cancelled',
+        variant: 'destructive',
+        color: 'text-red-500',
+      },
+    };
+    return config[status];
+  };
 return (
   <div className="space-y-6">
     {/* Project Overview Cards */}
@@ -826,7 +849,7 @@ return (
                           <div className="space-y-3">
                             {stage.startDate ? (
                               <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
                                   <p className="text-xs text-muted-foreground">Start Date</p>
                                   <p className="font-medium text-sm md:text-base">{formatDate(stage.startDate)}</p>
@@ -838,7 +861,7 @@ return (
                             
                             {stage.endDate ? (
                               <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
                                   <p className="text-xs text-muted-foreground">End Date</p>
                                   <p className="font-medium text-sm md:text-base">{formatDate(stage.endDate)}</p>
@@ -851,7 +874,7 @@ return (
                             {stage.startDate && stage.endDate && (
                               <div className="mt-3 pt-3 border-t">
                                 <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
                                   <div>
                                     <p className="text-xs text-muted-foreground">Duration</p>
                                     <p className="font-medium text-sm md:text-base">
@@ -893,7 +916,7 @@ return (
           <CardContent>
             {/* Responsive Table with horizontal scroll on mobile */}
             <div className="w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-              <div className="min-w-[640px] md:min-w-full">
+              <div className="min-w-160 md:min-w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -941,359 +964,599 @@ return (
       )}
 
       {/* Proforma Invoice Card - With Images */}
-      {proformaInvoice && (
-        <Card>
-          <CardHeader className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Proforma Invoice Information
-            </CardTitle>
-            {/* Update Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                router.push(`/dashboard/Stage/Design/${proformaInvoice.id}`)
-              }
-              className="w-full sm:w-auto"
-            >
-              Update PI
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Basic Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">PI Number</p>
-                <p className="font-medium text-sm md:text-base">{proformaInvoice.piNumber}</p>
+         {/* Add Tabs for Stages and Proforma Invoice */}
+      <Tabs defaultValue="stages" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="stages" className="text-sm">
+            <Package2 className="h-4 w-4 mr-2" />
+            Stages
+          </TabsTrigger>
+          <TabsTrigger value="proforma" className="text-sm">
+            <FileText className="h-4 w-4 mr-2" />
+            Proforma Invoice
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Stages Tab Content */}
+        <TabsContent value="stages" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
+              <div className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Package2 className="h-4 w-4 text-muted-foreground" />
+                  Stages
+                </CardTitle>
+                {hasStages && (
+                  <Badge variant="secondary" className="text-xs">{project.stages!.length}</Badge>
+                )}
               </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
-                <Badge variant="outline" className="mt-1 text-sm">
-                  {proformaInvoice.status.replace(/_/g, ' ')}
-                </Badge>
-              </div>
-            </div>
+              {hasStages && (
+                <Button
+                  onClick={() => router.push(`/dashboard/Project/stage?id=${project.id}`)}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Manage
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {hasStages ? (
+                <>
+                  {/* Summary Strip */}
+                  <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {[
+                      { label: 'Planned Units', value: project.stages!.reduce((s, st) => s + (st.workUnits || 0), 0), color: '' },
+                      { label: 'Actual Units', value: project.stages!.reduce((s, st) => s + (st.actualWorkUnits || 0), 0), color: 'text-emerald-600' },
+                      { label: 'Time Taken', value: formatMinutes(project.stages!.reduce((s, st) => s + (st.timeTaken || 0), 0)), color: 'text-blue-600' },
+                      { label: 'Total Duration', value: `${project.totalDays || 0} days`, color: 'text-primary' },
+                    ].map((stat) => (
+                      <div key={stat.label} className="rounded-lg border bg-muted/20 px-3 py-2 text-center">
+                        <p className={`text-base font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
+                        <p className="text-[10px] text-muted-foreground">{stat.label}</p>
+                      </div>
+                    ))}
+                  </div>
 
-            {/* Tabs for organizing content */}
-            <Tabs defaultValue="items" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-                <TabsTrigger value="items" className="text-xs sm:text-sm">Products</TabsTrigger>
-                <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials</TabsTrigger>
-                <TabsTrigger value="images" className="text-xs sm:text-sm">Images</TabsTrigger>
-                <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
-                                <TabsTrigger value="attachments" className="text-xs sm:text-sm">Description</TabsTrigger>
+                  {/* Mobile View */}
+                  <div className="space-y-3 md:hidden">
+                    {project.stages!.map((stage) => {
+                      const stageConfig = getStatusConfig(stage.stage);
+                      const stageStatusConfig = getStageStatusConfig(stage.status);
+                      const stageProgress = calculateStageProgress(stage);
 
-              </TabsList>
-
-              {/* Items Tab */}
-              <TabsContent value="items" className="space-y-4 mt-4">
-                {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Mobile View - Cards */}
-                    <div className="space-y-3 md:hidden">
-                      {proformaInvoice.items.map((item) => (
-                        <div key={item.id} className="border rounded-lg p-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm">{item?.item?.name || 'N/A'}</h4>
-                              {item.size && item.size !== "" && (
-                                <p className="text-xs text-muted-foreground">Size: {item.size}</p>
-                              )}
+                      return (
+                        <div key={stage.id} className="rounded-lg border p-4 space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              <stageConfig.icon className={`h-4 w-4 ${stageConfig.color}`} />
+                              <h4 className="font-semibold text-sm">{stageConfig.label}</h4>
                             </div>
-                            <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">Qty: {item.quantity}</Badge>
+                            <Badge variant={stageStatusConfig.variant as any} className="text-[11px]">
+                              {stageStatusConfig.label}
+                            </Badge>
                           </div>
 
-                          {/* Item Images - No description */}
-                          {item.images && item.images.length > 0 && (
-                            <div className="mt-2">
-                              <div className="flex gap-2 flex-wrap">
-                                {item.images.slice(0, 3).map((img) => (
-                                  <div key={img.id} className="relative w-10 h-10 rounded-md overflow-hidden border">
-                                    <Image
-                                      src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                      alt="Item"
-                                      fill
-                                      className="object-cover"
-                                    />
-                                  </div>
-                                ))}
-                                {item.images.length > 3 && (
-                                  <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
-                                    <Plus className="h-3 w-3" />
-                                    <span className="text-[10px]">+{item.images.length - 3}</span>
-                                  </div>
-                                )}
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { label: 'Duration', value: `${stage.capacityDays} day${stage.capacityDays !== 1 ? 's' : ''}` },
+                              { label: 'Scheduling', value: stage.autoSchedule ? 'Auto' : 'Manual' },
+                              { label: 'Planned', value: stage.workUnits || 0 },
+                              { label: 'Actual', value: stage.actualWorkUnits || 0 },
+                            ].map((item) => (
+                              <div key={item.label} className="rounded-md bg-muted/40 px-2.5 py-1.5">
+                                <p className="text-[10px] text-muted-foreground">{item.label}</p>
+                                <p className="text-sm font-medium">{item.value}</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          {stage.workUnits && stage.workUnits > 0 && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-muted-foreground">Completion</span>
+                                <span className="font-semibold">{stageProgress}%</span>
+                              </div>
+                              <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                                <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${stageProgress}%` }} />
                               </div>
                             </div>
                           )}
 
-                          {/* Materials Count */}
-                          {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <Layers className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">
-                                {item.proformaItemMaterials.length} material(s)
-                              </span>
+                          {stage.startDate && stage.endDate && (
+                            <div className="text-xs text-muted-foreground border-t pt-2 space-y-0.5">
+                              <p>{formatDate(stage.startDate)} → {formatDate(stage.endDate)}</p>
+                              <p className="text-[10px] italic">{formatDateEth(stage.startDate)} → {formatDateEth(stage.endDate)}</p>
                             </div>
                           )}
-                              <TableCell>
-                                                          <div className="space-y-1">
-                                                            <p className="font-medium text-sm">{formatDescription(item.description)}</p>
-                                                            {item.additionalDescription && (
-                                                              <p className="text-xs text-muted-foreground">
-                                                                {formatDescription(item.additionalDescription)}
-                                                              </p>
-                                                            )}
-                                                          </div>
-                                                        </TableCell>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Desktop View - Table */}
-                    <div className="hidden md:block w-full overflow-x-auto">
-                      <div className="min-w-full">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-sm">Product</TableHead>
-                              <TableHead className="text-sm">Size</TableHead>
-                              <TableHead className="text-sm">Quantity</TableHead>
-                              <TableHead className="text-sm">Images</TableHead>
-                              <TableHead className="text-sm">Materials</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {proformaInvoice.items.map((item) => (
-                              <TableRow key={item.id}>
-                                <TableCell className="text-sm font-medium">{item?.item?.name || 'N/A'}</TableCell>
-                                <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
-                                <TableCell className="text-sm">{item.quantity}</TableCell>
-                                <TableCell>
-                                  {item.images && item.images.length > 0 ? (
-                                    <div className="flex gap-1">
-                                      {item.images.slice(0, 2).map((img) => (
-                                        <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
-                                             onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
-                                          <Image
-                                            src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                            alt="Item"
-                                            fill
-                                            className="object-cover"
-                                          />
-                                        </div>
-                                      ))}
-                                      {item.images.length > 2 && (
-                                        <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">No images</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
-                                    <Badge variant="outline" className="flex items-center gap-1">
-                                      <Layers className="h-3 w-3" />
-                                      {item.proformaItemMaterials.length}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">None</span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Package className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No items found</p>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Materials Tab */}
-              <TabsContent value="materials" className="space-y-4 mt-4">
-                {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
-                  <div className="space-y-4">
-                    {proformaInvoice.items.map((item) => {
-                      if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
-                      
-                      return (
-                        <div key={item.id} className="border rounded-lg overflow-hidden">
-                          <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
-                            {item.size && item.size !== "" && (
-                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                            )}
-                          </div>
-                          <div className="p-3 w-full overflow-x-auto">
-                            <div className="min-w-[500px] md:min-w-full">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs md:text-sm">Material</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Color</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Size</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Qty</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Note</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {item.proformaItemMaterials.map((material) => (
-                                    <TableRow key={material.id}>
-                                      <TableCell className="text-sm">
-                                        <p className="font-medium">
-                                          {material.material?.name || 'N/A'}
-                                        </p>
-                                      </TableCell>
-                                      <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
-                                      <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
-                                      <TableCell className="text-sm">
-                                        <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
-                                      </TableCell>
-                                      <TableCell className="text-sm">
-                                        <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0}</Badge>
-                                      </TableCell>
-                                      <TableCell className="text-sm">
-                                        {material.note && material.note !== "" ? (
-                                          <p className="text-sm line-clamp-2">{material.note}</p>
-                                        ) : (
-                                          <span className="text-muted-foreground text-sm">-</span>
-                                        )}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </div>
                         </div>
                       );
                     })}
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
-                  </div>
-                )}
-              </TabsContent>
 
-              {/* Images Tab - Removed descriptions */}
-              <TabsContent value="images" className="space-y-4 mt-4">
-                {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
-                  <div className="space-y-6">
-                    {proformaInvoice.items.map((item) => {
-                      if (!item.images || item.images.length === 0) return null;
-                      
-                      return (
-                        <div key={item.id} className="border rounded-lg overflow-hidden">
-                          <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
-                            {item.size && item.size !== "" && (
-                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                            )}
-                          </div>
-                          <div className="p-3 md:p-4">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
-                              {item.images.map((image) => (
-                                <div key={image.id} className="space-y-2">
-                                  <div className="relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer group"
-                                       onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
-                                    <Image
-                                      src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
-                                      alt={item?.item?.name || 'Item image'}
-                                      fill
-                                      className="object-cover transition-transform group-hover:scale-105"
-                                    />
-                                  </div>
-                                  <p className="text-[10px] text-muted-foreground text-center">
-                                    {formatDate(image.createdAt)}
-                                  </p>
+                  {/* Desktop Table */}
+                  <div className="hidden md:block overflow-x-auto rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-xs font-semibold py-2">Stage</TableHead>
+                          <TableHead className="text-xs font-semibold py-2">Status</TableHead>
+                          <TableHead className="text-xs font-semibold py-2">Shift</TableHead>
+                          <TableHead className="text-xs font-semibold py-2">Days</TableHead>
+                          <TableHead className="text-xs font-semibold py-2 text-right">Plan</TableHead>
+                          <TableHead className="text-xs font-semibold py-2 text-right">Actual</TableHead>
+                          <TableHead className="text-xs font-semibold py-2">Time</TableHead>
+                          <TableHead className="text-xs font-semibold py-2">Sched</TableHead>
+                          <TableHead className="text-xs font-semibold py-2">Start</TableHead>
+                          <TableHead className="text-xs font-semibold py-2">End</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {project.stages!.map((stage) => {
+                          const stageConfig = getStatusConfig(stage.stage);
+                          const stageStatusConfig = getStageStatusConfig(stage.status);
+
+                          const getShiftLabel = (shift?: WorkShift | null) => {
+                            switch (shift) {
+                              case WorkShift.MORNING: return 'Morning';
+                              case WorkShift.AFTERNOON: return 'Afternoon';
+                              case WorkShift.FULL_DAY: return 'Full Day';
+                              case WorkShift.CUSTOM: return 'Custom';
+                              default: return 'N/A';
+                            }
+                          };
+
+                          return (
+                            <TableRow key={stage.id} className="hover:bg-muted/20">
+                              <TableCell className="py-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <stageConfig.icon className={`h-3 w-3 ${stageConfig.color}`} />
+                                  <span className="text-xs font-medium">{stageConfig.label}</span>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <Badge variant={stageStatusConfig.variant} className="text-[10px] h-5">
+                                  {stageStatusConfig.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <div className="flex flex-col">
+                                  <span className="text-xs">{getShiftLabel(stage.shift)}</span>
+                                  {stage.shift === WorkShift.CUSTOM && stage.customStartTime && stage.customEndTime && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {formatTimeGregorian(stage.customStartTime)} - {formatTimeGregorian(stage.customEndTime)}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1.5 tabular-nums text-xs">{stage.capacityDays}d</TableCell>
+                              <TableCell className="py-1.5 text-right tabular-nums text-xs font-medium">{stage.workUnits || 0}</TableCell>
+                              <TableCell className="py-1.5 text-right tabular-nums text-xs font-medium">{stage.actualWorkUnits || 0}</TableCell>
+                              <TableCell className="py-1.5">
+                                {stage.timeTaken !== undefined && stage.timeTaken !== null ? (
+                                  <span className="text-xs tabular-nums">{formatMinutes(stage.timeTaken)}</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <span className={`text-xs ${stage.autoSchedule ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
+                                  {stage.autoSchedule ? 'Auto' : 'Manual'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-xs">{stage.startDate ? formatDate(stage.startDate) : '—'}</span>
+                                  {stage.startDate && (
+                                    <span className="text-[10px] text-muted-foreground italic">{formatDateEth(stage.startDate)}</span>
+                                  )}
+                                  {stage.startDateTime && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-muted-foreground">{formatTimeGregorian(stage.startDateTime)}</span>
+                                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">{formatTimeEth(stage.startDateTime)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-xs">{stage.endDate ? formatDate(stage.endDate) : '—'}</span>
+                                  {stage.endDate && (
+                                    <span className="text-[10px] text-muted-foreground italic">{formatDateEth(stage.endDate)}</span>
+                                  )}
+                                  {stage.endDateTime && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-muted-foreground">{formatTimeGregorian(stage.endDateTime)}</span>
+                                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">{formatTimeEth(stage.endDateTime)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <ImageIcon className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No images found for any items</p>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
+                    <Package2 className="h-7 w-7 text-muted-foreground/60" />
                   </div>
-                )}
-              </TabsContent>
+                  <h3 className="mt-4 text-sm font-semibold">No stages created</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Add stages to track project progress</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              {/* Attachments Tab */}
-              <TabsContent value="attachments" className="space-y-4 mt-4">
-                {proformaInvoice.attachments && proformaInvoice.attachments.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3">
-                    {proformaInvoice.attachments.map((attachment) => (
-                      <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <a 
-                              href={normalizeImagePath(attachment.fileUrl)} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-sm text-blue-600 hover:underline break-all"
-                            >
-                              {attachment.fileUrl.split('/').pop() || 'View Attachment'}
-                            </a>
-                            {attachment.createdAt && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Added: {formatDate(attachment.createdAt)}
-                              </p>
-                            )}
+        {/* Proforma Invoice Tab Content */}
+        <TabsContent value="proforma" className="mt-4">
+          {proformaInvoice ? (
+            <Card>
+              <CardHeader className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Proforma Invoice Information
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    router.push(`/dashboard/Stage/Design/${proformaInvoice.id}`)
+                  }
+                  className="w-full sm:w-auto"
+                >
+                  Update PI
+                </Button>
+              </CardHeader>
+                <CardContent className="space-y-6">
+                        {/* Basic Info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">PI Number</p>
+                            <p className="font-medium text-sm md:text-base">{proformaInvoice.piNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Status</p>
+                            <Badge variant="outline" className="mt-1 text-sm">
+                              {proformaInvoice.status.replace(/_/g, ' ')}
+                            </Badge>
                           </div>
                         </div>
-                        <div className="flex gap-2 flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = normalizeImagePath(attachment.fileUrl) || '';
-                              link.download = attachment.fileUrl.split('/').pop() || 'attachment';
-                              link.click();
-                            }}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No attachments found</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
+            
+                        {/* Tabs for organizing content */}
+                        <Tabs defaultValue="items" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                            <TabsTrigger value="items" className="text-xs sm:text-sm">Products</TabsTrigger>
+                            <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials</TabsTrigger>
+                            <TabsTrigger value="images" className="text-xs sm:text-sm">Images</TabsTrigger>
+                            <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
+                                            <TabsTrigger value="attachments" className="text-xs sm:text-sm">Description</TabsTrigger>
+            
+                          </TabsList>
+            
+                          {/* Items Tab */}
+                          <TabsContent value="items" className="space-y-4 mt-4">
+                            {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
+                              <div className="space-y-4">
+                                {/* Mobile View - Cards */}
+                                <div className="space-y-3 md:hidden">
+                                  {proformaInvoice.items.map((item) => (
+                                    <div key={item.id} className="border rounded-lg p-3">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-semibold text-sm">{item?.item?.name || 'N/A'}</h4>
+                                          {item.size && item.size !== "" && (
+                                            <p className="text-xs text-muted-foreground">Size: {item.size}</p>
+                                          )}
+                                        </div>
+                                        <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">Qty: {item.quantity}</Badge>
+                                      </div>
+            
+                                      {/* Item Images - No description */}
+                                      {item.images && item.images.length > 0 && (
+                                        <div className="mt-2">
+                                          <div className="flex gap-2 flex-wrap">
+                                            {item.images.slice(0, 3).map((img) => (
+                                              <div key={img.id} className="relative w-10 h-10 rounded-md overflow-hidden border">
+                                                <Image
+                                                  src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                                                  alt="Item"
+                                                  fill
+                                                  className="object-cover"
+                                                />
+                                              </div>
+                                            ))}
+                                            {item.images.length > 3 && (
+                                              <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
+                                                <Plus className="h-3 w-3" />
+                                                <span className="text-[10px]">+{item.images.length - 3}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+            
+                                      {/* Materials Count */}
+                                      {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
+                                        <div className="mt-2 flex items-center gap-2">
+                                          <Layers className="h-3 w-3 text-muted-foreground" />
+                                          <span className="text-xs text-muted-foreground">
+                                            {item.proformaItemMaterials.length} material(s)
+                                          </span>
+                                        </div>
+                                      )}
+                                          <TableCell>
+                                                                      <div className="space-y-1">
+                                                                        <p className="font-medium text-sm">{formatDescription(item.description)}</p>
+                                                                        {item.additionalDescription && (
+                                                                          <p className="text-xs text-muted-foreground">
+                                                                            {formatDescription(item.additionalDescription)}
+                                                                          </p>
+                                                                        )}
+                                                                      </div>
+                                                                    </TableCell>
+                                    </div>
+                                  ))}
+                                </div>
+            
+                                {/* Desktop View - Table */}
+                                <div className="hidden md:block w-full overflow-x-auto">
+                                  <div className="min-w-full">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead className="text-sm">Product</TableHead>
+                                          <TableHead className="text-sm">Size</TableHead>
+                                          <TableHead className="text-sm">Quantity</TableHead>
+                                          <TableHead className="text-sm">Images</TableHead>
+                                          <TableHead className="text-sm">Materials</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {proformaInvoice.items.map((item) => (
+                                          <TableRow key={item.id}>
+                                            <TableCell className="text-sm font-medium">{item?.item?.name || 'N/A'}</TableCell>
+                                            <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+                                            <TableCell className="text-sm">{item.quantity}</TableCell>
+                                            <TableCell>
+                                              {item.images && item.images.length > 0 ? (
+                                                <div className="flex gap-1">
+                                                  {item.images.slice(0, 2).map((img) => (
+                                                    <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
+                                                         onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
+                                                      <Image
+                                                        src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                                                        alt="Item"
+                                                        fill
+                                                        className="object-cover"
+                                                      />
+                                                    </div>
+                                                  ))}
+                                                  {item.images.length > 2 && (
+                                                    <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <span className="text-sm text-muted-foreground">No images</span>
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
+                                                <Badge variant="outline" className="flex items-center gap-1">
+                                                  <Layers className="h-3 w-3" />
+                                                  {item.proformaItemMaterials.length}
+                                                </Badge>
+                                              ) : (
+                                                <span className="text-sm text-muted-foreground">None</span>
+                                              )}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <Package className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                                <p className="mt-4 text-muted-foreground text-sm md:text-base">No items found</p>
+                              </div>
+                            )}
+                          </TabsContent>
+            
+                          {/* Materials Tab */}
+                          <TabsContent value="materials" className="space-y-4 mt-4">
+                            {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
+                              <div className="space-y-4">
+                                {proformaInvoice.items.map((item) => {
+                                  if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+                                  
+                                  return (
+                                    <div key={item.id} className="border rounded-lg overflow-hidden">
+                                      <div className="bg-muted/30 p-3 border-b">
+                                        <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                                        {item.size && item.size !== "" && (
+                                          <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                                        )}
+                                      </div>
+                                      <div className="p-3 w-full overflow-x-auto">
+                                        <div className="min-w-[500px] md:min-w-full">
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow>
+                                                <TableHead className="text-xs md:text-sm">Material</TableHead>
+                                                <TableHead className="text-xs md:text-sm">Color</TableHead>
+                                                <TableHead className="text-xs md:text-sm">Size</TableHead>
+                                                <TableHead className="text-xs md:text-sm">Qty</TableHead>
+                                                <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
+                                                <TableHead className="text-xs md:text-sm">Note</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {item.proformaItemMaterials.map((material) => (
+                                                <TableRow key={material.id}>
+                                                  <TableCell className="text-sm">
+                                                    <p className="font-medium">
+                                                      {material.material?.name || 'N/A'}
+                                                    </p>
+                                                  </TableCell>
+                                                  <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
+                                                  <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
+                                                  <TableCell className="text-sm">
+                                                    <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
+                                                  </TableCell>
+                                                  <TableCell className="text-sm">
+                                                    <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0}</Badge>
+                                                  </TableCell>
+                                                  <TableCell className="text-sm">
+                                                    {material.note && material.note !== "" ? (
+                                                      <p className="text-sm line-clamp-2">{material.note}</p>
+                                                    ) : (
+                                                      <span className="text-muted-foreground text-sm">-</span>
+                                                    )}
+                                                  </TableCell>
+                                                </TableRow>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                                <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
+                              </div>
+                            )}
+                          </TabsContent>
+            
+                          {/* Images Tab - Removed descriptions */}
+                          <TabsContent value="images" className="space-y-4 mt-4">
+                            {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
+                              <div className="space-y-6">
+                                {proformaInvoice.items.map((item) => {
+                                  if (!item.images || item.images.length === 0) return null;
+                                  
+                                  return (
+                                    <div key={item.id} className="border rounded-lg overflow-hidden">
+                                      <div className="bg-muted/30 p-3 border-b">
+                                        <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                                        {item.size && item.size !== "" && (
+                                          <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                                        )}
+                                      </div>
+                                      <div className="p-3 md:p-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                                          {item.images.map((image) => (
+                                            <div key={image.id} className="space-y-2">
+                                              <div className="relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer group"
+                                                   onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
+                                                <Image
+                                                  src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
+                                                  alt={item?.item?.name || 'Item image'}
+                                                  fill
+                                                  className="object-cover transition-transform group-hover:scale-105"
+                                                />
+                                              </div>
+                                              <p className="text-[10px] text-muted-foreground text-center">
+                                                {formatDate(image.createdAt)}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <ImageIcon className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                                <p className="mt-4 text-muted-foreground text-sm md:text-base">No images found for any items</p>
+                              </div>
+                            )}
+                          </TabsContent>
+            
+                          {/* Attachments Tab */}
+                          <TabsContent value="attachments" className="space-y-4 mt-4">
+                            {proformaInvoice.attachments && proformaInvoice.attachments.length > 0 ? (
+                              <div className="grid grid-cols-1 gap-3">
+                                {proformaInvoice.attachments.map((attachment) => (
+                                  <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <a 
+                                          href={normalizeImagePath(attachment.fileUrl)} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="text-sm text-blue-600 hover:underline break-all"
+                                        >
+                                          {attachment.fileUrl.split('/').pop() || 'View Attachment'}
+                                        </a>
+                                        {attachment.createdAt && (
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            Added: {formatDate(attachment.createdAt)}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 flex-shrink-0">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          const link = document.createElement('a');
+                                          link.href = normalizeImagePath(attachment.fileUrl) || '';
+                                          link.download = attachment.fileUrl.split('/').pop() || 'attachment';
+                                          link.click();
+                                        }}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Download className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <FileText className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                                <p className="mt-4 text-muted-foreground text-sm md:text-base">No attachments found</p>
+                              </div>
+                            )}
+                          </TabsContent>
+                        </Tabs>
+                      </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <p className="mt-4 text-muted-foreground">No proforma invoice found for this project</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Customer Information Card - Limited View */}
       <Card>
@@ -1406,29 +1669,29 @@ return (
               {Object.entries(groupedLogs).map(([date, logs]) => (
                 <div key={date} className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                     <h4 className="font-semibold text-sm text-muted-foreground">{date}</h4>
                     <Separator className="flex-1" />
                   </div>
                   <div className="space-y-3 pl-2 md:pl-4">
                     {logs.map((log, index) => (
                       <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors">
-                        <div className="flex-shrink-0 mt-0.5">
+                        <div className="shrink-0 mt-0.5">
                           <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-blue-100 flex items-center justify-center">
                             <FileWarning className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm break-words">{log.note}</p>
+                          <p className="text-sm wrap-break-word">{log.note}</p>
                           <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-2">
                             {log.createdBy && (
                               <div className="flex items-center gap-1">
-                                <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                <User className="h-3 w-3 text-muted-foreground shrink-0" />
                                 <span className="text-xs text-muted-foreground">{log.createdBy.name}</span>
                               </div>
                             )}
                             <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
                               <span className="text-xs text-muted-foreground">
                                 {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>

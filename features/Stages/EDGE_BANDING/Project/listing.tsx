@@ -52,7 +52,7 @@ export default function EdgebandingProjectListingPage() {
     <StageProjectListing
       projects={projects}
       projectColumns={projectColumns}
-      stageName="Edgebanding"
+      stageName="EDGE_BANDING"
       emptyStateMessages={{
         today: 'No edgebanding projects due today',
         tomorrow: 'No edgebanding projects due tomorrow',

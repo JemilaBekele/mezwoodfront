@@ -173,7 +173,6 @@ export const getEdgebandingProjects = async (params?: {
     );
 
     const projects = response?.data?.projects ?? [];
-
     return {
       projects,
       totalCount: response?.data?.count ?? projects.length,

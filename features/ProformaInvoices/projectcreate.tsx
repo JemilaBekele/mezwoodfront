@@ -261,55 +261,90 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
               <input type="hidden" {...form.register('invoiceId')} value={id} />
 
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                {/* Difficulty Level with HARD as default */}
-                <div className="space-y-3">
-                  <FormField
-                    control={form.control}
-                    name="difficulty"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-base font-semibold flex items-center gap-2">
-                          <AlertCircle className="h-5 w-5" />
-                          Difficulty Level
-                        </FormLabel>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                          Select how challenging this project will be to complete
-                        </p>
-                        <FormControl>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger className="h-12 text-base">
-                              <SelectValue placeholder="Select difficulty" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={DifficultyLevel.EASY}>
-                                <div className="flex items-center gap-2">
+              {/* Difficulty Level with HARD as default */}
+              <div className="space-y-3">
+                <FormField
+                  control={form.control}
+                  name="difficulty"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-semibold flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5" />
+                        Difficulty Level
+                      </FormLabel>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                        Select how challenging this project will be to complete
+                      </p>
+                      <FormControl>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger className="h-12 text-base">
+                            <SelectValue placeholder="Select difficulty" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={DifficultyLevel.EASY}>
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col">
                                   <span>Easy</span>
                                 </div>
-                              </SelectItem>
-                              <SelectItem value={DifficultyLevel.MEDIUM}>
-                                <div className="flex items-center gap-2">
+                              </div>
+                            </SelectItem>
+                            <SelectItem value={DifficultyLevel.MEDIUM}>
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col">
                                   <span>Medium</span>
                                 </div>
-                              </SelectItem>
-                              <SelectItem value={DifficultyLevel.HARD}>
-                                <div className="flex items-center gap-2">
+                              </div>
+                            </SelectItem>
+                            <SelectItem value={DifficultyLevel.HARD}>
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col">
                                   <span>Hard</span>
                                 </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-           
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                  
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
+
+              {/* Requested Delivery Date */}
+              <div className="space-y-3">
+                <FormField
+                  control={form.control}
+                  name="requestedDelivery"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-semibold flex items-center gap-2">
+                        <Calendar className="h-5 w-5" />
+                        Requested Delivery Date
+                      </FormLabel>
+                     
+                      <FormControl>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                          <Input 
+                            type="date" 
+                            {...field}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="h-12 pl-10 text-base"
+                          />
+                        </div>
+                      </FormControl>
+                   
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
 
               <div className="flex justify-end space-x-4 pt-6 border-t">
                 <Button

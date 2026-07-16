@@ -36,6 +36,9 @@ import {
   Cog,
   Sparkles,
   Drill,
+  ImageIcon,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, IProjectStageWorkLog, StageStatus } from '@/models/Projects';
 import { getProjectId } from '@/service/Project';
@@ -58,16 +61,10 @@ import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { createProjectStageWorkLog, deleteProjectStageWorkLog } from '@/service/projectStageWorkLogService';
-
+import Image from 'next/image';
+import { normalizeImagePath } from '@/lib/norm';
 // Helper function for image URLs
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000/uploads';
 
-export const normalizeImagePath = (path?: string) => {
-  if (!path) return '/placeholder-image.jpg';
-  if (path.startsWith('http')) return path;
-  const cleanPath = path.replace(/\\/g, '/').replace(/^\/+/, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-};
 
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 
@@ -1177,15 +1174,19 @@ const formatDescription = (text: string, limit = 80) => {
       </Card>
 
       {/* Proforma Invoice Card - View Only */}
+     {/* Proforma Invoice Card - With Images */}
       {proformaInvoice && (
         <Card>
           <CardHeader className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Proforma Invoice Information (View Only)
+              Proforma Invoice Information
             </CardTitle>
+            {/* Update Button */}
+        
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Basic Info */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">PI Number</p>
@@ -1199,56 +1200,138 @@ const formatDescription = (text: string, limit = 80) => {
               </div>
             </div>
 
-            <Tabs defaultValue="materials" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+            {/* Tabs for organizing content */}
+            <Tabs defaultValue="items" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
                 <TabsTrigger value="items" className="text-xs sm:text-sm">Products</TabsTrigger>
-                <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials & Stock Information</TabsTrigger>
+                <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials</TabsTrigger>
+                <TabsTrigger value="images" className="text-xs sm:text-sm">Images</TabsTrigger>
+                <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
+                                <TabsTrigger value="attachments" className="text-xs sm:text-sm">Description</TabsTrigger>
+
               </TabsList>
 
+              {/* Items Tab */}
               <TabsContent value="items" className="space-y-4 mt-4">
                 {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
-                  <div className="w-full overflow-x-auto">
-                    <div className="min-w-160 md:min-w-full">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs md:text-sm">Products</TableHead>
-                            <TableHead className="text-xs md:text-sm">Size</TableHead>
-                            <TableHead className="text-xs md:text-sm">Quantity</TableHead>
-                            <TableHead className="text-xs md:text-sm">Materials</TableHead>
-                            <TableHead className="text-xs md:text-sm">Description</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {proformaInvoice.items.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell className="text-sm">{item.item?.name || 'N/A'}</TableCell>
-                              <TableCell className="text-sm">{item.size || ''}</TableCell>
-                              <TableCell className="text-sm">{item.quantity}</TableCell>
-                              <TableCell>
-                                {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
-                                  <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                                    <Layers className="h-3 w-3" />
-                                    {item.proformaItemMaterials.length} material(s)
-                                  </Badge>
-                                ) : (
-                                  'No materials'
+                  <div className="space-y-4">
+                    {/* Mobile View - Cards */}
+                    <div className="space-y-3 md:hidden">
+                      {proformaInvoice.items.map((item) => (
+                        <div key={item.id} className="border rounded-lg p-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-sm">{item?.item?.name || 'N/A'}</h4>
+                              {item.size && item.size !== "" && (
+                                <p className="text-xs text-muted-foreground">Size: {item.size}</p>
+                              )}
+                            </div>
+                            <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">Qty: {item.quantity}</Badge>
+                          </div>
+
+                          {/* Item Images - No description */}
+                          {item.images && item.images.length > 0 && (
+                            <div className="mt-2">
+                              <div className="flex gap-2 flex-wrap">
+                                {item.images.slice(0, 3).map((img) => (
+                                  <div key={img.id} className="relative w-10 h-10 rounded-md overflow-hidden border">
+                                    <Image
+                                      src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                                      alt="Item"
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                ))}
+                                {item.images.length > 3 && (
+                                  <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
+                                    <Plus className="h-3 w-3" />
+                                    <span className="text-[10px]">+{item.images.length - 3}</span>
+                                  </div>
                                 )}
-                              </TableCell>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Materials Count */}
+                          {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Layers className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                {item.proformaItemMaterials.length} material(s)
+                              </span>
+                            </div>
+                          )}
                               <TableCell>
-                                <div className="space-y-1">
-                                  <p className="font-medium text-sm">{formatDescription(item.description)}</p>
-                                  {item.additionalDescription && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatDescription(item.additionalDescription)}
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
+                                                          <div className="space-y-1">
+                                                            <p className="font-medium text-sm">{formatDescription(item.description)}</p>
+                                                            {item.additionalDescription && (
+                                                              <p className="text-xs text-muted-foreground">
+                                                                {formatDescription(item.additionalDescription)}
+                                                              </p>
+                                                            )}
+                                                          </div>
+                                                        </TableCell>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop View - Table */}
+                    <div className="hidden md:block w-full overflow-x-auto">
+                      <div className="min-w-full">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-sm">Product</TableHead>
+                              <TableHead className="text-sm">Size</TableHead>
+                              <TableHead className="text-sm">Quantity</TableHead>
+                              <TableHead className="text-sm">Images</TableHead>
+                              <TableHead className="text-sm">Materials</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {proformaInvoice.items.map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="text-sm font-medium">{item?.item?.name || 'N/A'}</TableCell>
+                                <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+                                <TableCell className="text-sm">{item.quantity}</TableCell>
+                                <TableCell>
+                                  {item.images && item.images.length > 0 ? (
+                                    <div className="flex gap-1">
+                                      {item.images.slice(0, 2).map((img) => (
+                                        <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
+                                             onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
+                                          <Image
+                                            src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                                            alt="Item"
+                                            fill
+                                            className="object-cover"
+                                          />
+                                        </div>
+                                      ))}
+                                      {item.images.length > 2 && (
+                                        <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">No images</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
+                                    <Badge variant="outline" className="flex items-center gap-1">
+                                      <Layers className="h-3 w-3" />
+                                      {item.proformaItemMaterials.length}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">None</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -1259,6 +1342,7 @@ const formatDescription = (text: string, limit = 80) => {
                 )}
               </TabsContent>
 
+              {/* Materials Tab */}
               <TabsContent value="materials" className="space-y-4 mt-4">
                 {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
                   <div className="space-y-4">
@@ -1268,39 +1352,49 @@ const formatDescription = (text: string, limit = 80) => {
                       return (
                         <div key={item.id} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item.item?.name || ''}</h4>
-                            {item.size && <p className="text-sm text-muted-foreground">Size: {item.size}</p>}
+                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                            {item.size && item.size !== "" && (
+                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                            )}
                           </div>
                           <div className="p-3 w-full overflow-x-auto">
                             <div className="min-w-[500px] md:min-w-full">
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead className="text-xs md:text-sm">Material Name</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Material</TableHead>
                                     <TableHead className="text-xs md:text-sm">Color</TableHead>
                                     <TableHead className="text-xs md:text-sm">Size</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Required Qty</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Additional Qty</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Qty</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Note</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {item.proformaItemMaterials.map((material) => {
-                                    return (
-                                      <TableRow key={material.id}>
-                                        <TableCell className="text-sm">
-                                          <p className="font-medium">{material.material?.name || 'N/A'}</p>
-                                        </TableCell>
-                                        <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
-                                        <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
-                                        <TableCell className="text-sm">
-                                          <Badge variant="outline" className="text-xs">{material.quantity} units</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                          <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0} units</Badge>
-                                        </TableCell>
-                                      </TableRow>
-                                    );
-                                  })}
+                                  {item.proformaItemMaterials.map((material) => (
+                                    <TableRow key={material.id}>
+                                      <TableCell className="text-sm">
+                                        <p className="font-medium">
+                                          {material.material?.name || 'N/A'}
+                                        </p>
+                                      </TableCell>
+                                      <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
+                                      <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
+                                      <TableCell className="text-sm">
+                                        <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-sm">
+                                        <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-sm">
+                                        {material.note && material.note !== "" ? (
+                                          <p className="text-sm line-clamp-2">{material.note}</p>
+                                        ) : (
+                                          <span className="text-muted-foreground text-sm">-</span>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
                                 </TableBody>
                               </Table>
                             </div>
@@ -1313,6 +1407,111 @@ const formatDescription = (text: string, limit = 80) => {
                   <div className="text-center py-8">
                     <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
                     <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Images Tab - Removed descriptions */}
+              <TabsContent value="images" className="space-y-4 mt-4">
+                {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
+                  <div className="space-y-6">
+                    {proformaInvoice.items.map((item) => {
+                      if (!item.images || item.images.length === 0) return null;
+                      
+                      return (
+                        <div key={item.id} className="border rounded-lg overflow-hidden">
+                          <div className="bg-muted/30 p-3 border-b">
+                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                            {item.size && item.size !== "" && (
+                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                            )}
+                          </div>
+                          <div className="p-3 md:p-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                              {item.images.map((image) => (
+                                <div key={image.id} className="space-y-2">
+                                  <div className="relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer group"
+                                       onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
+                                    <Image
+                                      src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
+                                      alt={item?.item?.name || 'Item image'}
+                                      fill
+                                      className="object-cover transition-transform group-hover:scale-105"
+                                    />
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground text-center">
+                                    {formatDate(image.createdAt)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <ImageIcon className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No images found for any items</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Attachments Tab */}
+              <TabsContent value="attachments" className="space-y-4 mt-4">
+                {proformaInvoice.attachments && proformaInvoice.attachments.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3">
+                    {proformaInvoice.attachments.map((attachment) => (
+                      <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <a 
+                              href={normalizeImagePath(attachment.fileUrl)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline break-all"
+                            >
+                              {attachment.fileUrl.split('/').pop() || 'View Attachment'}
+                            </a>
+                            {attachment.createdAt && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Added: {formatDate(attachment.createdAt)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = normalizeImagePath(attachment.fileUrl) || '';
+                              link.download = attachment.fileUrl.split('/').pop() || 'attachment';
+                              link.click();
+                            }}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No attachments found</p>
                   </div>
                 )}
               </TabsContent>
