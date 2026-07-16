@@ -877,63 +877,64 @@ return (
       </Card>
 
       {/* Material Stock Details Card */}
-      {materialStockChecks.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2">
-              <Package className="h-5 w-5" />
-              Material Stock Status
-              <Badge variant={allMaterialsAvailable ? 'default' : 'destructive'} className="ml-0 md:ml-2">
-                {allMaterialsAvailable ? 'All Available' : `${materialStockChecks.filter(c => !c.isAvailable).length} Shortfalls`}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <div className="min-w-[640px] md:min-w-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Required</TableHead>
-                    <TableHead>Already Issued</TableHead>
-                    <TableHead>Remaining Needed</TableHead>
-                    <TableHead>Available Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {materialStockChecks.map((check) => (
-                    <TableRow key={check.materialId}>
-                      <TableCell className="font-medium text-sm md:text-base">{check.materialName}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.color}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.size}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.requiredQuantity}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.alreadyIssued}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.remainingNeeded}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.availableStock}</TableCell>
-                      <TableCell>
-                        {check.isAvailable ? (
-                          <Badge variant="default" className="bg-green-500 text-xs md:text-sm">
-                            <CheckCircle2 className="h-2 w-2 md:h-3 md:w-3 mr-1" />
-                            Available
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs md:text-sm">
-                            <AlertCircle className="h-2 w-2 md:h-3 md:w-3 mr-1" />
-                            Shortfall: {check.shortfall}
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+     {/* Material Stock Details Card */}
+{materialStockChecks.length > 0 && (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex flex-wrap items-center gap-2">
+        <Package className="h-5 w-5" />
+        Material Stock Status
+        <Badge variant={allMaterialsAvailable ? 'default' : 'destructive'} className="ml-0 md:ml-2">
+          {allMaterialsAvailable ? 'All Available' : `${materialStockChecks.filter(c => !c.isAvailable).length} Shortfalls`}
+        </Badge>
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="p-0 overflow-x-auto">
+      <div className="min-w-[800px] md:min-w-full">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="whitespace-nowrap">Material</TableHead>
+              <TableHead className="whitespace-nowrap">Color</TableHead>
+              <TableHead className="whitespace-nowrap">Size</TableHead>
+              <TableHead className="whitespace-nowrap">Required</TableHead>
+              <TableHead className="whitespace-nowrap">Already Issued</TableHead>
+              <TableHead className="whitespace-nowrap">Remaining Needed</TableHead>
+              <TableHead className="whitespace-nowrap">Available Stock</TableHead>
+              <TableHead className="whitespace-nowrap">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {materialStockChecks.map((check) => (
+              <TableRow key={check.materialId}>
+                <TableCell className="font-medium whitespace-nowrap">{check.materialName}</TableCell>
+                <TableCell className="whitespace-nowrap">{check.color}</TableCell>
+                <TableCell className="whitespace-nowrap">{check.size}</TableCell>
+                <TableCell className="whitespace-nowrap">{check.requiredQuantity}</TableCell>
+                <TableCell className="whitespace-nowrap">{check.alreadyIssued}</TableCell>
+                <TableCell className="whitespace-nowrap">{check.remainingNeeded}</TableCell>
+                <TableCell className="whitespace-nowrap">{check.availableStock}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {check.isAvailable ? (
+                    <Badge variant="default" className="bg-green-500 whitespace-nowrap">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Available
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="whitespace-nowrap">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Shortfall: {check.shortfall}
+                    </Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </CardContent>
+  </Card>
+)}
 
       {/* Proforma Invoice Card - With Images */}
       {proformaInvoice && (
