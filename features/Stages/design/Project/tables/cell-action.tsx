@@ -107,16 +107,18 @@ const handleDesignUpdate = async (stage: DesignStatus) => {
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Change Stage</DropdownMenuLabel>
 
-              {designStages.map((stage) => (
-                <DropdownMenuItem
-                  key={stage}
-                  onClick={() => handleDesignUpdate(stage)}
-                  disabled={loading || data.designStatus === stage}
-                >
-                  <IconProgress className="mr-2 h-4 w-4" />
-                  {stage.replace('_', ' ')}
-                </DropdownMenuItem>
-              ))}
+          {designStages
+  .filter((stage) => stage !== DesignStatus.FINISHED)
+  .map((stage) => (
+    <DropdownMenuItem
+      key={stage}
+      onClick={() => handleDesignUpdate(stage)}
+      disabled={loading || data.designStatus === stage}
+    >
+      <IconProgress className="mr-2 h-4 w-4" />
+      {stage.replace("_", " ")}
+    </DropdownMenuItem>
+  ))}
             </>
           
         </DropdownMenuContent>

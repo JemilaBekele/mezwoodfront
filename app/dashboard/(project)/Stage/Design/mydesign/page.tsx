@@ -8,14 +8,11 @@ import { searchParamsCache } from '@/lib/searchparams';
 import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 
-import { PermissionGuard } from '@/components/PermissionGuard';
-import { PERMISSIONS } from '@/stores/permissions';
 
 import MyDesignProjectListingPage from '@/features/Stages/design/Project/mydesign';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
-import StageAllocationCalendar from '@/features/Project/StageAllocationCalendar';
 
 export const metadata = {
   title: 'Dashboard: Project'
