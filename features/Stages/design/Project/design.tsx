@@ -59,20 +59,9 @@ import {
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getMaterialStockById } from '@/service/StockCorrection';
+import { normalizeImagePath } from '@/lib/norm';
 
-// Helper function for image URLs
-const BACKEND_URL = 'http://localhost:5000';
 
-export const normalizeImagePath = (path?: string) => {
-  if (!path) return undefined;
-  const normalizedPath = path.replace(/\\/g, '/');
-  if (normalizedPath.startsWith('http')) {
-    return normalizedPath;
-  }
-  // Remove any leading slashes to prevent double slashes in URL
-  const cleanPath = normalizedPath.replace(/^\/+/, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-};
 
 // Define the variant type to match your Badge component
 type BadgeVariant = React.ComponentProps<typeof Badge>['variant'];
