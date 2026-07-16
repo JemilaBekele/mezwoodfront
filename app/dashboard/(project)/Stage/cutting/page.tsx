@@ -66,7 +66,10 @@ Calendar            </Link>
             <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
           }
         >
+                        <main className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+
           <CuttingProjectListingPage />
+                </main>
         </Suspense>
       </div>
     </PageContainer>

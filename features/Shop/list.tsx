@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import { createSell } from '@/service/Sell';
 import { normalizeImagePath } from '@/lib/norm';
 import { SaleStatus } from '@/models/Sell';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 
 
@@ -184,28 +185,153 @@ interface ItemCardProps {
 const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Carousel state for card
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+  
+  // Carousel state for modal
+  const [modalImageIndex, setModalImageIndex] = useState(0);
 
-  const imageUrl: string = imageError
-    ? '/placeholder-image.jpg'
-    : (normalizeImagePath(item.imageUrl) ?? '/placeholder-image.jpg');
+  // Get all images (main + additional)
+  const getAllImages = useMemo(() => {
+    const images: string[] = [];
+    
+    // Add main image first
+    if (item.imageUrl) {
+      const normalized = normalizeImagePath(item.imageUrl);
+      if (normalized) {
+        images.push(normalized);
+      }
+    }
+    
+    // Add additional images
+    if (item.itemImages && item.itemImages.length > 0) {
+      item.itemImages.forEach(img => {
+        const normalized = normalizeImagePath(img.imageUrl);
+        if (normalized) {
+          images.push(normalized);
+        }
+      });
+    }
+    
+    return images;
+  }, [item.imageUrl, item.itemImages]);
+
+  const allImages = getAllImages;
+  const hasMultipleImages = allImages.length > 1;
+
+  // Auto-rotate carousel on card
+  useEffect(() => {
+    if (!isHovering || !hasMultipleImages) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [isHovering, hasMultipleImages, allImages.length]);
+
+  const currentImage = allImages[currentImageIndex] || (imageError ? '/placeholder-image.jpg' : '/placeholder-image.jpg');
   const formattedPrice = formatPrice(item.price);
+
+  // Handle carousel navigation
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
+
+  // Handle modal carousel navigation
+  const nextModalImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setModalImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
+  const prevModalImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setModalImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
+
+  // Open modal with carousel
+  const openModal = () => {
+    setIsModalOpen(true);
+    setModalImageIndex(currentImageIndex);
+  };
 
   return (
     <>
       <Card
         className="group flex h-full w-full flex-col cursor-pointer overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
         onClick={() => onSelectItem(item)}
       >
         <CardHeader className="relative p-0">
           <div className="relative aspect-video w-full overflow-hidden bg-gray-50 dark:bg-gray-800">
-            <Image
-              src={imageUrl}
-              alt={item.name}
-              fill
-              className="object-contain p-2 transition-transform duration-500 group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              onError={() => setImageError(true)}
-            />
+            <div 
+              className="relative w-full h-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                openModal();
+              }}
+            >
+              <Image
+                src={currentImage}
+                alt={item.name}
+                fill
+                className="object-contain p-2 transition-transform duration-500 group-hover:scale-105"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                onError={() => setImageError(true)}
+              />
+              
+              {/* Image counter badge */}
+              {hasMultipleImages && (
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                  {currentImageIndex + 1} / {allImages.length}
+                </div>
+              )}
+              
+              {/* Navigation arrows - only show on hover */}
+              {hasMultipleImages && isHovering && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                    aria-label="Previous image"
+                  >
+                    <IconChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                    aria-label="Next image"
+                  >
+                    <IconChevronRight className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+              
+              {/* Dot indicators */}
+              {hasMultipleImages && (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                  {allImages.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${
+                        index === currentImageIndex
+                          ? 'bg-white w-3'
+                          : 'bg-white/50'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
 
@@ -213,6 +339,16 @@ const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
           <h3 className="line-clamp-1 text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
             {item.name}
           </h3>
+          {item.color && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Color: {item.color}
+            </p>
+          )}
+          {item.category && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {item.category.name}
+            </p>
+          )}
         </CardContent>
 
         <CardFooter className="flex items-center justify-between p-3 pt-2">
@@ -224,7 +360,7 @@ const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
             className="rounded-lg bg-[#0f172a] dark:bg-blue-600 px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-gray-800 dark:hover:bg-blue-500"
             onClick={(e) => {
               e.stopPropagation();
-              setIsModalOpen(true);
+              openModal();
             }}
           >
             View
@@ -232,7 +368,7 @@ const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
         </CardFooter>
       </Card>
 
-      {/* View Modal */}
+      {/* View Modal with Carousel */}
       {isModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 dark:bg-black/90 backdrop-blur-sm"
@@ -251,23 +387,67 @@ const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
               </svg>
             </button>
 
-            <div className="relative bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+            <div className="relative bg-white dark:bg-gray-900 rounded-lg overflow-hidden max-h-[90vh] overflow-y-auto">
+              {/* Modal Image Carousel */}
               <div className="relative aspect-video w-full bg-gray-900 dark:bg-black">
                 <Image
-                  src={imageUrl}
+                  src={allImages[modalImageIndex] || '/placeholder-image.jpg'}
                   alt={item.name}
                   fill
                   className="object-contain"
                   sizes="90vw"
                 />
+                
+                {/* Modal Navigation Arrows */}
+                {allImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevModalImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                    >
+                      <IconChevronLeft className="h-6 w-6" />
+                    </button>
+                    <button
+                      onClick={nextModalImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                    >
+                      <IconChevronRight className="h-6 w-6" />
+                    </button>
+                  </>
+                )}
+                
+                {/* Modal Image Counter */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-sm px-3 py-1 rounded-full">
+                  {modalImageIndex + 1} / {allImages.length}
+                </div>
               </div>
 
               <div className="p-4 bg-white dark:bg-gray-900">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {item.name}
                 </h3>
+                {item.category && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Category: {item.category.name}
+                  </p>
+                )}
+                {item.type && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Type: {item.type.name}
+                  </p>
+                )}
+                {item.size && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Size: {item.size.name}
+                  </p>
+                )}
+                {item.color && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Color: {item.color}
+                  </p>
+                )}
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Stock: {item.stock}
+                  Stock: {item.stock || 0}
                 </p>
                 <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-2">
                   {formattedPrice}

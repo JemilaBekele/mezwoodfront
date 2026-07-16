@@ -17,7 +17,10 @@ export default async function LeasePage({ searchParams }: PageProps) {
     <PageContainer scrollable>
       <div className='flex-1 space-y-4'>
         <Suspense fallback={<FormCardSkeleton />}>
+                      <main className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+
           <PAINTINGProjectDetailPage id={resolvedSearchParams.id} />
+                </main>
         </Suspense>
       </div>
     </PageContainer>
