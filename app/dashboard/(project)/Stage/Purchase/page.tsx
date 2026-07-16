@@ -15,7 +15,6 @@ import PurchaseProjectListingPage from '@/features/Stages/PURCHASING/Project/lis
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
-import StageAllocationCalendar from '@/features/Project/StageAllocationCalendar';
 
 export const metadata = {
   title: 'Dashboard: Project'

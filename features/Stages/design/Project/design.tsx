@@ -515,147 +515,131 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   // Check if design can be finished
   const canFinishDesign = allMaterialsAvailable && project.designStatus !== DesignStatus.FINISHED;
 
-  return (
-    <div className="space-y-6">
-      {/* Project Overview Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        {/* Status Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              {projectStatusConfig && (
-                <>
-                  <projectStatusConfig.icon className={`h-4 w-4 ${projectStatusConfig.color}`} />
-                  <span>Project Status</span>
-                </>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+return (
+  <div className="space-y-6">
+    {/* Project Overview Cards */}
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Status Card */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
             {projectStatusConfig && (
-              <Badge variant={projectStatusConfig.variant} className="px-3 py-1 text-sm">
-                {projectStatusConfig.label}
-              </Badge>
+              <>
+                <projectStatusConfig.icon className={`h-4 w-4 ${projectStatusConfig.color}`} />
+                <span>Project Status</span>
+              </>
             )}
-          </CardContent>
-        </Card>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {projectStatusConfig && (
+            <Badge variant={projectStatusConfig.variant} className="px-3 py-1 text-sm">
+              {projectStatusConfig.label}
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Difficulty Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              {difficultyConfig && (
-                <>
-                  <difficultyConfig.icon className={`h-4 w-4 ${difficultyConfig.color}`} />
-                  <span>Difficulty</span>
-                </>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Difficulty Card */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
             {difficultyConfig && (
-              <Badge variant={difficultyConfig.variant} className="px-3 py-1 text-sm">
-                {difficultyConfig.label}
-              </Badge>
+              <>
+                <difficultyConfig.icon className={`h-4 w-4 ${difficultyConfig.color}`} />
+                <span>Difficulty</span>
+              </>
             )}
-          </CardContent>
-        </Card>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {difficultyConfig && (
+            <Badge variant={difficultyConfig.variant} className="px-3 py-1 text-sm">
+              {difficultyConfig.label}
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Design Status Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              {designStatusConfig ? (
-                <>
-                  <designStatusConfig.icon className={`h-4 w-4 ${designStatusConfig.color}`} />
-                  <span>Design Status</span>
-                </>
-              ) : (
-                <>
-                  <PenTool className="h-4 w-4 text-blue-500" />
-                  <span>Design Status</span>
-                </>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {designStatusConfig ? (
-                <>
-                  <Badge variant={designStatusConfig.variant} className="px-3 py-1 text-sm">
-                    {designStatusConfig.label}
-                  </Badge>
+      {/* Design Status Card */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            {designStatusConfig ? (
+              <>
+                <designStatusConfig.icon className={`h-4 w-4 ${designStatusConfig.color}`} />
+                <span>Design Status</span>
+              </>
+            ) : (
+              <>
+                <PenTool className="h-4 w-4 text-blue-500" />
+                <span>Design Status</span>
+              </>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {designStatusConfig ? (
+              <>
+                <Badge variant={designStatusConfig.variant} className="px-3 py-1 text-sm">
+                  {designStatusConfig.label}
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {designStatusConfig.description}
+                </p>
+                {project.designFinished && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    {designStatusConfig.description}
+                    Finished: {formatDate(project.designFinished)}
                   </p>
-                  {project.designFinished && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Finished: {formatDate(project.designFinished)}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Badge variant="secondary" className="px-3 py-1 text-sm">
-                    Not Started
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Design work has not begun yet
-                  </p>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+              </>
+            ) : (
+              <>
+                <Badge variant="secondary" className="px-3 py-1 text-sm">
+                  Not Started
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Design work has not begun yet
+                </p>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Material Availability Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Package className="h-4 w-4 text-green-500" />
-              <span>Material Availability</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {isCheckingStock ? (
+      {/* Material Availability Card */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Package className="h-4 w-4 text-green-500" />
+            <span>Material Availability</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {isCheckingStock ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Checking stock...</span>
+              </div>
+            ) : materialStockChecks.length > 0 ? (
+              <>
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Checking stock...</span>
+                  {allMaterialsAvailable ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium text-green-600">All available</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                      <span className="text-sm font-medium text-red-600">
+                        {materialStockChecks.filter(c => !c.isAvailable).length} shortfall(s)
+                      </span>
+                    </>
+                  )}
                 </div>
-              ) : materialStockChecks.length > 0 ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    {allMaterialsAvailable ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm font-medium text-green-600">All available</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                        <span className="text-sm font-medium text-red-600">
-                          {materialStockChecks.filter(c => !c.isAvailable).length} shortfall(s)
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={checkMaterialStock}
-                    disabled={isCheckingStock}
-                    className="w-full"
-                  >
-                    {isCheckingStock ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3 mr-2" />
-                    )}
-                    Check Stock
-                  </Button>
-                </>
-              ) : (
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -666,226 +650,247 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   {isCheckingStock ? (
                     <Loader2 className="h-3 w-3 animate-spin mr-2" />
                   ) : (
-                    <Package className="h-3 w-3 mr-2" />
+                    <RefreshCw className="h-3 w-3 mr-2" />
                   )}
-                  Check Material Stock
+                  Check Stock
                 </Button>
+              </>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={checkMaterialStock}
+                disabled={isCheckingStock}
+                className="w-full"
+              >
+                {isCheckingStock ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                ) : (
+                  <Package className="h-3 w-3 mr-2" />
+                )}
+                Check Material Stock
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    {/* Main Content - Design Stage Focus */}
+    <div className="space-y-6">
+      {/* Design Stage Card */}
+      <Card className="border-blue-200 shadow-md">
+        <CardHeader className="bg-blue-50 border-b border-blue-100">
+          <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-blue-600" />
+              <span className="text-blue-900">Design Stage Details</span>
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Update Status Buttons */}
+              {project.designStatus !== DesignStatus.FINISHED && (
+                <>
+                  {/* Design Status Update Buttons */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDesignUpdate(DesignStatus.MODELING)}
+                    disabled={updating}
+                    className="text-xs px-2 py-1 md:text-sm md:px-3"
+                  >
+                    {updating ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin mr-1" /> : null}
+                    Modeling
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDesignUpdate(DesignStatus.DRAFTING)}
+                    disabled={updating}
+                    className="text-xs px-2 py-1 md:text-sm md:px-3"
+                  >
+                    {updating ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin mr-1" /> : null}
+                    Drafting
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDesignUpdate(DesignStatus.CUTLIST)}
+                    disabled={updating}
+                    className="text-xs px-2 py-1 md:text-sm md:px-3"
+                  >
+                    {updating ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin mr-1" /> : null}
+                    Cutlist
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDesignUpdate(DesignStatus.BOQ)}
+                    disabled={updating}
+                    className="text-xs px-2 py-1 md:text-sm md:px-3"
+                  >
+                    {updating ? <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin mr-1" /> : null}
+                    BOQ
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className={`text-xs px-2 py-1 md:text-sm md:px-3 ${!canFinishDesign ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => handleDesignUpdate(DesignStatus.FINISHED)}
+                    disabled={updating || !canFinishDesign}
+                    title={!canFinishDesign ? 'All materials must be available in stock to finish design' : ''}
+                  >
+                    {updating ? (
+                      <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                    )}
+                    Finish Design
+                  </Button>
+                </>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6">
+          {hasDesignStage ? (
+            <div className="space-y-6">
+              {designStages.map((stage) => {
+                const stageConfig = getStatusConfig(stage.stage);
+                const isActive = stage.status === 'ACTIVE' || stage.status === 'IN_PROGRESS';
+                const isCompleted = stage.status === 'COMPLETED';
+                
+                return (
+                  <div key={stage.id} className="space-y-4 md:space-y-6">
+                    {/* Stage Header */}
+                    <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          isCompleted ? 'bg-green-100' : 
+                          isActive ? 'bg-blue-100' : 'bg-gray-100'
+                        }`}>
+                          {stageConfig && <stageConfig.icon className={`h-5 w-5 md:h-6 md:w-6 ${stageConfig.color}`} />}
+                        </div>
+                        <div>
+                          <h3 className="text-base md:text-lg font-semibold">{stageConfig?.label || 'Design'}</h3>
+                          <p className="text-xs md:text-sm text-muted-foreground">Stage ID: {stage.id.substring(0, 8)}</p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant={
+                          isCompleted
+                            ? 'default'
+                            : isActive
+                            ? 'outline'
+                            : 'secondary'
+                        }
+                        className={`px-2 py-1 md:px-3 ${
+                          isCompleted ? 'bg-green-500' : 
+                          isActive ? 'border-blue-500 text-blue-700' : ''
+                        }`}
+                      >
+                        {isCompleted ? 'Completed' : 
+                         isActive ? 'In Progress' : 'Pending'}
+                      </Badge>
+                    </div>
 
-      {/* Main Content - Design Stage Focus */}
-      <div className="space-y-6">
-        {/* Design Stage Card */}
-        <Card className="border-blue-200 shadow-md">
-          <CardHeader className="bg-blue-50 border-b border-blue-100">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-blue-600" />
-                <span className="text-blue-900">Design Stage Details</span>
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                {/* Update Status Buttons */}
-                {project.designStatus !== DesignStatus.FINISHED && (
-                  <>
-                    {/* Design Status Update Buttons */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDesignUpdate(DesignStatus.MODELING)}
-                      disabled={updating}
-                    >
-                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Modeling
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDesignUpdate(DesignStatus.DRAFTING)}
-                      disabled={updating}
-                    >
-                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Drafting
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDesignUpdate(DesignStatus.CUTLIST)}
-                      disabled={updating}
-                    >
-                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Cutlist
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDesignUpdate(DesignStatus.BOQ)}
-                      disabled={updating}
-                    >
-                      {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      BOQ
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className={!canFinishDesign ? 'opacity-50 cursor-not-allowed' : ''}
-                      onClick={() => handleDesignUpdate(DesignStatus.FINISHED)}
-                      disabled={updating || !canFinishDesign}
-                      title={!canFinishDesign ? 'All materials must be available in stock to finish design' : ''}
-                    >
-                      {updating ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                      )}
-                      Finish Design
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            {hasDesignStage ? (
-              <div className="space-y-6">
-                {designStages.map((stage) => {
-                  const stageConfig = getStatusConfig(stage.stage);
-                  const isActive = stage.status === 'ACTIVE' || stage.status === 'IN_PROGRESS';
-                  const isCompleted = stage.status === 'COMPLETED';
-                  
-                  return (
-                    <div key={stage.id} className="space-y-6">
-                      {/* Stage Header */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            isCompleted ? 'bg-green-100' : 
-                            isActive ? 'bg-blue-100' : 'bg-gray-100'
-                          }`}>
-                            {stageConfig && <stageConfig.icon className={`h-6 w-6 ${stageConfig.color}`} />}
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-semibold">{stageConfig?.label || 'Design'}</h3>
-                            <p className="text-sm text-muted-foreground">Stage ID: {stage.id.substring(0, 8)}</p>
+                    {/* Stage Details Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                      {/* Left Column - Key Metrics */}
+                      <div className="space-y-4">
+                        <div className="bg-muted/30 p-3 md:p-4 rounded-lg">
+                          <h4 className="text-sm font-medium text-muted-foreground mb-3">Key Metrics</h4>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm">Duration</span>
+                              <span className="font-semibold">{stage.capacityDays} days</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm">Work Units</span>
+                              <span className="font-semibold">{stage.workUnits || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm">Scheduling</span>
+                              <Badge variant="outline" className="text-xs">
+                                {stage.autoSchedule ? 'Auto-scheduled' : 'Manual'}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
-                        <Badge
-                          variant={
-                            isCompleted
-                              ? 'default'
-                              : isActive
-                              ? 'outline'
-                              : 'secondary'
-                          }
-                          className={`px-3 py-1 ${
-                            isCompleted ? 'bg-green-500' : 
-                            isActive ? 'border-blue-500 text-blue-700' : ''
-                          }`}
-                        >
-                          {isCompleted ? 'Completed' : 
-                           isActive ? 'In Progress' : 'Pending'}
-                        </Badge>
                       </div>
 
-                      {/* Stage Details Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Left Column - Key Metrics */}
-                        <div className="space-y-4">
-                          <div className="bg-muted/30 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-muted-foreground mb-3">Key Metrics</h4>
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm">Duration</span>
-                                <span className="font-semibold">{stage.capacityDays} days</span>
+                      {/* Right Column - Schedule */}
+                      <div className="space-y-4">
+                        <div className="bg-muted/30 p-3 md:p-4 rounded-lg">
+                          <h4 className="text-sm font-medium text-muted-foreground mb-3">Schedule</h4>
+                          <div className="space-y-3">
+                            {stage.startDate ? (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Start Date</p>
+                                  <p className="font-medium text-sm md:text-base">{formatDate(stage.startDate)}</p>
+                                </div>
                               </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm">Work Units</span>
-                                <span className="font-semibold">{stage.workUnits || 0}</span>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Start date not scheduled</p>
+                            )}
+                            
+                            {stage.endDate ? (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">End Date</p>
+                                  <p className="font-medium text-sm md:text-base">{formatDate(stage.endDate)}</p>
+                                </div>
                               </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm">Scheduling</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {stage.autoSchedule ? 'Auto-scheduled' : 'Manual'}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">End date not scheduled</p>
+                            )}
 
-                        {/* Right Column - Schedule */}
-                        <div className="space-y-4">
-                          <div className="bg-muted/30 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-muted-foreground mb-3">Schedule</h4>
-                            <div className="space-y-3">
-                              {stage.startDate ? (
+                            {stage.startDate && stage.endDate && (
+                              <div className="mt-3 pt-3 border-t">
                                 <div className="flex items-center gap-2">
-                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Start Date</p>
-                                    <p className="font-medium">{formatDate(stage.startDate)}</p>
+                                    <p className="text-xs text-muted-foreground">Duration</p>
+                                    <p className="font-medium text-sm md:text-base">
+                                      {Math.ceil((new Date(stage.endDate).getTime() - new Date(stage.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
+                                    </p>
                                   </div>
                                 </div>
-                              ) : (
-                                <p className="text-sm text-muted-foreground">Start date not scheduled</p>
-                              )}
-                              
-                              {stage.endDate ? (
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">End Date</p>
-                                    <p className="font-medium">{formatDate(stage.endDate)}</p>
-                                  </div>
-                                </div>
-                              ) : (
-                                <p className="text-sm text-muted-foreground">End date not scheduled</p>
-                              )}
-
-                              {stage.startDate && stage.endDate && (
-                                <div className="mt-3 pt-3 border-t">
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                      <p className="text-xs text-muted-foreground">Duration</p>
-                                      <p className="font-medium">
-                                        {Math.ceil((new Date(stage.endDate).getTime() - new Date(stage.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Settings className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-4 text-muted-foreground">No design stage information available for this project</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 md:py-12">
+              <Settings className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+              <p className="mt-4 text-muted-foreground text-sm md:text-base">No design stage information available for this project</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Material Stock Details Card */}
-        {materialStockChecks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Material Stock Status
-                <Badge variant={allMaterialsAvailable ? 'default' : 'destructive'} className="ml-2">
-                  {allMaterialsAvailable ? 'All Available' : `${materialStockChecks.filter(c => !c.isAvailable).length} Shortfalls`}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+      {/* Material Stock Details Card */}
+      {materialStockChecks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              <Package className="h-5 w-5" />
+              Material Stock Status
+              <Badge variant={allMaterialsAvailable ? 'default' : 'destructive'} className="ml-0 md:ml-2">
+                {allMaterialsAvailable ? 'All Available' : `${materialStockChecks.filter(c => !c.isAvailable).length} Shortfalls`}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <div className="min-w-[640px] md:min-w-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -902,22 +907,22 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                 <TableBody>
                   {materialStockChecks.map((check) => (
                     <TableRow key={check.materialId}>
-                      <TableCell className="font-medium">{check.materialName}</TableCell>
-                      <TableCell>{check.color}</TableCell>
-                      <TableCell>{check.size}</TableCell>
-                      <TableCell>{check.requiredQuantity}</TableCell>
-                      <TableCell>{check.alreadyIssued}</TableCell>
-                      <TableCell>{check.remainingNeeded}</TableCell>
-                      <TableCell>{check.availableStock}</TableCell>
+                      <TableCell className="font-medium text-sm md:text-base">{check.materialName}</TableCell>
+                      <TableCell className="text-sm md:text-base">{check.color}</TableCell>
+                      <TableCell className="text-sm md:text-base">{check.size}</TableCell>
+                      <TableCell className="text-sm md:text-base">{check.requiredQuantity}</TableCell>
+                      <TableCell className="text-sm md:text-base">{check.alreadyIssued}</TableCell>
+                      <TableCell className="text-sm md:text-base">{check.remainingNeeded}</TableCell>
+                      <TableCell className="text-sm md:text-base">{check.availableStock}</TableCell>
                       <TableCell>
                         {check.isAvailable ? (
-                          <Badge variant="default" className="bg-green-500">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                          <Badge variant="default" className="bg-green-500 text-xs md:text-sm">
+                            <CheckCircle2 className="h-2 w-2 md:h-3 md:w-3 mr-1" />
                             Available
                           </Badge>
                         ) : (
-                          <Badge variant="destructive">
-                            <AlertCircle className="h-3 w-3 mr-1" />
+                          <Badge variant="destructive" className="text-xs md:text-sm">
+                            <AlertCircle className="h-2 w-2 md:h-3 md:w-3 mr-1" />
                             Shortfall: {check.shortfall}
                           </Badge>
                         )}
@@ -926,233 +931,232 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Proforma Invoice Card - With Images */}
-        {proformaInvoice && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Proforma Invoice Information
-              </CardTitle>
-              {/* Update Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  router.push(`/dashboard/Stage/Design/${proformaInvoice.id}`)
-                }
-              >
-                Update PI
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">PI Number</p>
-                  <p className="font-medium">{proformaInvoice.piNumber}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Status</p>
-                  <Badge variant="outline" className="mt-1">
-                    {proformaInvoice.status.replace(/_/g, ' ')}
-                  </Badge>
-                </div>
+      {/* Proforma Invoice Card - With Images */}
+      {proformaInvoice && (
+        <Card>
+          <CardHeader className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Proforma Invoice Information
+            </CardTitle>
+            {/* Update Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                router.push(`/dashboard/Stage/Design/${proformaInvoice.id}`)
+              }
+              className="w-full sm:w-auto"
+            >
+              Update PI
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">PI Number</p>
+                <p className="font-medium text-sm md:text-base">{proformaInvoice.piNumber}</p>
               </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <Badge variant="outline" className="mt-1 text-sm">
+                  {proformaInvoice.status.replace(/_/g, ' ')}
+                </Badge>
+              </div>
+            </div>
 
-              {/* Tabs for organizing content */}
-              <Tabs defaultValue="items" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="items">Items</TabsTrigger>
-                  <TabsTrigger value="materials">Materials</TabsTrigger>
-                  <TabsTrigger value="images">Images</TabsTrigger>
-                  <TabsTrigger value="attachments">Attachments</TabsTrigger>
-                </TabsList>
+            {/* Tabs for organizing content */}
+            <Tabs defaultValue="items" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                <TabsTrigger value="items" className="text-xs sm:text-sm">Items</TabsTrigger>
+                <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials</TabsTrigger>
+                <TabsTrigger value="images" className="text-xs sm:text-sm">Images</TabsTrigger>
+                <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
+              </TabsList>
 
-                {/* Items Tab */}
-                <TabsContent value="items" className="space-y-4 mt-4">
-                  {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
-                    <div className="space-y-4">
-                      {/* Mobile View */}
-                      <div className="space-y-4 md:hidden">
-                        {proformaInvoice.items.map((item) => (
-                          <div key={item.id} className="border rounded-lg p-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-semibold text-base">{item.description}</h4>
-                                {item.size && item.size !== "" && (
-                                  <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                                )}
-                                {item.additionalDescription && item.additionalDescription !== "" && (
-                                  <p className="text-sm text-muted-foreground mt-1">{item.additionalDescription}</p>
-                                )}
-                              </div>
-                              <Badge variant="outline">Qty: {item.quantity}</Badge>
-                            </div>
-
-                            {/* Item Images Preview */}
-                            {item.images && item.images.length > 0 && (
-                              <div className="mt-3">
-                                <p className="text-xs text-muted-foreground mb-2">Item Images:</p>
-                                <div className="flex gap-2 flex-wrap">
-                                  {item.images.slice(0, 3).map((img) => (
-                                    <div key={img.id} className="relative w-16 h-16 rounded-md overflow-hidden border">
-                                      <Image
-                                        src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                        alt="Item"
-                                        fill
-                                        className="object-cover"
-                                      />
-                                    </div>
-                                  ))}
-                                  {item.images.length > 3 && (
-                                    <div className="w-16 h-16 rounded-md bg-muted flex items-center justify-center">
-                                      <Plus className="h-4 w-4" />
-                                      <span className="text-xs">+{item.images.length - 3}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Materials Count */}
-                            {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">
-                                  {item.proformaItemMaterials.length} material(s) • {getItemMaterialsTotal(item)} total units
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Desktop View */}
-                      <div className="hidden md:block">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Description</TableHead>
-                              <TableHead>Size</TableHead>
-                              <TableHead>Quantity</TableHead>
-                              <TableHead>Images</TableHead>
-                              <TableHead>Materials</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {proformaInvoice.items.map((item) => (
-                              <TableRow key={item.id}>
-                                <TableCell>
-                                  <div className="space-y-1">
-                                    <p className="font-medium">{item.description}</p>
-                                    {item.additionalDescription && item.additionalDescription !== "" && (
-                                      <p className="text-xs text-muted-foreground">
-                                        {item.additionalDescription}
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>
-                                  {item.images && item.images.length > 0 ? (
-                                    <div className="flex gap-1">
-                                      {item.images.slice(0, 2).map((img) => (
-                                        <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
-                                             onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
-                                          <Image
-                                            src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                            alt="Item"
-                                            fill
-                                            className="object-cover"
-                                          />
-                                        </div>
-                                      ))}
-                                      {item.images.length > 2 && (
-                                        <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    'No images'
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
-                                    <Badge variant="outline" className="flex items-center gap-1">
-                                      <Layers className="h-3 w-3" />
-                                      {item.proformaItemMaterials.length} material(s)
-                                    </Badge>
-                                  ) : (
-                                    'No materials'
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Package className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                      <p className="mt-4 text-muted-foreground">No items found</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Materials Tab */}
-                <TabsContent value="materials" className="space-y-4 mt-4">
-                  {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
-                    <div className="space-y-4">
-                      {proformaInvoice.items.map((item) => {
-                        if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
-                        
-                        return (
-                          <div key={item.id} className="border rounded-lg overflow-hidden">
-                            <div className="bg-muted/30 p-3 border-b">
-                              <h4 className="font-semibold">{item.description}</h4>
+              {/* Items Tab */}
+              <TabsContent value="items" className="space-y-4 mt-4">
+                {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Mobile View */}
+                    <div className="space-y-4 md:hidden">
+                      {proformaInvoice.items.map((item) => (
+                        <div key={item.id} className="border rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-semibold text-base">{item.description}</h4>
                               {item.size && item.size !== "" && (
                                 <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                               )}
+                              {item.additionalDescription && item.additionalDescription !== "" && (
+                                <p className="text-sm text-muted-foreground mt-1">{item.additionalDescription}</p>
+                              )}
                             </div>
-                            <div className="p-3">
+                            <Badge variant="outline" className="text-xs">Qty: {item.quantity}</Badge>
+                          </div>
+
+                          {/* Item Images Preview */}
+                          {item.images && item.images.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs text-muted-foreground mb-2">Item Images:</p>
+                              <div className="flex gap-2 flex-wrap">
+                                {item.images.slice(0, 3).map((img) => (
+                                  <div key={img.id} className="relative w-12 h-12 md:w-16 md:h-16 rounded-md overflow-hidden border">
+                                    <Image
+                                      src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                                      alt="Item"
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                ))}
+                                {item.images.length > 3 && (
+                                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-md bg-muted flex items-center justify-center">
+                                    <Plus className="h-3 w-3 md:h-4 md:w-4" />
+                                    <span className="text-xs">+{item.images.length - 3}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Materials Count */}
+                          {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Layers className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                              <span className="text-xs md:text-sm text-muted-foreground">
+                                {item.proformaItemMaterials.length} material(s) • {getItemMaterialsTotal(item)} total units
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop View */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Size</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Images</TableHead>
+                            <TableHead>Materials</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {proformaInvoice.items.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <p className="font-medium text-sm">{item.description}</p>
+                                  {item.additionalDescription && item.additionalDescription !== "" && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.additionalDescription}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+                              <TableCell className="text-sm">{item.quantity}</TableCell>
+                              <TableCell>
+                                {item.images && item.images.length > 0 ? (
+                                  <div className="flex gap-1">
+                                    {item.images.slice(0, 2).map((img) => (
+                                      <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
+                                           onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
+                                        <Image
+                                          src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                                          alt="Item"
+                                          fill
+                                          className="object-cover"
+                                        />
+                                      </div>
+                                    ))}
+                                    {item.images.length > 2 && (
+                                      <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  'No images'
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
+                                  <Badge variant="outline" className="flex items-center gap-1">
+                                    <Layers className="h-3 w-3" />
+                                    {item.proformaItemMaterials.length} material(s)
+                                  </Badge>
+                                ) : (
+                                  'No materials'
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Package className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No items found</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Materials Tab */}
+              <TabsContent value="materials" className="space-y-4 mt-4">
+                {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
+                  <div className="space-y-4">
+                    {proformaInvoice.items.map((item) => {
+                      if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+                      
+                      return (
+                        <div key={item.id} className="border rounded-lg overflow-hidden">
+                          <div className="bg-muted/30 p-3 border-b">
+                            <h4 className="font-semibold text-sm md:text-base">{item.description}</h4>
+                            {item.size && item.size !== "" && (
+                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                            )}
+                          </div>
+                          <div className="p-3 overflow-x-auto">
+                            <div className="min-w-[500px] md:min-w-0">
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead>Material Name</TableHead>
-                                    <TableHead>Color</TableHead>
-                                    <TableHead>Size</TableHead>
-                                    <TableHead>Quantity</TableHead>
-                                    <TableHead>Additional Qty</TableHead>
-                                    <TableHead>Note</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Material Name</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Color</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Size</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Quantity</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Additional Qty</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Note</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {item.proformaItemMaterials.map((material) => (
                                     <TableRow key={material.id}>
-                                      <TableCell>
+                                      <TableCell className="text-sm">
                                         <p className="font-medium">
                                           {material.material?.name || 'N/A'}
                                         </p>
                                       </TableCell>
-                                      <TableCell>
-                                        {material.material?.color || 'N/A'}
+                                      <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
+                                      <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
+                                      <TableCell className="text-sm">
+                                        <Badge variant="outline" className="text-xs">{material.quantity} units</Badge>
                                       </TableCell>
-                                      <TableCell>
-                                        {material.material?.size || 'N/A'}
+                                      <TableCell className="text-sm">
+                                        <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0} units</Badge>
                                       </TableCell>
-                                      <TableCell>
-                                        <Badge variant="outline">{material.quantity} units</Badge>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Badge variant="outline">{material?.additionalQuantity || 0} units</Badge>
-                                      </TableCell>
-                                      <TableCell>
+                                      <TableCell className="text-sm">
                                         {material.note && material.note !== "" ? (
                                           <p className="text-sm line-clamp-2">{material.note}</p>
                                         ) : (
@@ -1165,281 +1169,284 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                               </Table>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Box className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                      <p className="mt-4 text-muted-foreground">No materials found</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Images Tab - New Tab for Item Images */}
-                <TabsContent value="images" className="space-y-4 mt-4">
-                  {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
-                    <div className="space-y-6">
-                      {proformaInvoice.items.map((item) => {
-                        if (!item.images || item.images.length === 0) return null;
-                        
-                        return (
-                          <div key={item.id} className="border rounded-lg overflow-hidden">
-                            <div className="bg-muted/30 p-3 border-b">
-                              <h4 className="font-semibold">{item.description}</h4>
-                              {item.size && item.size !== "" && (
-                                <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                              )}
-                            </div>
-                            <div className="p-4">
-                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {item.images.map((image) => (
-                                  <div key={image.id} className="space-y-2">
-                                    <div className="relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer group"
-                                         onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
-                                      <Image
-                                        src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
-                                        alt={`Item image for ${item.description}`}
-                                        fill
-                                        className="object-cover transition-transform group-hover:scale-105"
-                                      />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground text-center">
-                                      Added: {formatDate(image.createdAt)}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                      <p className="mt-4 text-muted-foreground">No images found for any items</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Attachments Tab */}
-                <TabsContent value="attachments" className="space-y-4 mt-4">
-                  {proformaInvoice.attachments && proformaInvoice.attachments.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3">
-                      {proformaInvoice.attachments.map((attachment) => (
-                        <div key={attachment.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3 flex-1">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                            <div className="flex-1">
-                              <a 
-                                href={normalizeImagePath(attachment.fileUrl)} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:underline"
-                              >
-                                {attachment.fileUrl.split('/').pop() || 'View Attachment'}
-                              </a>
-                              {attachment.createdAt && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Added: {formatDate(attachment.createdAt)}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = normalizeImagePath(attachment.fileUrl) || '';
-                                link.download = attachment.fileUrl.split('/').pop() || 'attachment';
-                                link.click();
-                              }}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                      <p className="mt-4 text-muted-foreground">No attachments found</p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Customer Information Card - Limited View */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Customer Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {project.customer ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Name</p>
-                  <p className="font-medium">{project.customer.name || 'N/A'}</p>
-                </div>
-                {project.customer.phone1 && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Contact</p>
-                    <p className="font-medium">{project.customer.phone1}</p>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
                   </div>
                 )}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No customer information available</p>
-            )}
-          </CardContent>
-        </Card>
+              </TabsContent>
 
-        {/* Project Timeline Summary - Limited View */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5" />
-              Project Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Requested Delivery</p>
-                  <p>{project.requestedDelivery ? formatDate(project.requestedDelivery) : 'Not specified'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Calculated Delivery</p>
-                  <p>{project.calculatedDelivery ? formatDate(project.calculatedDelivery) : 'Not calculated'}</p>
-                </div>
-              </div>
-              <Separator />
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Project Duration</p>
-                <p className="text-2xl font-bold">{project.totalDays || 0} days</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Personnel Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Personnel
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {project.createdBy && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Created By</p>
-                  <p>{project.createdBy.name}</p>
-                </div>
-              )}
-              {project.updatedBy && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Last Updated By</p>
-                  <p>{project.updatedBy.name}</p>
-                </div>
-              )}
-              {project.designBy && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Designer</p>
-                  <p>{project.designBy.name}</p>
-                  {project.designBy.email && (
-                    <p className="text-xs text-muted-foreground">{project.designBy.email}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Project Logs Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Project Activity Logs
-              {hasLogs && (
-                <Badge variant="secondary" className="ml-2">
-                  {project.projectLogs?.length} entries
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {hasLogs ? (
-              <div className="space-y-6">
-                {Object.entries(groupedLogs).map(([date, logs]) => (
-                  <div key={date} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <h4 className="font-semibold text-sm text-muted-foreground">{date}</h4>
-                      <Separator className="flex-1" />
-                    </div>
-                    <div className="space-y-3 pl-4">
-                      {logs.map((log, index) => (
-                        <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors">
-                          <div className="flex-shrink-0 mt-0.5">
-                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                              <FileWarning className="h-4 w-4 text-blue-600" />
-                            </div>
+              {/* Images Tab - New Tab for Item Images */}
+              <TabsContent value="images" className="space-y-4 mt-4">
+                {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
+                  <div className="space-y-6">
+                    {proformaInvoice.items.map((item) => {
+                      if (!item.images || item.images.length === 0) return null;
+                      
+                      return (
+                        <div key={item.id} className="border rounded-lg overflow-hidden">
+                          <div className="bg-muted/30 p-3 border-b">
+                            <h4 className="font-semibold text-sm md:text-base">{item.description}</h4>
+                            {item.size && item.size !== "" && (
+                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
+                            )}
                           </div>
-                          <div className="flex-1">
-                            <p className="text-sm">{log.note}</p>
-                            <div className="flex items-center gap-4 mt-2">
-                              {log.createdBy && (
-                                <div className="flex items-center gap-1">
-                                  <User className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-xs text-muted-foreground">{log.createdBy.name}</span>
+                          <div className="p-3 md:p-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                              {item.images.map((image) => (
+                                <div key={image.id} className="space-y-2">
+                                  <div className="relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer group"
+                                       onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
+                                    <Image
+                                      src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
+                                      alt={`Item image for ${item.description}`}
+                                      fill
+                                      className="object-cover transition-transform group-hover:scale-105"
+                                    />
+                                  </div>
+                                  <p className="text-xs text-muted-foreground text-center">
+                                    Added: {formatDate(image.createdAt)}
+                                  </p>
                                 </div>
-                              )}
-                              <div className="flex items-center gap-1">
-                                <Clock className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </div>
+                              ))}
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <History className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-4 text-muted-foreground">No activity logs available for this project</p>
-              </div>
-            )}
+                ) : (
+                  <div className="text-center py-8">
+                    <ImageIcon className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No images found for any items</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Attachments Tab */}
+              <TabsContent value="attachments" className="space-y-4 mt-4">
+                {proformaInvoice.attachments && proformaInvoice.attachments.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3">
+                    {proformaInvoice.attachments.map((attachment) => (
+                      <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <a 
+                              href={normalizeImagePath(attachment.fileUrl)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline break-all"
+                            >
+                              {attachment.fileUrl.split('/').pop() || 'View Attachment'}
+                            </a>
+                            {attachment.createdAt && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Added: {formatDate(attachment.createdAt)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = normalizeImagePath(attachment.fileUrl) || '';
+                              link.download = attachment.fileUrl.split('/').pop() || 'attachment';
+                              link.click();
+                            }}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No attachments found</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
-      </div>
+      )}
+
+      {/* Customer Information Card - Limited View */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Customer Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {project.customer ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Name</p>
+                <p className="font-medium text-sm md:text-base">{project.customer.name || 'N/A'}</p>
+              </div>
+              {project.customer.phone1 && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Contact</p>
+                  <p className="font-medium text-sm md:text-base">{project.customer.phone1}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm md:text-base">No customer information available</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Project Timeline Summary - Limited View */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5" />
+            Project Timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Requested Delivery</p>
+                <p className="text-sm md:text-base">{project.requestedDelivery ? formatDate(project.requestedDelivery) : 'Not specified'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Calculated Delivery</p>
+                <p className="text-sm md:text-base">{project.calculatedDelivery ? formatDate(project.calculatedDelivery) : 'Not calculated'}</p>
+              </div>
+            </div>
+            <Separator />
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Project Duration</p>
+              <p className="text-xl md:text-2xl font-bold">{project.totalDays || 0} days</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Personnel Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Personnel
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {project.createdBy && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Created By</p>
+                <p className="text-sm md:text-base">{project.createdBy.name}</p>
+              </div>
+            )}
+            {project.updatedBy && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Last Updated By</p>
+                <p className="text-sm md:text-base">{project.updatedBy.name}</p>
+              </div>
+            )}
+            {project.designBy && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Designer</p>
+                <p className="text-sm md:text-base">{project.designBy.name}</p>
+                {project.designBy.email && (
+                  <p className="text-xs text-muted-foreground break-all">{project.designBy.email}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Project Logs Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            <History className="h-5 w-5" />
+            Project Activity Logs
+            {hasLogs && (
+              <Badge variant="secondary" className="ml-0">
+                {project.projectLogs?.length} entries
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasLogs ? (
+            <div className="space-y-6">
+              {Object.entries(groupedLogs).map(([date, logs]) => (
+                <div key={date} className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <h4 className="font-semibold text-sm text-muted-foreground">{date}</h4>
+                    <Separator className="flex-1" />
+                  </div>
+                  <div className="space-y-3 pl-2 md:pl-4">
+                    {logs.map((log, index) => (
+                      <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                            <FileWarning className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm break-words">{log.note}</p>
+                          <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-2">
+                            {log.createdBy && (
+                              <div className="flex items-center gap-1">
+                                <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                <span className="text-xs text-muted-foreground">{log.createdBy.name}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 md:py-12">
+              <History className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+              <p className="mt-4 text-muted-foreground text-sm md:text-base">No activity logs available for this project</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
-  );
+  </div>
+);
 };
 
 export default DesignProjectDetailPage;

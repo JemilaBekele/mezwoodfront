@@ -15,7 +15,6 @@ import MetalworkProjectListingPage from '@/features/Stages/METAL_WORKS/Project/l
 import Link from 'next/link';import { IconPlus } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
-import StageAllocationCalendar from '@/features/Project/StageAllocationCalendar';
 
 export const metadata = {
   title: 'Dashboard: Project'

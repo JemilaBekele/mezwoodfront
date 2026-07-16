@@ -15,7 +15,6 @@ import AssemblyProjectListingPage from '@/features/Stages/ASSEMBLY/Project/listi
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
-import StageAllocationCalendar from '@/features/Project/StageAllocationCalendar';
 
 export const metadata = {
   title: 'Dashboard: Project'
