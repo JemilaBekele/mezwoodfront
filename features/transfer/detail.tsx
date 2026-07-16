@@ -69,12 +69,7 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
       
       try {
         const profile = await getUserById();
-        console.log('DEBUG - User Profile:', {
-          id: profile.id,
-          name: profile.name,
-          stores: profile.stores?.map((s: { id: any; name: any; }) => ({ id: s.id, name: s.name })) || [],
-          showrooms: profile.showrooms?.map((s: { id: any; name: any; }) => ({ id: s.id, name: s.name })) || []
-        });
+     
         setUserProfile(profile);
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -90,16 +85,8 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
     const fetchTransfer = async () => {
       try {
         if (id) {
-          console.log('Fetching transfer details for ID:', id);
           const transferData = await getTransferId(id);
-          console.log('Transfer data received:', {
-            id: transferData.id,
-            destinationType: transferData.destinationType,
-            destStore: transferData.destStore?.name,
-            destStoreId: transferData.destStore?.id,
-            destShowroom: transferData.destShowroom?.name,
-            destShowroomId: transferData.destShowroom?.id
-          });
+        
           setTransfer(transferData);
           setSelectedStatus(transferData.status);
         }
@@ -139,18 +126,12 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
       const destShowroomId = transfer.destShowroom?.id;
       const userShowroomIds = userProfile.showrooms?.map(s => s.id) || [];
       const showroomHasAccess = destShowroomId ? userShowroomIds.includes(destShowroomId) : false;
-      
-      console.log('Checking showroom access:', {
-        destShowroomId,
-        userShowroomIds,
-        match: showroomHasAccess
-      });
+ 
       
       hasAccess = showroomHasAccess;
     }
 
     setHasDestinationAccess(hasAccess);
-    console.log('User has destination access:', hasAccess);
   }, [transfer, userProfile]);
 
   const handleStatusUpdate = async (action: 'complete' | 'cancel') => {
@@ -166,13 +147,11 @@ const TransferDetailPage: React.FC<TransferViewProps> = ({ id }) => {
     try {
       let updatedTransfer;
       if (action === 'complete') {
-        console.log('Completing transfer:', id);
         updatedTransfer = await completeTransfer(id);
         setSelectedStatus(TransferStatus.COMPLETED);
         setIsCompleteModalOpen(false);
         toast.success('Transfer completed successfully');
       } else {
-        console.log('Cancelling transfer:', id);
         updatedTransfer = await cancelTransfer(id);
         setSelectedStatus(TransferStatus.CANCELLED);
         setIsCancelModalOpen(false);

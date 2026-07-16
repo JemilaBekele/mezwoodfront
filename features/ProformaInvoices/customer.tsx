@@ -84,11 +84,9 @@ export default function CreateCustomerModal({
         }
       });
 
-      console.log('Cleaned data being sent:', cleanedData);
 
       const response = await createCustomer(cleanedData);
       
-      console.log('Create customer response:', response);
 
       toast.success('Customer created successfully');
       closeModal();

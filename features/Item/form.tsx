@@ -356,7 +356,6 @@ export default function ItemForm({
     setLoadingMaterials(true);
     try {
       const materialsData = await getMaterials();
-      console.log('Fetched materials:', materialsData);
       setMaterials(materialsData);
     } catch (error: any) {
       toast.error('Failed to load materials');
@@ -652,7 +651,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     
     // Main image
     if (mainImageFile) {
-      console.log('Adding main image:', mainImageFile.name, mainImageFile.size);
       formData.append('image', mainImageFile);
     } else if (mainImageUrl === null || mainImageUrl === '') {
       formData.append('imageUrl', 'null');
@@ -660,7 +658,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     
     // Additional images
     const newImageFiles = additionalImages.filter(img => !img.isExisting);
-    console.log('New additional images:', newImageFiles.length);
     newImageFiles.forEach((img, index) => {
       if (img.file) {
         console.log(`Adding additional image ${index + 1}:`, img.file.name, img.file.size);
@@ -670,7 +667,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     
     // Images to delete
     if (imagesToDelete.length > 0) {
-      console.log('Images to delete:', imagesToDelete);
       formData.append('imagesToDelete', JSON.stringify(imagesToDelete));
     }
     
@@ -684,7 +680,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     ));
 
     // Log all FormData entries for debugging
-    console.log('=== FORMDATA CONTENTS ===');
     for (const pair of formData.entries()) {
       if (pair[1] instanceof File) {
         console.log(`${pair[0]}: File - ${pair[1].name} (${pair[1].size} bytes)`);
@@ -696,7 +691,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     let response;
     if (isEdit && initialData?.id) {
       // Make sure you're passing the FormData correctly
-      console.log('Updating item with ID:', initialData.id);
       await updateItem(initialData.id, formData);
       router.push('/dashboard/Item');
       router.refresh();

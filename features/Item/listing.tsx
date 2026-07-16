@@ -150,7 +150,6 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
       setLoading(true);
       // Add your API delete call here:
       // await axios.delete(`/api/items/${item.id}`);
-      console.log('Item deleted:', item.id);
       setOpenDeleteModal(false);
     } catch (error) {
       console.error('Failed to delete item', error);

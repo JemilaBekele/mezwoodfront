@@ -51,7 +51,6 @@ export const getCategories = async () => {
 export const getAllDailyStageCapacities = async () => {
   try {
     const response = await axiosInstance.get(`/daily/all/capacity`);
-    console.log("capacity", response.data);
     
     // Extract the array from the nested structure
     // The array is at response.data.category.dailyStageCapacities
@@ -59,7 +58,6 @@ export const getAllDailyStageCapacities = async () => {
     
     // If data is not an array, try alternative paths
     const result = Array.isArray(data) ? data : [];
-    console.log('Extracted capacities array length:', result.length);
     
     return result;
   } catch (error) {

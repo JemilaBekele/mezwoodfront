@@ -272,13 +272,11 @@ export default function MaterialForm({
         
         if (isEdit && initialData?.id) {
           response = await updateMaterial(initialData.id, formData);
-                    console.log(response.material);
 
              router.push('/dashboard/Material'); // Navigate to materials list page
       router.refresh();
         } else {
           response = await createMaterial(formData);
-          console.log(response.material);
             // Now response is accessible here
             router.push(`/dashboard/Material/initial?id=${response?.material?.id}`);
                   router.refresh();
@@ -292,12 +290,11 @@ export default function MaterialForm({
         
         if (isEdit && initialData?.id) {
           response = await updateMaterial(initialData.id, payload);
-          console.log(response.material);
           router.push('/dashboard/Material'); // Navigate to materials list page
           router.refresh();
         } else {
           response = await createMaterial(payload);
-          console.log(response.material);
+          // console.log(response.material);
           router.push(`/dashboard/Material/initial?id=${response?.material?.id}`);
           router.refresh();
         }

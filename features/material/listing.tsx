@@ -79,7 +79,6 @@ export const MaterialCard = ({ material, onSelectMaterial }: MaterialCardProps) 
     try {
       setLoading(true);
       await deleteMaterial(material.id);
-      console.log('Material deleted:', material.id);
       setOpenDeleteModal(false);
     } catch (error) {
       console.error('Failed to delete material', error);

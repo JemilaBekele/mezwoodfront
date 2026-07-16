@@ -95,7 +95,6 @@ function categorizeProjects(projects: IProject[], searchQuery: string, stageName
   );
 
   // Log for debugging
-  console.log(`Projects with ${stageName} stage (normalized: ${normalizedStageName}):`, projectsWithStage.length);
   projectsWithStage.forEach(project => {
     const stage = project.stages?.find((s: IProjectStage) => s.stage === normalizedStageName);
     console.log(`Project ${project.invoice?.piNumber}:`, {
@@ -166,12 +165,6 @@ function categorizeProjects(projects: IProject[], searchQuery: string, stageName
     stageName
   );
 
-  console.log('Categorization results:', {
-    today: todayProjects.length,
-    tomorrow: tomorrowProjects.length,
-    other: otherProjects.length,
-    stageName: normalizedStageName
-  });
 
   return { todayProjects, tomorrowProjects, otherProjects };
 }

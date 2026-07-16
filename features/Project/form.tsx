@@ -111,7 +111,6 @@ export default function ProjectForm({
 
         // Always fetch all invoices for the dropdown (in case user wants to change)
         const data = await getProformaInvoices();
-        console.log('Invoices data:', data);
         setInvoices(data || []);
       } catch {
         toast.error('Failed to load invoices');
@@ -171,7 +170,6 @@ export default function ProjectForm({
       response = await createProject(projectData);
       toast.success('Project created successfully');
     }
-console.log('Project API response:', response);
     // Now response is accessible here
     router.push(`/dashboard/Project/view?id=${response.data.id}`);
     router.refresh();

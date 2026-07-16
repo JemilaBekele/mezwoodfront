@@ -168,7 +168,6 @@ export default function TransferForm({
       return;
     }
 
-    console.log(`Fetching ${productType} for source: ${currentSource}`);
     
     setLoadingProducts(true);
     hasFetchedProductsRef.current = true;

@@ -200,7 +200,6 @@ const FinishedProductsReportDashboard: React.FC = () => {
         endDate,
         materialTypes: ['plainMDF', 'laminatedMDF', 'wood', 'metal'],
       });
-      console.log(data)
       setReportData(data);
       toast.success('Report data refreshed');
     } catch (error: any) {

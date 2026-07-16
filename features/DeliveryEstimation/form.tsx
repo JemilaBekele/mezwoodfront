@@ -287,7 +287,6 @@ export default function DeliveryEstimationForm({
     setIsLoadingItems(true);
     try {
       const response = await getItems();
-      console.log('Items loaded:', response);
       setAllItems(response);
       setFilteredItems(response);
     } catch (error) {

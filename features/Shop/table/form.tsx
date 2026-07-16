@@ -760,11 +760,7 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
   const [orderUpdated, setOrderUpdated] = useState(false);
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
-  // Debug logging
-  console.log("ProductSearch - items prop:", items);
-  console.log("ProductSearch - items length:", items?.length);
-  console.log("ProductSearch - initialSellData:", initialSellData);
-
+  
   // Filter items
   const filteredItems = useMemo(() => {
     let filtered = items || [];

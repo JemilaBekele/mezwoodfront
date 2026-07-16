@@ -240,6 +240,5 @@ export const getProducts = async ({
   const response = await axiosInstance.get(
     `/${source}/${id}/${type}`
   );
-console.log('Products response:', response.data); // Debug log
   return response.data;
 };

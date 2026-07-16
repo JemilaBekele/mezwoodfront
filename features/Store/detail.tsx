@@ -87,7 +87,6 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
       setLoading(true);
       try {
         const saleData = await getSellById(id);
-        console.log("sales data", saleData);
         setSale(saleData);
       } catch {
         toast.error('Failed to fetch sale details');
@@ -527,7 +526,6 @@ const handleConfirmDelivery = async () => {
                   const isSelected = selectedItems.has(item.id);
                   const canSelect = item.itemSaleStatus !== 'DELIVERED';
                   const productImage = normalizeImagePath(item.item?.imageUrl);
-                  console.log("product image",productImage )
                   return (
                     <Card 
                       key={item.id} 

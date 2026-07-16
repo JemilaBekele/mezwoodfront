@@ -173,7 +173,6 @@ export default function EmployeeForm({
         submitData.password = data.password;
       }
 
-      console.log('Submitting data:', submitData);
 
       if (isUpdateMode && initialData?.id) {
         await updateEmployee(initialData.id, submitData);

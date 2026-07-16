@@ -315,7 +315,6 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
       if (id) {
         const projectData = await getProjectId(id);
         setProject(projectData);
-        console.log('Fetched project data:', projectData);
 
         // Fetch proforma invoice if available
         if (projectData.invoice?.id) {

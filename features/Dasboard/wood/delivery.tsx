@@ -89,7 +89,6 @@ const DeliveryDateComparisonReport: React.FC = () => {
     setLoading(true);
     try {
       const data = await getDeliveryDateComparisonReport();
-      console.log('Report data:', data);
       setReport(data);
       toast.success('Report refreshed');
     } catch (error) {

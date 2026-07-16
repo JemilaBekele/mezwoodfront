@@ -83,7 +83,6 @@ const ProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     if (id) {
       const projectData = await getProjectId(id);
       setProject(projectData);
-      console.log('Fetched project data:', projectData);
     }
   } catch (error: any) {
     toast.error('Failed to fetch project details');

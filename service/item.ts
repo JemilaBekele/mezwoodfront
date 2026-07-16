@@ -46,7 +46,6 @@ export const getAllItems = async (params?: {
   sortOrder?: 'asc' | 'desc';
 }) => {
   try {
-    console.log('fetaching  ')
     const response = await axiosInstance.get(`/items/get/all`);
 
     const items = response?.data?.items ?? [];
@@ -324,7 +323,6 @@ export const getAllProformaInvoicesAndSales = async (
         },
       },
     );
-console.log('Response from API:', response.data);
     return response.data;
   } catch (error) {
     throw error;

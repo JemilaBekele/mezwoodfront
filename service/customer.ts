@@ -55,7 +55,6 @@ export const createCustomer = async (
   customerData: any,
 ) => {
   try {
-    console.log("customer data",customerData)
     const response = await axiosInstance.post('/customers', customerData);
     return response.data;
   } catch (error) {

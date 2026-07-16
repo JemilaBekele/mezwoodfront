@@ -174,7 +174,6 @@ export default function StockCorrectionForm({
       return;
     }
 
-    console.log(`Fetching ${productType} for location: ${currentLocation}`);
     
     setLoadingProducts(true);
     hasFetchedProductsRef.current = true;

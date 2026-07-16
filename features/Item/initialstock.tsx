@@ -154,7 +154,6 @@ const handleSubmit = async (e: React.FormEvent) => {
       }))
     };
 
-    console.log('Submitting payload:', payload); // Debug log
 
     await acceptItemInitialStock(payload);
     

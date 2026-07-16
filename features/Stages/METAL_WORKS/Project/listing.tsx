@@ -16,7 +16,6 @@ export default function MetalworkProjectListingPage() {
       try {
         setLoading(true);
         const result = await getMetalWorkProjects({ status: 'not-finished' });
-        console.log('Fetched metalwork projects:', result.projects); // Log the fetched projects
         setProjects(result.projects);
         setError(null);
       } catch (err) {

@@ -77,7 +77,6 @@ const StockCorrectionDetailPage: React.FC<StockCorrectionViewProps> = ({
       try {
         if (id) {
           const stockCorrectionData = await getStockCorrectionId(id);
-          console.log('Fetched stock correction data:', stockCorrectionData);
           setStockCorrection(stockCorrectionData);
         }
       } catch (error) {

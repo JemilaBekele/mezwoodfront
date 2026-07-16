@@ -482,30 +482,18 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
     // Collect all material updates
     const materialUpdates: MaterialUpdate[] = [];
     
-    console.log('=== Starting onSubmit ===');
-    console.log('Initial data ID:', initialData.id);
-    
+   
     data.items.forEach((item, itemIndex) => {
-      console.log(`Processing item ${itemIndex}:`, item);
       
       if (item.materials && item.materials.length > 0) {
         item.materials.forEach((material, materialIndex) => {
           const originalQty = originalMaterialQuantities.get(material.id) || 0;
-          console.log(`Material ${materialIndex}:`, {
-            id: material.id,
-            materialId: material.materialId,
-            originalQty,
-            quantity: material.quantity,
-            additionalQuantity: (material as ExtendedMaterial).additionalQuantity,
-            note: material.note
-          });
-          
+     
           // Only include materials that have changes
           if (material.id && originalQty > 0) {
             // Existing material - check if additional quantity is provided
             const additionalQty = (material as ExtendedMaterial).additionalQuantity || 0;
             
-            console.log(`Existing material - additionalQty: ${additionalQty}`);
             
             if (additionalQty > 0) {
               const update = {
@@ -513,7 +501,6 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
                 additionalQuantity: additionalQty,
                 note: material.note || null
               };
-              console.log('Adding existing material update:', update);
               materialUpdates.push(update);
             }
           } else if (!material.id && material.quantity > 0) {
@@ -523,30 +510,21 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
               additionalQuantity: material.quantity,
               note: material.note || null
             };
-            console.log('Adding new material update:', update);
             materialUpdates.push(update);
           }
         });
       }
     });
 
-    console.log('Final materialUpdates array:', JSON.stringify(materialUpdates, null, 2));
 
     if (materialUpdates.length === 0) {
-      console.log('No material updates to apply');
       toast.info('No material updates to apply');
       setIsLoading(false);
       return;
     }
 
-    // Call the new service to update additional quantities
-    console.log('Calling API with:', {
-      id: initialData.id,
-      materialUpdates: materialUpdates
-    });
     
     const response = await updateProformaInvoiceAdditionalQuantity(initialData.id, materialUpdates);
-    console.log('API Response:', response);
     
     toast.success('Materials updated successfully');
     

@@ -84,7 +84,6 @@ export const getMaterialId = async (
     const response = await axiosInstance.get<MaterialResponse>(
       `/materials/viewmaterial/${id}`
     );
-    console.log(response)
     return response.data.material as unknown  as MaterialDetail;
   } catch (error) {
     throw error;

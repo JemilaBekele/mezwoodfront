@@ -204,13 +204,11 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
       
       // Don't auto-finish if already triggered
       if (autoFinishTriggered) {
-        console.log('Auto-finish already triggered, skipping');
         return false;
       }
 
       const designStages = getDesignStages(project.stages);
       if (designStages.length === 0) {
-        console.log('No design stages found');
         return false;
       }
 
@@ -224,22 +222,14 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
         stage.actualWorkUnits > 0 // Only auto-finish if actual work units are set
       );
 
-      console.log('Work unit mismatch check:', { 
-        hasMismatch, 
-        designStages,
-        designStatus: project.designStatus 
-      });
+  
       
       return hasMismatch;
     };
 
     if (project && !loading && !updatingDesign && !autoFinishTriggered) {
       const shouldAutoFinish = shouldAutoFinishDesign();
-      console.log('Auto-finish check:', { 
-        shouldAutoFinish, 
-        designStatus: project.designStatus,
-        autoFinishTriggered 
-      });
+   
       
       if (shouldAutoFinish) {
         setAutoFinishTriggered(true);
@@ -247,7 +237,6 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
         const autoFinish = async () => {
           try {
             setUpdatingDesign(true);
-            console.log('Auto-finishing design due to work unit mismatch...');
             await updateProjectDesignStatus(project.id, DesignStatus.FINISHED);
             await fetchProjectData();
         
