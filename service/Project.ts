@@ -476,7 +476,7 @@ export const deleteProjectStage = async (
 ): Promise<any> => {
   try {
     const response = await axiosInstance.delete(
-      `/projects/stage/delete/spe`,
+      `/projects/stage/delete/specific`,
       {
         data,
       }
