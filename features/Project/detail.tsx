@@ -1071,13 +1071,13 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                   {project.invoice.items && project.invoice.items.length > 0 && (
                     <div className="space-y-3">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Line Items ({project.invoice.items.length})
+                        Line Products ({project.invoice.items.length})
                       </h4>
                       <div className="overflow-hidden rounded-lg border">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-muted/30">
-                                                          <TableHead className="font-semibold">Item</TableHead>
+                                                          <TableHead className="font-semibold">Products</TableHead>
 
                               <TableHead className="font-semibold text-right">Qty</TableHead>
                               <TableHead className="font-semibold text-right">Unit Price</TableHead>
@@ -1099,7 +1099,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                         {project.invoice.items.length > 5 && (
                           <div className="border-t bg-muted/10 px-4 py-2.5 text-center">
                             <p className="text-xs text-muted-foreground">
-                              Showing 5 of {project.invoice.items.length} items
+                              Showing 5 of {project.invoice.items.length} Products
                             </p>
                           </div>
                         )}

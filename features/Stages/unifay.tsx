@@ -1201,7 +1201,7 @@ const formatDescription = (text: string, limit = 80) => {
 
             <Tabs defaultValue="materials" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="items" className="text-xs sm:text-sm">Items</TabsTrigger>
+                <TabsTrigger value="items" className="text-xs sm:text-sm">Products</TabsTrigger>
                 <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials & Stock Information</TabsTrigger>
               </TabsList>
 
@@ -1212,7 +1212,7 @@ const formatDescription = (text: string, limit = 80) => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="text-xs md:text-sm">Item</TableHead>
+                            <TableHead className="text-xs md:text-sm">Products</TableHead>
                             <TableHead className="text-xs md:text-sm">Size</TableHead>
                             <TableHead className="text-xs md:text-sm">Quantity</TableHead>
                             <TableHead className="text-xs md:text-sm">Materials</TableHead>
