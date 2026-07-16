@@ -878,6 +878,7 @@ return (
 
       {/* Material Stock Details Card */}
      {/* Material Stock Details Card */}
+{/* Material Stock Details Card */}
 {materialStockChecks.length > 0 && (
   <Card>
     <CardHeader>
@@ -889,406 +890,124 @@ return (
         </Badge>
       </CardTitle>
     </CardHeader>
-    <CardContent className="p-0 overflow-x-auto">
-      <div className="min-w-[800px] md:min-w-full">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap">Material</TableHead>
-              <TableHead className="whitespace-nowrap">Color</TableHead>
-              <TableHead className="whitespace-nowrap">Size</TableHead>
-              <TableHead className="whitespace-nowrap">Required</TableHead>
-              <TableHead className="whitespace-nowrap">Already Issued</TableHead>
-              <TableHead className="whitespace-nowrap">Remaining Needed</TableHead>
-              <TableHead className="whitespace-nowrap">Available Stock</TableHead>
-              <TableHead className="whitespace-nowrap">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {materialStockChecks.map((check) => (
-              <TableRow key={check.materialId}>
-                <TableCell className="font-medium whitespace-nowrap">{check.materialName}</TableCell>
-                <TableCell className="whitespace-nowrap">{check.color}</TableCell>
-                <TableCell className="whitespace-nowrap">{check.size}</TableCell>
-                <TableCell className="whitespace-nowrap">{check.requiredQuantity}</TableCell>
-                <TableCell className="whitespace-nowrap">{check.alreadyIssued}</TableCell>
-                <TableCell className="whitespace-nowrap">{check.remainingNeeded}</TableCell>
-                <TableCell className="whitespace-nowrap">{check.availableStock}</TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {check.isAvailable ? (
-                    <Badge variant="default" className="bg-green-500 whitespace-nowrap">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Available
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="whitespace-nowrap">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Shortfall: {check.shortfall}
-                    </Badge>
-                  )}
-                </TableCell>
+    <CardContent className="p-0">
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-full" style={{ width: 'max-content' }}>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Material</TableHead>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Color</TableHead>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Size</TableHead>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Required</TableHead>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Issued</TableHead>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Remaining</TableHead>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Stock</TableHead>
+                <TableHead className="whitespace-nowrap text-xs md:text-sm">Status</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {materialStockChecks.map((check) => (
+                <TableRow key={check.materialId}>
+                  <TableCell className="whitespace-nowrap text-xs md:text-sm font-medium">{check.materialName}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs md:text-sm">{check.color}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs md:text-sm">{check.size}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs md:text-sm">{check.requiredQuantity}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs md:text-sm">{check.alreadyIssued}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs md:text-sm">{check.remainingNeeded}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs md:text-sm">{check.availableStock}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {check.isAvailable ? (
+                      <Badge variant="default" className="bg-green-500 whitespace-nowrap text-xs">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Available
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="whitespace-nowrap text-xs">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Shortfall
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </CardContent>
   </Card>
 )}
 
       {/* Proforma Invoice Card - With Images */}
-      {proformaInvoice && (
-        <Card>
-          <CardHeader className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Proforma Invoice Information
-            </CardTitle>
-            {/* Update Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                router.push(`/dashboard/Stage/Design/${proformaInvoice.id}`)
-              }
-              className="w-full sm:w-auto"
-            >
-              Update PI
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Basic Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">PI Number</p>
-                <p className="font-medium text-sm md:text-base">{proformaInvoice.piNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
-                <Badge variant="outline" className="mt-1 text-sm">
-                  {proformaInvoice.status.replace(/_/g, ' ')}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Tabs for organizing content */}
-            <Tabs defaultValue="items" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-                <TabsTrigger value="items" className="text-xs sm:text-sm">Items</TabsTrigger>
-                <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials</TabsTrigger>
-                <TabsTrigger value="images" className="text-xs sm:text-sm">Images</TabsTrigger>
-                <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
-              </TabsList>
-
-              {/* Items Tab */}
-              <TabsContent value="items" className="space-y-4 mt-4">
-                {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Mobile View */}
-                    <div className="space-y-4 md:hidden">
-                      {proformaInvoice.items.map((item) => (
-                        <div key={item.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-semibold text-base">{item.description}</h4>
-                              {item.size && item.size !== "" && (
-                                <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                              )}
-                              {item.additionalDescription && item.additionalDescription !== "" && (
-                                <p className="text-sm text-muted-foreground mt-1">{item.additionalDescription}</p>
-                              )}
-                            </div>
-                            <Badge variant="outline" className="text-xs">Qty: {item.quantity}</Badge>
-                          </div>
-
-                          {/* Item Images Preview */}
-                          {item.images && item.images.length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-xs text-muted-foreground mb-2">Item Images:</p>
-                              <div className="flex gap-2 flex-wrap">
-                                {item.images.slice(0, 3).map((img) => (
-                                  <div key={img.id} className="relative w-12 h-12 md:w-16 md:h-16 rounded-md overflow-hidden border">
-                                    <Image
-                                      src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                      alt="Item"
-                                      fill
-                                      className="object-cover"
-                                    />
-                                  </div>
-                                ))}
-                                {item.images.length > 3 && (
-                                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-md bg-muted flex items-center justify-center">
-                                    <Plus className="h-3 w-3 md:h-4 md:w-4" />
-                                    <span className="text-xs">+{item.images.length - 3}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Materials Count */}
-                          {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <Layers className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-                              <span className="text-xs md:text-sm text-muted-foreground">
-                                {item.proformaItemMaterials.length} material(s) • {getItemMaterialsTotal(item)} total units
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Desktop View */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead>Quantity</TableHead>
-                            <TableHead>Images</TableHead>
-                            <TableHead>Materials</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {proformaInvoice.items.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <p className="font-medium text-sm">{item.description}</p>
-                                  {item.additionalDescription && item.additionalDescription !== "" && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {item.additionalDescription}
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
-                              <TableCell className="text-sm">{item.quantity}</TableCell>
-                              <TableCell>
-                                {item.images && item.images.length > 0 ? (
-                                  <div className="flex gap-1">
-                                    {item.images.slice(0, 2).map((img) => (
-                                      <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
-                                           onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
-                                        <Image
-                                          src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                          alt="Item"
-                                          fill
-                                          className="object-cover"
-                                        />
-                                      </div>
-                                    ))}
-                                    {item.images.length > 2 && (
-                                      <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  'No images'
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
-                                  <Badge variant="outline" className="flex items-center gap-1">
-                                    <Layers className="h-3 w-3" />
-                                    {item.proformaItemMaterials.length} material(s)
-                                  </Badge>
-                                ) : (
-                                  'No materials'
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Package className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No items found</p>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Materials Tab */}
-              <TabsContent value="materials" className="space-y-4 mt-4">
-                {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
-                  <div className="space-y-4">
-                    {proformaInvoice.items.map((item) => {
-                      if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
-                      
-                      return (
-                        <div key={item.id} className="border rounded-lg overflow-hidden">
-                          <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item.description}</h4>
-                            {item.size && item.size !== "" && (
-                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                            )}
-                          </div>
-                          <div className="p-3 overflow-x-auto">
-                            <div className="min-w-[500px] md:min-w-0">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs md:text-sm">Material Name</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Color</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Size</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Quantity</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Additional Qty</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Note</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {item.proformaItemMaterials.map((material) => (
-                                    <TableRow key={material.id}>
-                                      <TableCell className="text-sm">
-                                        <p className="font-medium">
-                                          {material.material?.name || 'N/A'}
-                                        </p>
-                                      </TableCell>
-                                      <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
-                                      <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
-                                      <TableCell className="text-sm">
-                                        <Badge variant="outline" className="text-xs">{material.quantity} units</Badge>
-                                      </TableCell>
-                                      <TableCell className="text-sm">
-                                        <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0} units</Badge>
-                                      </TableCell>
-                                      <TableCell className="text-sm">
-                                        {material.note && material.note !== "" ? (
-                                          <p className="text-sm line-clamp-2">{material.note}</p>
-                                        ) : (
-                                          <span className="text-muted-foreground text-sm">No note</span>
-                                        )}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Images Tab - New Tab for Item Images */}
-              <TabsContent value="images" className="space-y-4 mt-4">
-                {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
-                  <div className="space-y-6">
-                    {proformaInvoice.items.map((item) => {
-                      if (!item.images || item.images.length === 0) return null;
-                      
-                      return (
-                        <div key={item.id} className="border rounded-lg overflow-hidden">
-                          <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item.description}</h4>
-                            {item.size && item.size !== "" && (
-                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                            )}
-                          </div>
-                          <div className="p-3 md:p-4">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
-                              {item.images.map((image) => (
-                                <div key={image.id} className="space-y-2">
-                                  <div className="relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer group"
-                                       onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
-                                    <Image
-                                      src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
-                                      alt={`Item image for ${item.description}`}
-                                      fill
-                                      className="object-cover transition-transform group-hover:scale-105"
-                                    />
-                                  </div>
-                                  <p className="text-xs text-muted-foreground text-center">
-                                    Added: {formatDate(image.createdAt)}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <ImageIcon className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No images found for any items</p>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Attachments Tab */}
-              <TabsContent value="attachments" className="space-y-4 mt-4">
-                {proformaInvoice.attachments && proformaInvoice.attachments.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3">
-                    {proformaInvoice.attachments.map((attachment) => (
-                      <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
-                        <div className="flex items-center gap-3 flex-1">
-                          <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <a 
-                              href={normalizeImagePath(attachment.fileUrl)} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-sm text-blue-600 hover:underline break-all"
-                            >
-                              {attachment.fileUrl.split('/').pop() || 'View Attachment'}
-                            </a>
-                            {attachment.createdAt && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Added: {formatDate(attachment.createdAt)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = normalizeImagePath(attachment.fileUrl) || '';
-                              link.download = attachment.fileUrl.split('/').pop() || 'attachment';
-                              link.click();
-                            }}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
+   {/* Desktop View */}
+<div className="hidden md:block">
+  <div className="w-full overflow-x-auto">
+    <div className="min-w-full">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="whitespace-nowrap text-xs">Description</TableHead>
+            <TableHead className="whitespace-nowrap text-xs">Size</TableHead>
+            <TableHead className="whitespace-nowrap text-xs">Qty</TableHead>
+            <TableHead className="whitespace-nowrap text-xs">Images</TableHead>
+            <TableHead className="whitespace-nowrap text-xs">Materials</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {proformaInvoice.items.map((item) => (
+            <TableRow key={item.id}>
+              <TableCell>
+                <div className="space-y-1 min-w-[100px]">
+                  <p className="font-medium text-xs md:text-sm">{item.description}</p>
+                  {item.additionalDescription && item.additionalDescription !== "" && (
+                    <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                      {item.additionalDescription}
+                    </p>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="text-xs md:text-sm whitespace-nowrap">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+              <TableCell className="text-xs md:text-sm whitespace-nowrap">{item.quantity}</TableCell>
+              <TableCell>
+                {item.images && item.images.length > 0 ? (
+                  <div className="flex gap-1">
+                    {item.images.slice(0, 2).map((img) => (
+                      <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
+                           onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
+                        <Image
+                          src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                          alt="Item"
+                          fill
+                          className="object-cover"
+                        />
                       </div>
                     ))}
+                    {item.images.length > 2 && (
+                      <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
+                    )}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <FileText className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                    <p className="mt-4 text-muted-foreground text-sm md:text-base">No attachments found</p>
-                  </div>
+                  <span className="text-xs text-muted-foreground">No images</span>
                 )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
+              </TableCell>
+              <TableCell>
+                {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
+                  <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                    <Layers className="h-3 w-3" />
+                    {item.proformaItemMaterials.length}
+                  </Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">None</span>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  </div>
+</div>
 
       {/* Customer Information Card - Limited View */}
       <Card>
