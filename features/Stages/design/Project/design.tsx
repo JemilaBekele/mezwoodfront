@@ -888,48 +888,51 @@ return (
               </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <div className="min-w-[640px] md:min-w-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Required</TableHead>
-                    <TableHead>Already Issued</TableHead>
-                    <TableHead>Remaining Needed</TableHead>
-                    <TableHead>Available Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {materialStockChecks.map((check) => (
-                    <TableRow key={check.materialId}>
-                      <TableCell className="font-medium text-sm md:text-base">{check.materialName}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.color}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.size}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.requiredQuantity}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.alreadyIssued}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.remainingNeeded}</TableCell>
-                      <TableCell className="text-sm md:text-base">{check.availableStock}</TableCell>
-                      <TableCell>
-                        {check.isAvailable ? (
-                          <Badge variant="default" className="bg-green-500 text-xs md:text-sm">
-                            <CheckCircle2 className="h-2 w-2 md:h-3 md:w-3 mr-1" />
-                            Available
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs md:text-sm">
-                            <AlertCircle className="h-2 w-2 md:h-3 md:w-3 mr-1" />
-                            Shortfall: {check.shortfall}
-                          </Badge>
-                        )}
-                      </TableCell>
+          <CardContent>
+            {/* Responsive Table with horizontal scroll on mobile */}
+            <div className="w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+              <div className="min-w-[640px] md:min-w-full">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs sm:text-sm">Material</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Color</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Size</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Required</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Issued</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Remaining</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Stock</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {materialStockChecks.map((check) => (
+                      <TableRow key={check.materialId}>
+                        <TableCell className="font-medium text-xs sm:text-sm">{check.materialName}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{check.color}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{check.size}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{check.requiredQuantity}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{check.alreadyIssued}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{check.remainingNeeded}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{check.availableStock}</TableCell>
+                        <TableCell>
+                          {check.isAvailable ? (
+                            <Badge variant="default" className="bg-green-500 text-[10px] sm:text-xs whitespace-nowrap">
+                              <CheckCircle2 className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+                              Available
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px] sm:text-xs whitespace-nowrap">
+                              <AlertCircle className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+                              Shortfall
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -973,7 +976,7 @@ return (
             {/* Tabs for organizing content */}
             <Tabs defaultValue="items" className="w-full">
               <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-                <TabsTrigger value="items" className="text-xs sm:text-sm">Items</TabsTrigger>
+                <TabsTrigger value="items" className="text-xs sm:text-sm">Products</TabsTrigger>
                 <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials</TabsTrigger>
                 <TabsTrigger value="images" className="text-xs sm:text-sm">Images</TabsTrigger>
                 <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
@@ -983,30 +986,26 @@ return (
               <TabsContent value="items" className="space-y-4 mt-4">
                 {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
                   <div className="space-y-4">
-                    {/* Mobile View */}
-                    <div className="space-y-4 md:hidden">
+                    {/* Mobile View - Cards */}
+                    <div className="space-y-3 md:hidden">
                       {proformaInvoice.items.map((item) => (
-                        <div key={item.id} className="border rounded-lg p-4">
+                        <div key={item.id} className="border rounded-lg p-3">
                           <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h4 className="font-semibold text-base">{item.description}</h4>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-sm">{item?.item?.name || 'N/A'}</h4>
                               {item.size && item.size !== "" && (
-                                <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                              )}
-                              {item.additionalDescription && item.additionalDescription !== "" && (
-                                <p className="text-sm text-muted-foreground mt-1">{item.additionalDescription}</p>
+                                <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                               )}
                             </div>
-                            <Badge variant="outline" className="text-xs">Qty: {item.quantity}</Badge>
+                            <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">Qty: {item.quantity}</Badge>
                           </div>
 
-                          {/* Item Images Preview */}
+                          {/* Item Images - No description */}
                           {item.images && item.images.length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-xs text-muted-foreground mb-2">Item Images:</p>
+                            <div className="mt-2">
                               <div className="flex gap-2 flex-wrap">
                                 {item.images.slice(0, 3).map((img) => (
-                                  <div key={img.id} className="relative w-12 h-12 md:w-16 md:h-16 rounded-md overflow-hidden border">
+                                  <div key={img.id} className="relative w-10 h-10 rounded-md overflow-hidden border">
                                     <Image
                                       src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
                                       alt="Item"
@@ -1016,9 +1015,9 @@ return (
                                   </div>
                                 ))}
                                 {item.images.length > 3 && (
-                                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-md bg-muted flex items-center justify-center">
-                                    <Plus className="h-3 w-3 md:h-4 md:w-4" />
-                                    <span className="text-xs">+{item.images.length - 3}</span>
+                                  <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
+                                    <Plus className="h-3 w-3" />
+                                    <span className="text-[10px]">+{item.images.length - 3}</span>
                                   </div>
                                 )}
                               </div>
@@ -1028,9 +1027,9 @@ return (
                           {/* Materials Count */}
                           {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
                             <div className="mt-2 flex items-center gap-2">
-                              <Layers className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-                              <span className="text-xs md:text-sm text-muted-foreground">
-                                {item.proformaItemMaterials.length} material(s) • {getItemMaterialsTotal(item)} total units
+                              <Layers className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                {item.proformaItemMaterials.length} material(s)
                               </span>
                             </div>
                           )}
@@ -1038,69 +1037,62 @@ return (
                       ))}
                     </div>
 
-                    {/* Desktop View */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead>Quantity</TableHead>
-                            <TableHead>Images</TableHead>
-                            <TableHead>Materials</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {proformaInvoice.items.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <p className="font-medium text-sm">{item.description}</p>
-                                  {item.additionalDescription && item.additionalDescription !== "" && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {item.additionalDescription}
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
-                              <TableCell className="text-sm">{item.quantity}</TableCell>
-                              <TableCell>
-                                {item.images && item.images.length > 0 ? (
-                                  <div className="flex gap-1">
-                                    {item.images.slice(0, 2).map((img) => (
-                                      <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
-                                           onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
-                                        <Image
-                                          src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
-                                          alt="Item"
-                                          fill
-                                          className="object-cover"
-                                        />
-                                      </div>
-                                    ))}
-                                    {item.images.length > 2 && (
-                                      <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  'No images'
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
-                                  <Badge variant="outline" className="flex items-center gap-1">
-                                    <Layers className="h-3 w-3" />
-                                    {item.proformaItemMaterials.length} material(s)
-                                  </Badge>
-                                ) : (
-                                  'No materials'
-                                )}
-                              </TableCell>
+                    {/* Desktop View - Table */}
+                    <div className="hidden md:block w-full overflow-x-auto">
+                      <div className="min-w-full">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-sm">Product</TableHead>
+                              <TableHead className="text-sm">Size</TableHead>
+                              <TableHead className="text-sm">Quantity</TableHead>
+                              <TableHead className="text-sm">Images</TableHead>
+                              <TableHead className="text-sm">Materials</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {proformaInvoice.items.map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="text-sm font-medium">{item?.item?.name || 'N/A'}</TableCell>
+                                <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+                                <TableCell className="text-sm">{item.quantity}</TableCell>
+                                <TableCell>
+                                  {item.images && item.images.length > 0 ? (
+                                    <div className="flex gap-1">
+                                      {item.images.slice(0, 2).map((img) => (
+                                        <div key={img.id} className="relative w-8 h-8 rounded overflow-hidden border cursor-pointer"
+                                             onClick={() => window.open(normalizeImagePath(img.imageUrl), '_blank')}>
+                                          <Image
+                                            src={normalizeImagePath(img.imageUrl) || '/placeholder-image.jpg'}
+                                            alt="Item"
+                                            fill
+                                            className="object-cover"
+                                          />
+                                        </div>
+                                      ))}
+                                      {item.images.length > 2 && (
+                                        <span className="text-xs text-muted-foreground">+{item.images.length - 2}</span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">No images</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
+                                    <Badge variant="outline" className="flex items-center gap-1">
+                                      <Layers className="h-3 w-3" />
+                                      {item.proformaItemMaterials.length}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">None</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -1121,21 +1113,21 @@ return (
                       return (
                         <div key={item.id} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item.description}</h4>
+                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
                             {item.size && item.size !== "" && (
                               <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                             )}
                           </div>
-                          <div className="p-3 overflow-x-auto">
-                            <div className="min-w-[500px] md:min-w-0">
+                          <div className="p-3 w-full overflow-x-auto">
+                            <div className="min-w-[500px] md:min-w-full">
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead className="text-xs md:text-sm">Material Name</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Material</TableHead>
                                     <TableHead className="text-xs md:text-sm">Color</TableHead>
                                     <TableHead className="text-xs md:text-sm">Size</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Quantity</TableHead>
-                                    <TableHead className="text-xs md:text-sm">Additional Qty</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Qty</TableHead>
+                                    <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
                                     <TableHead className="text-xs md:text-sm">Note</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -1150,16 +1142,16 @@ return (
                                       <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
                                       <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
                                       <TableCell className="text-sm">
-                                        <Badge variant="outline" className="text-xs">{material.quantity} units</Badge>
+                                        <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
                                       </TableCell>
                                       <TableCell className="text-sm">
-                                        <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0} units</Badge>
+                                        <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0}</Badge>
                                       </TableCell>
                                       <TableCell className="text-sm">
                                         {material.note && material.note !== "" ? (
                                           <p className="text-sm line-clamp-2">{material.note}</p>
                                         ) : (
-                                          <span className="text-muted-foreground text-sm">No note</span>
+                                          <span className="text-muted-foreground text-sm">-</span>
                                         )}
                                       </TableCell>
                                     </TableRow>
@@ -1180,7 +1172,7 @@ return (
                 )}
               </TabsContent>
 
-              {/* Images Tab - New Tab for Item Images */}
+              {/* Images Tab - Removed descriptions */}
               <TabsContent value="images" className="space-y-4 mt-4">
                 {proformaInvoice.items && proformaInvoice.items.some(item => item.images && item.images.length > 0) ? (
                   <div className="space-y-6">
@@ -1190,7 +1182,7 @@ return (
                       return (
                         <div key={item.id} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item.description}</h4>
+                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
                             {item.size && item.size !== "" && (
                               <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                             )}
@@ -1203,13 +1195,13 @@ return (
                                        onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
                                     <Image
                                       src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
-                                      alt={`Item image for ${item.description}`}
+                                      alt={item?.item?.name || 'Item image'}
                                       fill
                                       className="object-cover transition-transform group-hover:scale-105"
                                     />
                                   </div>
-                                  <p className="text-xs text-muted-foreground text-center">
-                                    Added: {formatDate(image.createdAt)}
+                                  <p className="text-[10px] text-muted-foreground text-center">
+                                    {formatDate(image.createdAt)}
                                   </p>
                                 </div>
                               ))}
@@ -1233,7 +1225,7 @@ return (
                   <div className="grid grid-cols-1 gap-3">
                     {proformaInvoice.attachments.map((attachment) => (
                       <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
-                        <div className="flex items-center gap-3 flex-1">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <a 
@@ -1251,7 +1243,7 @@ return (
                             )}
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-shrink-0">
                           <Button
                             variant="ghost"
                             size="sm"
