@@ -669,7 +669,20 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
   const projectStatusConfig = project ? getStatusConfig(project.status) : null;
   const difficultyConfig = project ? getDifficultyConfig(project.difficulty) : null;
   const stageStatusConfig = getStageStatusConfig();
+const formatDescription = (text: string, limit = 80) => {
+  if (text.length <= limit) return text;
 
+  const firstLine = text.slice(0, limit);
+  const secondLine = text.slice(limit);
+
+  return (
+    <>
+      {firstLine}
+      <br />
+      {secondLine}
+    </>
+  );
+};
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -836,7 +849,7 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                           <div className="space-y-3">
                             {stage.startDate ? (
                               <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
                                   <p className="text-xs text-muted-foreground">Start Date</p>
                                   <p className="font-medium text-sm md:text-base">{formatDate(stage.startDate)}</p>
@@ -859,7 +872,7 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                             )}
                             {stage.timeTaken ? (
                               <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
                                   <p className="text-xs text-muted-foreground">Time taken</p>
                                   <p className="font-medium text-sm md:text-base">{formatMinutes(stage.timeTaken)}</p>
@@ -947,7 +960,7 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                                           </span>
                                         </div>
                                         {cleanNote && (
-                                          <p className="text-sm text-gray-600 mt-1 break-words">{cleanNote}</p>
+                                          <p className="text-sm text-gray-600 mt-1 wrap-break-word">{cleanNote}</p>
                                         )}
                                         {log.doneBy && (
                                           <p className="text-xs text-muted-foreground mt-1">
@@ -1194,8 +1207,8 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
 
               <TabsContent value="items" className="space-y-4 mt-4">
                 {proformaInvoice.items && proformaInvoice.items.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[600px] md:min-w-0">
+                  <div className="w-full overflow-x-auto">
+                    <div className="min-w-160 md:min-w-full">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1224,10 +1237,10 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <p className="font-medium text-sm">{item.description}</p>
+                                  <p className="font-medium text-sm">{formatDescription(item.description)}</p>
                                   {item.additionalDescription && (
                                     <p className="text-xs text-muted-foreground">
-                                      {item.additionalDescription}
+                                      {formatDescription(item.additionalDescription)}
                                     </p>
                                   )}
                                 </div>
@@ -1258,8 +1271,8 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
                             <h4 className="font-semibold text-sm md:text-base">{item.item?.name || ''}</h4>
                             {item.size && <p className="text-sm text-muted-foreground">Size: {item.size}</p>}
                           </div>
-                          <div className="p-3 overflow-x-auto">
-                            <div className="min-w-[500px] md:min-w-0">
+                          <div className="p-3 w-full overflow-x-auto">
+                            <div className="min-w-[500px] md:min-w-full">
                               <Table>
                                 <TableHeader>
                                   <TableRow>

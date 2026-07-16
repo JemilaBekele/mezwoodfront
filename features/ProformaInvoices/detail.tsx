@@ -1110,13 +1110,13 @@ const formatDescription = (text: string, limit = 80) => {
                                   <DialogContent className="max-w-3xl">
                                     <DialogHeader>
                                       <DialogTitle>
-                                        {item.description} - Image {imgIndex + 1}
+                                         Image {imgIndex + 1}
                                       </DialogTitle>
                                     </DialogHeader>
                                     <div className="relative aspect-video">
                                       <img
                                         src={normalizeImagePath(image.imageUrl)}
-                                        alt={`${item.description} - image ${imgIndex + 1}`}
+                                        alt={` image ${imgIndex + 1}`}
                                         className="object-contain w-full h-full rounded-md"
                                       />
                                     </div>
@@ -1189,13 +1189,13 @@ const formatDescription = (text: string, limit = 80) => {
                                     <DialogContent className="max-w-3xl">
                                       <DialogHeader>
                                         <DialogTitle>
-                                          {item.description} - Image {imgIndex + 1}
+                                           Image {imgIndex + 1}
                                         </DialogTitle>
                                       </DialogHeader>
                                       <div className="relative aspect-video">
                                         <img
                                           src={normalizeImagePath(image.imageUrl)}
-                                          alt={`${item.description} - image ${imgIndex + 1}`}
+                                          alt={` image ${imgIndex + 1}`}
                                           className="object-contain w-full h-full rounded-md"
                                         />
                                       </div>

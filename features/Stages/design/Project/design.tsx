@@ -502,7 +502,20 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
   // Check if design can be finished
   const canFinishDesign = allMaterialsAvailable && project.designStatus !== DesignStatus.FINISHED;
+const formatDescription = (text: string, limit = 80) => {
+  if (text.length <= limit) return text;
 
+  const firstLine = text.slice(0, limit);
+  const secondLine = text.slice(limit);
+
+  return (
+    <>
+      {firstLine}
+      <br />
+      {secondLine}
+    </>
+  );
+};
 return (
   <div className="space-y-6">
     {/* Project Overview Cards */}
@@ -969,6 +982,8 @@ return (
                 <TabsTrigger value="materials" className="text-xs sm:text-sm">Materials</TabsTrigger>
                 <TabsTrigger value="images" className="text-xs sm:text-sm">Images</TabsTrigger>
                 <TabsTrigger value="attachments" className="text-xs sm:text-sm">Attachments</TabsTrigger>
+                                <TabsTrigger value="attachments" className="text-xs sm:text-sm">Description</TabsTrigger>
+
               </TabsList>
 
               {/* Items Tab */}
@@ -1022,6 +1037,16 @@ return (
                               </span>
                             </div>
                           )}
+                              <TableCell>
+                                                          <div className="space-y-1">
+                                                            <p className="font-medium text-sm">{formatDescription(item.description)}</p>
+                                                            {item.additionalDescription && (
+                                                              <p className="text-xs text-muted-foreground">
+                                                                {formatDescription(item.additionalDescription)}
+                                                              </p>
+                                                            )}
+                                                          </div>
+                                                        </TableCell>
                         </div>
                       ))}
                     </div>
