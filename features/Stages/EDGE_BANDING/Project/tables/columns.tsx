@@ -3,8 +3,8 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { DataTableColumnHeader } from '@/components/ui/table/data-table-column-header';
-import { CalendarDays, User, FileText, Layers, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, IProjectStageWorkLog } from '@/models/Projects';
+import { User, FileText, Layers, Clock, CheckCircle2 } from 'lucide-react';
+import { IProject, ProjectStatus, IProjectStage, IProjectStageWorkLog } from '@/models/Projects';
 import { ProjectCellAction } from './cell-action';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -256,6 +256,10 @@ export const projectColumns: ColumnDef<IProject>[] = [
   },
   {
     id: 'actions',
-    cell: ({ row }) => <ProjectCellAction data={row.original} />
+    cell: ({ row, table }) => {
+      // Get the refresh function from table meta
+      const meta = table.options.meta as { onRefresh?: () => void };
+      return <ProjectCellAction data={row.original} onRefresh={meta?.onRefresh} />;
+    }
   }
 ];

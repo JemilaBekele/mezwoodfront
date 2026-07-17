@@ -321,16 +321,45 @@ useEffect(() => {
   );
 
   // Material options
-  const materialOptions: SelectOption[] = useMemo(() => {
-    if (!materials || materials.length === 0) {
-      return [];
-    }
-    
-    return materials.map((material) => ({
-      value: material.id,
-      label: `${material.name}${material.color ? ` (${material.color})` : ''}`
-    }));
-  }, [materials]);
+const materialOptions: SelectOption[] = useMemo(
+  () => [
+    { value: '', label: 'Select a material' },
+    ...materials.map((material) => {
+      const details: string[] = [];
+
+      if (material.color?.trim()) {
+        details.push(material.color);
+      }
+
+      if (material.size?.trim()) {
+        details.push(material.size);
+      }
+
+      // Material type
+      if (material.plainMDF) {
+        details.push('Plain MDF');
+      } else if (material.laminatedMDF) {
+        details.push('Laminated MDF');
+      } else if (material.wood) {
+        details.push('Wood');
+      } else if (material.metal) {
+        details.push('Metal');
+      } else if (material.accessory) {
+        details.push('Accessory');
+      } else if (material.other) {
+        details.push('Other');
+      }
+
+      return {
+        value: material.id,
+        label: details.length
+          ? `${material.name} (${details.join(' - ')})`
+          : material.name,
+      };
+    }),
+  ],
+  [materials]
+);
 
   // Filter sizes based on selected category
   useEffect(() => {

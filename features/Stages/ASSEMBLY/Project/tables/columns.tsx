@@ -254,8 +254,12 @@ export const projectColumns: ColumnDef<IProject>[] = [
       );
     }
   },
-  {
-    id: 'actions',
-    cell: ({ row }) => <ProjectCellAction data={row.original} />
+{
+  id: 'actions',
+  cell: ({ row, table }) => {
+    // Get the refresh function from table meta
+    const meta = table.options.meta as { onRefresh?: () => void };
+    return <ProjectCellAction data={row.original} onRefresh={meta?.onRefresh} />;
   }
+}
 ];

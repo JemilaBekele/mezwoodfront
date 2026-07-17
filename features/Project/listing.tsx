@@ -25,6 +25,7 @@ import {
   LayoutGrid,
   HardDrive,
   TrendingUp,
+  CheckCheck,
 } from "lucide-react";
 import { DataTable } from "@/components/ui/table/newdatatable";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
@@ -107,12 +108,24 @@ const PROJECT_STATUS_CONFIG: Record<ProjectStatus, { label: string; icon: React.
   INSTALLATION: { label: "Installation", icon: Layers, color: "yellow" },
 };
 
-const DESIGN_STATUS_CONFIG: Record<DesignStatus, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
+const DESIGN_STATUS_CONFIG: Record<
+  DesignStatus,
+  {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }
+> = {
   INITIATED: { label: "Initiated", icon: PenTool, color: "amber" },
   MODELING: { label: "Modeling", icon: BarChart3, color: "blue" },
   DRAFTING: { label: "Drafting", icon: Ruler, color: "cyan" },
   CUTLIST: { label: "Cutlist", icon: Grid, color: "violet" },
   BOQ: { label: "BOQ", icon: ListChecks, color: "indigo" },
+  DESIGN_FINISHED: {
+    label: "Design Finished",
+    icon: CheckCheck, // or BadgeCheck
+    color: "green",
+  },
   FINISHED: { label: "Finished", icon: CheckCircle, color: "emerald" },
 };
 

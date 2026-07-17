@@ -3,31 +3,39 @@
 import { StageProjectListing } from '../../listlibrary';
 import { projectColumns } from './tables/columns';
 import { getEdgebandingProjects } from '@/service/Stages';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { IProject } from '@/models/Projects';
 
 export default function EdgebandingProjectListingPage() {
   const [projects, setProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await getEdgebandingProjects({ status: 'not-finished' });
+      setProjects(result.projects);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load edgebanding projects');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    // Increment refresh key to force re-render of the table
+    setRefreshKey(prev => prev + 1);
+    // Fetch fresh data
+    fetchProjects();
+  }, [fetchProjects]);
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setLoading(true);
-        const result = await getEdgebandingProjects({  status: 'not-finished' });
-        setProjects(result.projects);
-        setError(null);
-      } catch (err) {
-        setError('Failed to load edgebanding projects');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProjects();
-  }, []);
+  }, [fetchProjects]);
 
   if (loading) {
     return (
@@ -50,6 +58,7 @@ export default function EdgebandingProjectListingPage() {
 
   return (
     <StageProjectListing
+      key={refreshKey} // Force re-render when refreshKey changes
       projects={projects}
       projectColumns={projectColumns}
       stageName="EDGE_BANDING"
@@ -58,6 +67,7 @@ export default function EdgebandingProjectListingPage() {
         tomorrow: 'No edgebanding projects due tomorrow',
         other: 'No other edgebanding projects found'
       }}
+      onRefresh={handleRefresh} // Pass refresh function to the listing component
     />
   );
 }

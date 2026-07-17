@@ -3,11 +3,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/error-boundaries */
 import { useSearchParams } from 'next/navigation';
-import { DataTable } from '@/components/ui/table/data-table';
+import { DataTable } from '@/components/ui/table/refereshdatatable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, CalendarDays, CalendarClock } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarClock, RefreshCw } from 'lucide-react';
 import { IProject, IProjectStage } from '@/models/Projects';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface StageProjectListingProps {
   projects: IProject[];
@@ -18,6 +19,8 @@ interface StageProjectListingProps {
     tomorrow?: string;
     other?: string;
   };
+  onRefresh?: () => void;
+  isLoading?: boolean;
 }
 
 // Helper to get date without time for accurate comparison
@@ -94,18 +97,6 @@ function categorizeProjects(projects: IProject[], searchQuery: string, stageName
     (project) => project.stages?.some((s: IProjectStage) => s.stage === normalizedStageName)
   );
 
-  // Log for debugging
-  projectsWithStage.forEach(project => {
-    const stage = project.stages?.find((s: IProjectStage) => s.stage === normalizedStageName);
-    console.log(`Project ${project.invoice?.piNumber}:`, {
-      stageName: stage?.stage,
-      startDate: stage?.startDate,
-      endDate: stage?.endDate,
-      isToday: stage?.startDate ? isToday(new Date(stage.startDate)) : false,
-      isTomorrow: stage?.startDate ? isTomorrow(new Date(stage.startDate)) : false,
-    });
-  });
-
   // Today: projects where the stage starts today or is active today
   const todayProjects = sortByStageDate(
     projectsWithStage.filter((project) => {
@@ -165,7 +156,6 @@ function categorizeProjects(projects: IProject[], searchQuery: string, stageName
     stageName
   );
 
-
   return { todayProjects, tomorrowProjects, otherProjects };
 }
 
@@ -177,12 +167,15 @@ export function StageProjectListing({
     today: 'No projects due today',
     tomorrow: 'No projects due tomorrow',
     other: 'No other projects found'
-  }
+  },
+  onRefresh,
+  isLoading = false,
 }: StageProjectListingProps) {
   const searchParams = useSearchParams();
   const page = Number(searchParams.get('page') || 1);
   const search = searchParams.get('q') || '';
   const limit = Number(searchParams.get('limit') || 10);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { todayProjects, tomorrowProjects, otherProjects } = useMemo(
     () => categorizeProjects(projects, search, stageName),
@@ -190,6 +183,17 @@ export function StageProjectListing({
   );
 
   const defaultTab = todayProjects.length > 0 ? 'today' : tomorrowProjects.length > 0 ? 'tomorrow' : 'other';
+
+  const handleRefresh = async () => {
+    if (onRefresh && !isRefreshing) {
+      setIsRefreshing(true);
+      try {
+        await onRefresh();
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
+  };
 
   const renderProjectTable = (projectsList: IProject[]) => {
     const startIndex = (page - 1) * limit;
@@ -200,6 +204,7 @@ export function StageProjectListing({
         data={paginatedData}
         totalItems={projectsList.length}
         columns={projectColumns}
+        meta={{ onRefresh }} // Pass onRefresh to DataTable via meta
       />
     );
   };
@@ -209,6 +214,28 @@ export function StageProjectListing({
 
   return (
     <div className="space-y-6 p-4">
+      {/* Header with Refresh Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">{displayStageName}</h1>
+          <p className="text-sm text-muted-foreground">
+            Track and manage {displayStageName.toLowerCase()} projects
+          </p>
+        </div>
+        {onRefresh && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing || isLoading ? 'animate-spin' : ''}`} />
+            {isRefreshing || isLoading ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        )}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border bg-card p-4 shadow-sm">
           <div className="flex items-center gap-2">

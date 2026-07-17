@@ -57,19 +57,10 @@ import {
 } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { normalizeImagePath } from '@/lib/norm';
 
 // Helper function for image URLs
-const BACKEND_URL = 'http://localhost:5000';
 
-export const normalizeImagePath = (path?: string) => {
-  if (!path) return undefined;
-  const normalizedPath = path.replace(/\\/g, '/');
-  if (normalizedPath.startsWith('http')) {
-    return normalizedPath;
-  }
-  const cleanPath = normalizedPath.replace(/^\/+/, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-};
 
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 
@@ -825,7 +816,7 @@ const calculateStageProgress = (stage: any) => {
                                  case WorkShift.AFTERNOON: return 'Afternoon';
                                  case WorkShift.FULL_DAY: return 'Full Day';
                                  case WorkShift.CUSTOM: return 'Custom';
-                                 default: return 'N/A';
+                                 default: return '';
                                }
                              };
    
@@ -928,7 +919,7 @@ const calculateStageProgress = (stage: any) => {
                      variant="outline"
                      size="sm"
                      onClick={() =>
-                       router.push(`/dashboard/Stage/Design/${proformaInvoice.id}`)
+                       router.push(`/dashboard/Stage/Design/adissional/${proformaInvoice.id}`)
                      }
                      className="w-full sm:w-auto"
                    >
@@ -971,7 +962,7 @@ const calculateStageProgress = (stage: any) => {
                                        <div key={item.id} className="border rounded-lg p-3">
                                          <div className="flex justify-between items-start mb-2">
                                            <div className="flex-1 min-w-0">
-                                             <h4 className="font-semibold text-sm">{item?.item?.name || 'N/A'}</h4>
+                                             <h4 className="font-semibold text-sm">{item?.item?.name || ''}</h4>
                                              {item.size && item.size !== "" && (
                                                <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                                              )}
@@ -1042,8 +1033,8 @@ const calculateStageProgress = (stage: any) => {
                                          <TableBody>
                                            {proformaInvoice.items.map((item) => (
                                              <TableRow key={item.id}>
-                                               <TableCell className="text-sm font-medium">{item?.item?.name || 'N/A'}</TableCell>
-                                               <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+                                               <TableCell className="text-sm font-medium">{item?.item?.name || ''}</TableCell>
+                                               <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : ''}</TableCell>
                                                <TableCell className="text-sm">{item.quantity}</TableCell>
                                                <TableCell>
                                                  {item.images && item.images.length > 0 ? (
@@ -1102,7 +1093,7 @@ const calculateStageProgress = (stage: any) => {
                                      return (
                                        <div key={item.id} className="border rounded-lg overflow-hidden">
                                          <div className="bg-muted/30 p-3 border-b">
-                                           <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                                           <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
                                            {item.size && item.size !== "" && (
                                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                                            )}
@@ -1125,11 +1116,11 @@ const calculateStageProgress = (stage: any) => {
                                                    <TableRow key={material.id}>
                                                      <TableCell className="text-sm">
                                                        <p className="font-medium">
-                                                         {material.material?.name || 'N/A'}
+                                                         {material.material?.name || ''}
                                                        </p>
                                                      </TableCell>
-                                                     <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
-                                                     <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
+                                                     <TableCell className="text-sm">{material.material?.color || ''}</TableCell>
+                                                     <TableCell className="text-sm">{material.material?.size || ''}</TableCell>
                                                      <TableCell className="text-sm">
                                                        <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
                                                      </TableCell>
@@ -1171,7 +1162,7 @@ const calculateStageProgress = (stage: any) => {
                                      return (
                                        <div key={item.id} className="border rounded-lg overflow-hidden">
                                          <div className="bg-muted/30 p-3 border-b">
-                                           <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                                           <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
                                            {item.size && item.size !== "" && (
                                              <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                                            )}
@@ -1292,7 +1283,7 @@ const calculateStageProgress = (stage: any) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Name</p>
-                  <p className="font-medium">{project.customer.name || 'N/A'}</p>
+                  <p className="font-medium">{project.customer.name || ''}</p>
                 </div>
                 {project.customer.phone1 && (
                   <div>

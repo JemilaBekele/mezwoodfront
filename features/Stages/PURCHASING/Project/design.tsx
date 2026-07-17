@@ -69,14 +69,7 @@ import { getAllEmploy } from '@/service/employee';
 import { Input } from '@/components/ui/input';
 
 // Helper function for image URLs
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000/uploads';
 
-export const normalizeImagePath = (path?: string) => {
-  if (!path) return '/placeholder-image.jpg';
-  if (path.startsWith('http')) return path;
-  const cleanPath = path.replace(/\\/g, '/').replace(/^\/+/, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-};
 
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 

@@ -312,16 +312,45 @@ export default function DesignProformaInvoiceForm({
     [customers]
   );
 
-  const materialOptions: SelectOption[] = useMemo(
-    () => [
-      { value: '', label: 'Select a material' },
-      ...materials.map((material) => ({
+const materialOptions: SelectOption[] = useMemo(
+  () => [
+    { value: '', label: 'Select a material' },
+    ...materials.map((material) => {
+      const details: string[] = [];
+
+      if (material.color?.trim()) {
+        details.push(material.color);
+      }
+
+      if (material.size?.trim()) {
+        details.push(material.size);
+      }
+
+      // Material type
+      if (material.plainMDF) {
+        details.push('Plain MDF');
+      } else if (material.laminatedMDF) {
+        details.push('Laminated MDF');
+      } else if (material.wood) {
+        details.push('Wood');
+      } else if (material.metal) {
+        details.push('Metal');
+      } else if (material.accessory) {
+        details.push('Accessory');
+      } else if (material.other) {
+        details.push('Other');
+      }
+
+      return {
         value: material.id,
-        label: `${material.name} (${material.color} - ${material.size})`
-      }))
-    ],
-    [materials]
-  );
+        label: details.length
+          ? `${material.name} (${details.join(' - ')})`
+          : material.name,
+      };
+    }),
+  ],
+  [materials]
+);
 
   const refreshMaterials = async () => {
     try {

@@ -41,6 +41,7 @@ import {
   Cog,
   Sparkles,
   Drill,
+  CheckCircle,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog } from '@/models/Projects';
 import { getProjectId } from '@/service/Project';
@@ -59,19 +60,10 @@ import {
 } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { normalizeImagePath } from '@/lib/norm';
 
 // Helper function for image URLs
-const BACKEND_URL = 'http://localhost:5000';
 
-export const normalizeImagePath = (path?: string) => {
-  if (!path) return undefined;
-  const normalizedPath = path.replace(/\\/g, '/');
-  if (normalizedPath.startsWith('http')) {
-    return normalizedPath;
-  }
-  const cleanPath = normalizedPath.replace(/^\/+/, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-};
 
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 
@@ -277,59 +269,70 @@ const AdminProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   };
 
   // Get design status configuration
-  const getDesignStatusConfig = (status?: DesignStatus) => {
-    const config: Record<DesignStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
+const getDesignStatusConfig = (status?: DesignStatus) => {
+  const config: Record<
+    DesignStatus,
+    {
+      label: string;
+      variant: BadgeVariant;
+      icon: any;
       color: string;
       description: string;
-    }> = {
-      [DesignStatus.INITIATED]: {
-        label: 'Initiated',
-        variant: 'secondary',
-        icon: PenTool,
-        color: 'text-gray-500',
-        description: 'Design process has been initiated',
-      },
-      [DesignStatus.MODELING]: {
-        label: '3D Modeling',
-        variant: 'outline',
-        icon: PenTool,
-        color: 'text-purple-500',
-        description: 'Creating 3D models and visualizations',
-      },
-      [DesignStatus.DRAFTING]: {
-        label: 'Technical Drafting',
-        variant: 'outline',
-        icon: Ruler,
-        color: 'text-blue-500',
-        description: 'Creating technical drawings and specifications',
-      },
-      [DesignStatus.CUTLIST]: {
-        label: 'Cut List',
-        variant: 'outline',
-        icon: Scissors,
-        color: 'text-amber-500',
-        description: 'Generating cut lists for manufacturing',
-      },
-      [DesignStatus.BOQ]: {
-        label: 'Bill of Quantities',
-        variant: 'outline',
-        icon: ListChecks,
-        color: 'text-green-500',
-        description: 'Preparing bill of quantities and material lists',
-      },
-      [DesignStatus.FINISHED]: {
-        label: 'Design Finished',
-        variant: 'default',
-        icon: FileCheck,
-        color: 'text-emerald-500',
-        description: 'Design work completed',
-      },
-    };
-    return status ? config[status] : null;
+    }
+  > = {
+    [DesignStatus.INITIATED]: {
+      label: 'Initiated',
+      variant: 'secondary',
+      icon: PenTool,
+      color: 'text-gray-500',
+      description: 'Design process has been initiated',
+    },
+    [DesignStatus.MODELING]: {
+      label: '3D Modeling',
+      variant: 'outline',
+      icon: PenTool,
+      color: 'text-purple-500',
+      description: 'Creating 3D models and visualizations',
+    },
+    [DesignStatus.DRAFTING]: {
+      label: 'Technical Drafting',
+      variant: 'outline',
+      icon: Ruler,
+      color: 'text-blue-500',
+      description: 'Creating technical drawings and specifications',
+    },
+    [DesignStatus.CUTLIST]: {
+      label: 'Cut List',
+      variant: 'outline',
+      icon: Scissors,
+      color: 'text-amber-500',
+      description: 'Generating cut lists for manufacturing',
+    },
+    [DesignStatus.BOQ]: {
+      label: 'Bill of Quantities',
+      variant: 'outline',
+      icon: ListChecks,
+      color: 'text-green-500',
+      description: 'Preparing bill of quantities and material lists',
+    },
+    [DesignStatus.DESIGN_FINISHED]: {
+      label: 'Design Finished',
+      variant: 'default',
+      icon: FileCheck,
+      color: 'text-emerald-500',
+      description: 'Design phase completed but awaiting final approval or stock check',
+    },
+    [DesignStatus.FINISHED]: {
+      label: 'Finished',
+      variant: 'default',
+      icon: CheckCircle,
+      color: 'text-green-600',
+      description: 'Project fully completed',
+    },
   };
+
+  return status ? config[status] : null;
+};
 
   // Fetch project data and associated proforma invoice
   const fetchProjectData = React.useCallback(async () => {
@@ -830,7 +833,7 @@ const AdminProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
               <Tabs defaultValue="items" className="w-full">
                 <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="items">Items</TabsTrigger>
+                  <TabsTrigger value="items">Products</TabsTrigger>
                   <TabsTrigger value="materials">Materials</TabsTrigger>
                   <TabsTrigger value="images">Images</TabsTrigger>
                   <TabsTrigger value="attachments">Attachments</TabsTrigger>
@@ -862,7 +865,7 @@ const AdminProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell>{item.size || 'N/A'}</TableCell>
+                              <TableCell>{item.size || ''}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>
                                 {item.images && item.images.length > 0 ? (

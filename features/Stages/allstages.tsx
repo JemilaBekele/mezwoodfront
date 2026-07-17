@@ -28,6 +28,7 @@ import {
   Signal,
   BarChart3,
   AlertCircle,
+  CheckCheck,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DesignStatus, DifficultyLevel } from '@/models/Projects';
 import { useMemo, useCallback, useState } from 'react';
@@ -119,6 +120,11 @@ const DESIGN_STATUS_CONFIG: Record<DesignStatus, { label: string; icon: React.Co
   DRAFTING: { label: "Drafting", icon: Ruler, color: "cyan" },
   CUTLIST: { label: "Cutlist", icon: Grid, color: "violet" },
   BOQ: { label: "BOQ", icon: ListChecks, color: "indigo" },
+    DESIGN_FINISHED: {
+    label: "Design Finished",
+    icon: CheckCheck, // or BadgeCheck
+    color: "green",
+  },
   FINISHED: { label: "Finished", icon: CheckCircle, color: "emerald" },
 };
 

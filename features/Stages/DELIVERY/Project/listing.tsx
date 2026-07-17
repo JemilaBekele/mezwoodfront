@@ -3,31 +3,39 @@
 import { StageProjectListing } from '../../listlibrary';
 import { projectColumns } from './tables/columns';
 import { getdeliveryProjects } from '@/service/Stages';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { IProject } from '@/models/Projects';
 
 export default function DeliveryProjectListingPage() {
   const [projects, setProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await getdeliveryProjects({ status: 'not-finished' });
+      setProjects(result.projects);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load delivery projects');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    // Increment refresh key to force re-render of the table
+    setRefreshKey(prev => prev + 1);
+    // Fetch fresh data
+    fetchProjects();
+  }, [fetchProjects]);
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setLoading(true);
-        const result = await getdeliveryProjects({ status: 'not-finished' });
-        setProjects(result.projects);
-        setError(null);
-      } catch (err) {
-        setError('Failed to load delivery projects');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProjects();
-  }, []);
+  }, [fetchProjects]);
 
   if (loading) {
     return (
@@ -50,6 +58,7 @@ export default function DeliveryProjectListingPage() {
 
   return (
     <StageProjectListing
+      key={refreshKey} // Force re-render when refreshKey changes
       projects={projects}
       projectColumns={projectColumns}
       stageName="Delivery"
@@ -58,6 +67,7 @@ export default function DeliveryProjectListingPage() {
         tomorrow: 'No delivery projects due tomorrow',
         other: 'No other delivery projects found'
       }}
+      onRefresh={handleRefresh} // Pass refresh function to the listing component
     />
   );
 }

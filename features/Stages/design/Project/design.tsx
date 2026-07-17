@@ -1268,7 +1268,7 @@ return (
                                             <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                                           )}
                                         </div>
-                                        <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">Qty: {item.quantity}</Badge>
+                                        <Badge variant="outline" className="text-xs shrink-0 ml-2">Qty: {item.quantity}</Badge>
                                       </div>
             
                                       {/* Item Images - No description */}
@@ -1400,7 +1400,7 @@ return (
                                         )}
                                       </div>
                                       <div className="p-3 w-full overflow-x-auto">
-                                        <div className="min-w-[500px] md:min-w-full">
+                                        <div className="min-w-125 md:min-w-full">
                                           <Table>
                                             <TableHeader>
                                               <TableRow>
@@ -1507,7 +1507,7 @@ return (
                                 {proformaInvoice.attachments.map((attachment) => (
                                   <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
                                       <div className="flex-1 min-w-0">
                                         <a 
                                           href={normalizeImagePath(attachment.fileUrl)} 
@@ -1524,7 +1524,7 @@ return (
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex gap-2 flex-shrink-0">
+                                    <div className="flex gap-2 shrink-0">
                                       <Button
                                         variant="ghost"
                                         size="sm"
