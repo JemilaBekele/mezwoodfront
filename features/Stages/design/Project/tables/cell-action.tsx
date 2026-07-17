@@ -44,6 +44,7 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
     DesignStatus.DRAFTING,
     DesignStatus.CUTLIST,
     DesignStatus.BOQ,
+    DesignStatus.DESIGN_FINISHED,
     DesignStatus.FINISHED
   ];
 

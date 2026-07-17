@@ -92,59 +92,70 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   };
 
   // Get design status configuration
-  const getDesignStatusConfig = (status?: DesignStatus) => {
-    const config: Record<DesignStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
+const getDesignStatusConfig = (status?: DesignStatus) => {
+  const config: Record<
+    DesignStatus,
+    {
+      label: string;
+      variant: BadgeVariant;
+      icon: any;
       color: string;
       description: string;
-    }> = {
-      [DesignStatus.INITIATED]: {
-        label: 'Initiated',
-        variant: 'secondary',
-        icon: PenTool,
-        color: 'text-gray-500',
-        description: 'Design process has been initiated',
-      },
-      [DesignStatus.MODELING]: {
-        label: '3D Modeling',
-        variant: 'outline',
-        icon: PenTool,
-        color: 'text-purple-500',
-        description: 'Creating 3D models and visualizations',
-      },
-      [DesignStatus.DRAFTING]: {
-        label: 'Technical Drafting',
-        variant: 'outline',
-        icon: Ruler,
-        color: 'text-blue-500',
-        description: 'Creating technical drawings and specifications',
-      },
-      [DesignStatus.CUTLIST]: {
-        label: 'Cut List',
-        variant: 'outline',
-        icon: Scissors,
-        color: 'text-amber-500',
-        description: 'Generating cut lists for manufacturing',
-      },
-      [DesignStatus.BOQ]: {
-        label: 'Bill of Quantities',
-        variant: 'outline',
-        icon: ListChecks,
-        color: 'text-green-500',
-        description: 'Preparing bill of quantities and material lists',
-      },
-      [DesignStatus.FINISHED]: {
-        label: 'Design Finished',
-        variant: 'default',
-        icon: FileCheck,
-        color: 'text-emerald-500',
-        description: 'Design work completed',
-      },
-    };
-    return status ? config[status] : null;
+    }
+  > = {
+    [DesignStatus.INITIATED]: {
+      label: 'Initiated',
+      variant: 'secondary',
+      icon: PenTool,
+      color: 'text-gray-500',
+      description: 'Design process has been initiated',
+    },
+    [DesignStatus.MODELING]: {
+      label: '3D Modeling',
+      variant: 'outline',
+      icon: PenTool,
+      color: 'text-purple-500',
+      description: 'Creating 3D models and visualizations',
+    },
+    [DesignStatus.DRAFTING]: {
+      label: 'Technical Drafting',
+      variant: 'outline',
+      icon: Ruler,
+      color: 'text-blue-500',
+      description: 'Creating technical drawings and specifications',
+    },
+    [DesignStatus.CUTLIST]: {
+      label: 'Cut List',
+      variant: 'outline',
+      icon: Scissors,
+      color: 'text-amber-500',
+      description: 'Generating cut lists for manufacturing',
+    },
+    [DesignStatus.BOQ]: {
+      label: 'Bill of Quantities',
+      variant: 'outline',
+      icon: ListChecks,
+      color: 'text-green-500',
+      description: 'Preparing bill of quantities and material lists',
+    },
+    [DesignStatus.DESIGN_FINISHED]: {
+      label: 'Design Finished',
+      variant: 'default',
+      icon: FileCheck,
+      color: 'text-emerald-500',
+      description: 'Design phase completed but awaiting final approval or stock check',
+    },
+    [DesignStatus.FINISHED]: {
+      label: 'Finished',
+      variant: 'default',
+      icon: CheckCircle,
+      color: 'text-green-600',
+      description: 'Project fully completed',
+    },
   };
+
+  return status ? config[status] : null;
+};
 
   // Fetch project data and associated proforma invoice
   const fetchProjectData = React.useCallback(async () => {
@@ -684,17 +695,18 @@ const calculateStageProgress = (stage: any) => {
 
         {/* Proforma Invoice Card */}
       {/* Add Tabs for Stages and Proforma Invoice */}
-         <Tabs defaultValue="stages" className="w-full">
-           <TabsList className="grid w-full grid-cols-2">
-             <TabsTrigger value="stages" className="text-sm">
-               <Package2 className="h-4 w-4 mr-2" />
-               Stages
-             </TabsTrigger>
-             <TabsTrigger value="proforma" className="text-sm">
-               <FileText className="h-4 w-4 mr-2" />
-               Proforma Invoice
-             </TabsTrigger>
-           </TabsList>
+            <Tabs defaultValue="proforma" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="proforma" className="text-sm">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Proforma Invoice
+                  </TabsTrigger>
+                  <TabsTrigger value="stages" className="text-sm">
+                    <Package2 className="h-4 w-4 mr-2" />
+                    Stages
+                  </TabsTrigger>
+                
+                </TabsList>
    
            {/* Stages Tab Content */}
            <TabsContent value="stages" className="mt-4">
@@ -1203,7 +1215,7 @@ const calculateStageProgress = (stage: any) => {
                                    {proformaInvoice.attachments.map((attachment) => (
                                      <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                         <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                         <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
                                          <div className="flex-1 min-w-0">
                                            <a 
                                              href={normalizeImagePath(attachment.fileUrl)} 

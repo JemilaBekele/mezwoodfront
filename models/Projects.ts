@@ -29,6 +29,7 @@ export enum DesignStatus {
   CUTLIST = 'CUTLIST',
   BOQ = 'BOQ',
   FINISHED = 'FINISHED',
+  DESIGN_FINISHED = 'DESIGN_FINISHED',
 }
 
 
