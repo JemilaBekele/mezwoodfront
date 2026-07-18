@@ -239,8 +239,40 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
     setIsConfirmDialogOpen(true);
   };
 
+// Add this function to handle refreshing the sale data
+const refreshSaleData = async (retryCount = 3) => {
+  if (!id) return null;
+  
+  for (let attempt = 1; attempt <= retryCount; attempt++) {
+    try {
+      // Wait before each attempt (increasing delay)
+      if (attempt > 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+      
+      const refreshedSale = await getSellById(id);
+      if (refreshedSale) {
+        return refreshedSale;
+      }
+    } catch (error) {
+      console.warn(`Refresh attempt ${attempt} failed:`, error);
+      if (attempt === retryCount) {
+        throw error;
+      }
+    }
+  }
+  return null;
+};
+
 const handleConfirmDelivery = async () => {
   if (!sale || !id) return;
+
+  // Check if sale is already delivered before making the API call
+  if (sale.saleStatus === 'DELIVERED') {
+    toast.info('This sale is already fully delivered');
+    setIsConfirmDialogOpen(false);
+    return;
+  }
 
   const itemsToDeliver = Array.from(selectedItems).map(itemId => {
     const sellItem = sale.items?.find(item => item.id === itemId);
@@ -252,28 +284,88 @@ const handleConfirmDelivery = async () => {
 
   setIsSubmittingDelivery(true);
   try {
+    // Perform the delivery
     const result = await deliverSaleItems(id, itemsToDeliver);
     
-    setSale(result.sale);
+    // Safely handle the response
+    let updatedSale = null;
+    let isAllDelivered = false;
+    let successMessage = 'Delivery processed successfully!';
     
-    toast.success(
-      result.summary.allItemsDelivered 
-        ? 'All items delivered successfully!' 
-        : 'Delivery processed successfully!'
-    );
+    if (result) {
+      // Check if result has a 'sale' property (nested response)
+      if (result.sale) {
+        updatedSale = result.sale;
+        // Check for summary in different possible locations
+        if (result.summary) {
+          isAllDelivered = result.summary.allItemsDelivered || false;
+          if (isAllDelivered) {
+            successMessage = 'All items delivered successfully!';
+          }
+        } else if (result.sale.saleStatus === 'DELIVERED') {
+          isAllDelivered = true;
+          successMessage = 'All items delivered successfully!';
+        }
+      } 
+      // Check if result itself is the sale (direct response)
+      else if (result.id && result.invoiceNo) {
+        updatedSale = result;
+        if (result.saleStatus === 'DELIVERED') {
+          isAllDelivered = true;
+          successMessage = 'All items delivered successfully!';
+        }
+      }
+      // If neither, try to use the result as is
+      else {
+        updatedSale = result;
+      }
+    }
+    
+    // Update the sale in state
+    if (updatedSale) {
+      setSale(updatedSale);
+      toast.success(successMessage);
+    } else {
+      toast.success('Delivery processed successfully!');
+    }
     
     setIsConfirmDialogOpen(false);
     setSelectedItems(new Set());
     
-    // ADD THIS: Wait 1 second before refreshing
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait a moment for database to sync
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // Refresh
-    const refreshedSale = await getSellById(id);
-    setSale(refreshedSale);
+    // Force refresh the sale data
+    try {
+      const refreshedSale = await getSellById(id);
+      if (refreshedSale) {
+        setSale(refreshedSale);
+      }
+    } catch (refreshError) {
+      console.warn('Failed to refresh sale after delivery:', refreshError);
+      // Keep the result from the delivery
+    }
     
   } catch (error: any) {
-    toast.error(error.response?.data?.message || 'Failed to process delivery');
+    console.error('Delivery error:', error);
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to process delivery';
+    
+    // Check for "already delivered" error
+    if (errorMessage.includes('already fully delivered')) {
+      toast.info('This sale has already been delivered. Refreshing data...');
+      // Try to refresh the sale
+      try {
+        const refreshedSale = await getSellById(id);
+        if (refreshedSale) {
+          setSale(refreshedSale);
+        }
+      } catch (refreshError) {
+        console.warn('Failed to refresh sale:', refreshError);
+      }
+    } else {
+      toast.error(errorMessage);
+    }
   } finally {
     setIsSubmittingDelivery(false);
   }
@@ -425,6 +517,16 @@ const handleConfirmDelivery = async () => {
                     </div>
                   </div>
                 )}
+                   {sale.deliveryDate && (
+                                                                   <div className='flex items-start gap-2'>
+                                                                                       <Calendar className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
+                 
+                                                                      <p>
+                                                     <span className='font-medium'>Delivery Date:</span>{' '}
+                                                     {formatDate(sale.deliveryDate || '')}
+                                                   </p>
+                                                                   </div>
+                                                                 )}
                 {sale.createdBy && (
                   <div className='flex items-start gap-2'>
                     <User className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
@@ -516,112 +618,69 @@ const handleConfirmDelivery = async () => {
           </div>
 
           {/* Sale Items Table with Checkboxes and Images */}
-          {sale.items && sale.items.length > 0 ? (
-            <div className='space-y-4'>
-              <h3 className='text-base font-semibold sm:text-lg'>Sale Items</h3>
+        {sale.items && sale.items.length > 0 ? (
+  <div className='space-y-4'>
+    <h3 className='text-base font-semibold sm:text-lg'>Sale Items</h3>
 
-              {/* Mobile Card View with Images */}
-              <div className='space-y-3 sm:hidden'>
-                {sale.items.map((item: ISellItem) => {
-                  const isSelected = selectedItems.has(item.id);
-                  const canSelect = item.itemSaleStatus !== 'DELIVERED';
-                  const productImage = normalizeImagePath(item.item?.imageUrl);
-                  return (
-                    <Card 
-                      key={item.id} 
-                      className={`overflow-hidden transition-colors ${
-                        isSelected && canSelect ? 'border-green-500 bg-green-50' : ''
-                      }`}
-                    >
-                      <CardContent className='pt-4'>
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-2 flex-1">
-                            {canSelect && (
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleItemSelection(item.id)}
-                                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                              />
-                            )}
-                            <h4 className='font-semibold'>{item.item?.name || 'Unknown Product'}</h4>
-                          </div>
-                          {getItemStatusBadge(item.itemSaleStatus)}
-                        </div>
-                        
-                        {/* Product Image */}
-                        {productImage && (
-                          <div className='mt-3 flex justify-center'>
-                            <div 
-                              className='relative cursor-pointer group'
-                              onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
-                            >
-                              <div className='relative h-32 w-32'>
-    <img 
-      src={productImage} 
-      alt={item.item?.name || 'Product'}
-      className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
-      style={{ display: 'block' }}
-    />
-    <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
-      <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
-    </div>
-                              </div>
-                             
-                            </div>
-                          </div>
-                        )}
-                    
-                        <div className='mt-3 grid grid-cols-2 gap-2'>
-                          <div>
-                            <p className='text-xs text-muted-foreground'>Quantity</p>
-                            <p className='font-medium'>{item.quantity}</p>
-                          </div>
-                          <div>
-                            <p className='text-xs text-muted-foreground'>Unit Price</p>
-                            <p className='font-medium'>{item.unitPrice.toFixed(2)}</p>
-                          </div>
-                        </div>
-                        <div className='mt-2 flex justify-between items-center border-t pt-2'>
-                          <span className='text-sm font-medium'>Total:</span>
-                          <span className='font-bold'>{item.totalPrice.toFixed(2)}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+    {/* Mobile Card View with Images */}
+    <div className='space-y-3 sm:hidden'>
+      {sale.items.map((item: ISellItem) => {
+        const isSelected = selectedItems.has(item.id);
+        const canSelect = item.itemSaleStatus !== 'DELIVERED';
+        const productImage = normalizeImagePath(item.item?.imageUrl);
+        
+        // Get location display
+        const getLocationDisplay = () => {
+          if (item.store && item.showroom) {
+            return `${item.store.name} → ${item.showroom.name}`;
+          } else if (item.store) {
+            return item.store.name;
+          } else if (item.showroom) {
+            return item.showroom.name;
+          }
+          return 'No Location';
+        };
 
-              {/* Desktop Table View with Images */}
-            {/* Desktop Table View with Images */}
-<div className='block overflow-x-auto'>  {/* Changed from 'hidden sm:block' to just 'block' */}
-  <div className='inline-block min-w-full align-middle'>
-    <div className='overflow-hidden border rounded-lg'>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12">Select</TableHead>
-            <TableHead>#</TableHead>
-            <TableHead>Product Image</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead className='text-center'>Quantity</TableHead>
-            <TableHead className='text-right'>Unit Price</TableHead>
-            <TableHead className='text-right'>Total Price</TableHead>
-            <TableHead className='text-center'>Delivery Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sale.items.map((item: ISellItem, index: number) => {
-            const isSelected = selectedItems.has(item.id);
-            const canSelect = item.itemSaleStatus !== 'DELIVERED';
-            const productImage = normalizeImagePath(item.item?.imageUrl);
-            
-            return (
-              <TableRow 
-                key={item.id}
-                className={isSelected && canSelect ? 'bg-green-50' : ''}
-              >
-                <TableCell>
+        // Get location style
+        const getLocationStyle = () => {
+          if (item.store && item.showroom) {
+            return {
+              icon: '🏪',
+              bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+              textColor: 'text-purple-700 dark:text-purple-300',
+            };
+          } else if (item.store) {
+            return {
+              icon: '🏬',
+              bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+              textColor: 'text-blue-700 dark:text-blue-300',
+            };
+          } else if (item.showroom) {
+            return {
+              icon: '🏪',
+              bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+              textColor: 'text-purple-700 dark:text-purple-300',
+            };
+          }
+          return {
+            icon: '📍',
+            bgColor: 'bg-gray-50 dark:bg-gray-800',
+            textColor: 'text-gray-500 dark:text-gray-400',
+          };
+        };
+
+        const locationStyle = getLocationStyle();
+
+        return (
+          <Card 
+            key={item.id} 
+            className={`overflow-hidden transition-colors ${
+              isSelected && canSelect ? 'border-green-500 bg-green-50' : ''
+            }`}
+          >
+            <CardContent className='pt-4'>
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 flex-1">
                   {canSelect && (
                     <input
                       type="checkbox"
@@ -630,60 +689,203 @@ const handleConfirmDelivery = async () => {
                       className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                     />
                   )}
-                </TableCell>
-                <TableCell>{index + 1}</TableCell>
-           <TableCell className="p-2">
-  {productImage ? (
-    <div
-      className="relative cursor-pointer group w-14 h-14 overflow-hidden rounded-md border bg-white"
-      onClick={() =>
-        handleImageClick(productImage, item.item?.name || 'Product')
-      }
-    >
-      <img
-        src={productImage}
-        alt={item.item?.name || 'Product'}
-        className="w-full h-full object-cover"
-        draggable={false}
-        onError={(e) => {
-          console.error('Image failed to load:', productImage);
-          e.currentTarget.style.display = 'none';
-        }}
-      />
+                  <h4 className='font-semibold'>{item.item?.name || 'Unknown Product'}</h4>
+                </div>
+                {getItemStatusBadge(item.itemSaleStatus)}
+              </div>
+              
+              {/* Location Badge - Mobile */}
+              <div className='mt-2'>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor}`}>
+                  <span>{locationStyle.icon}</span>
+                  <span>{getLocationDisplay()}</span>
+                </span>
+              </div>
+              
+              {/* Product Image */}
+              {productImage && (
+                <div className='mt-3 flex justify-center'>
+                  <div 
+                    className='relative cursor-pointer group'
+                    onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                  >
+                    <div className='relative h-32 w-32'>
+                      <img 
+                        src={productImage} 
+                        alt={item.item?.name || 'Product'}
+                        className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                        style={{ display: 'block' }}
+                      />
+                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                        <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+          
+              <div className='mt-3 grid grid-cols-2 gap-2'>
+                <div>
+                  <p className='text-xs text-muted-foreground'>Quantity</p>
+                  <p className='font-medium'>{item.quantity}</p>
+                </div>
+                <div>
+                  <p className='text-xs text-muted-foreground'>Unit Price</p>
+                  <p className='font-medium'>{item.unitPrice.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className='mt-2 flex justify-between items-center border-t pt-2'>
+                <span className='text-sm font-medium'>Total:</span>
+                <span className='font-bold'>{item.totalPrice.toFixed(2)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
 
-      {/* Hover only */}
-      <div className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/20">
-        <ZoomIn className="h-4 w-4 text-white" />
+    {/* Desktop Table View with Images */}
+    <div className='block overflow-x-auto'>
+      <div className='inline-block min-w-full align-middle'>
+        <div className='overflow-hidden border rounded-lg'>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">Select</TableHead>
+                <TableHead>#</TableHead>
+                <TableHead>Product Image</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead className='text-center'>Quantity</TableHead>
+                <TableHead className='text-right'>Unit Price</TableHead>
+                <TableHead className='text-right'>Total Price</TableHead>
+                <TableHead className='text-center'>Delivery Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sale.items.map((item: ISellItem, index: number) => {
+                const isSelected = selectedItems.has(item.id);
+                const canSelect = item.itemSaleStatus !== 'DELIVERED';
+                const productImage = normalizeImagePath(item.item?.imageUrl);
+                
+                // Get location display
+                const getLocationDisplay = () => {
+                  if (item.store && item.showroom) {
+                    return `${item.store.name} → ${item.showroom.name}`;
+                  } else if (item.store) {
+                    return item.store.name;
+                  } else if (item.showroom) {
+                    return item.showroom.name;
+                  }
+                  return 'No Location';
+                };
+
+                // Get location style
+                const getLocationStyle = () => {
+                  if (item.store && item.showroom) {
+                    return {
+                      icon: '🏪',
+                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                      textColor: 'text-purple-700 dark:text-purple-300',
+                      borderColor: 'border-purple-200 dark:border-purple-800'
+                    };
+                  } else if (item.store) {
+                    return {
+                      icon: '🏬',
+                      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+                      textColor: 'text-blue-700 dark:text-blue-300',
+                      borderColor: 'border-blue-200 dark:border-blue-800'
+                    };
+                  } else if (item.showroom) {
+                    return {
+                      icon: '🏪',
+                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                      textColor: 'text-purple-700 dark:text-purple-300',
+                      borderColor: 'border-purple-200 dark:border-purple-800'
+                    };
+                  }
+                  return {
+                    icon: '📍',
+                    bgColor: 'bg-gray-50 dark:bg-gray-800',
+                    textColor: 'text-gray-500 dark:text-gray-400',
+                    borderColor: 'border-gray-200 dark:border-gray-700'
+                  };
+                };
+
+                const locationStyle = getLocationStyle();
+                
+                return (
+                  <TableRow 
+                    key={item.id}
+                    className={isSelected && canSelect ? 'bg-green-50' : ''}
+                  >
+                    <TableCell>
+                      {canSelect && (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleItemSelection(item.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell className="p-2">
+                      {productImage ? (
+                        <div
+                          className="relative cursor-pointer group w-14 h-14 overflow-hidden rounded-md border bg-white"
+                          onClick={() =>
+                            handleImageClick(productImage, item.item?.name || 'Product')
+                          }
+                        >
+                          <img
+                            src={productImage}
+                            alt={item.item?.name || 'Product'}
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                            onError={(e) => {
+                              console.error('Image failed to load:', productImage);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/20">
+                            <ZoomIn className="h-4 w-4 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-14 w-14 bg-gray-100 rounded-md border flex items-center justify-center">
+                          <Package className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className='font-medium'>
+                      {item.item?.name || 'Unknown Product'}
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
+                        <span>{locationStyle.icon}</span>
+                        <span>{getLocationDisplay()}</span>
+                      </span>
+                    </TableCell>
+                    <TableCell className='text-center'>{item.quantity}</TableCell>
+                    <TableCell className='text-right'>{item.unitPrice.toFixed(2)}</TableCell>
+                    <TableCell className='text-right font-bold'>{item.totalPrice.toFixed(2)}</TableCell>
+                    <TableCell className='text-center'>{getItemStatusBadge(item.itemSaleStatus)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
-  ) : (
-    <div className="h-14 w-14 bg-gray-100 rounded-md border flex items-center justify-center">
-      <Package className="h-6 w-6 text-gray-400" />
-    </div>
-  )}
-</TableCell>
-                <TableCell className='font-medium'>
-                  {item.item?.name || 'Unknown Product'}
-                </TableCell>
-                <TableCell className='text-center'>{item.quantity}</TableCell>
-                <TableCell className='text-right'>{item.unitPrice.toFixed(2)}</TableCell>
-                <TableCell className='text-right font-bold'>{item.totalPrice.toFixed(2)}</TableCell>
-                <TableCell className='text-center'>{getItemStatusBadge(item.itemSaleStatus)}</TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
   </div>
-</div>
-            </div>
-          ) : (
-            <div className='text-muted-foreground py-8 text-center'>
-              <Package className='mx-auto h-12 w-12 opacity-20' />
-              <p className='mt-2'>No items found in this sale</p>
-            </div>
-          )}
+) : (
+  <div className='text-muted-foreground py-8 text-center'>
+    <Package className='mx-auto h-12 w-12 opacity-20' />
+    <p className='mt-2'>No items found in this sale</p>
+  </div>
+)}
         </CardContent>
       </Card>
 

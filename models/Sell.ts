@@ -2,6 +2,8 @@ import { IBank } from './bank';
 import { ICustomer } from './customer';
 import { IEmployee } from './employee';
 import { IItem } from './item';
+import { IShowroom } from './showroom';
+import { IStore } from './store';
 
 export interface ISellItem {
   id: string;
@@ -14,7 +16,12 @@ export interface ISellItem {
   item?: IItem;          // ✅ changed
 
   quantity: number;
+  // Location
+  storeId?: string | null;
+  showroomId?: string | null;
 
+  store?: IStore | null; // replace with IStore
+  showroom?: IShowroom | null; // replace with IShowroom
   unitPrice: number;
   totalPrice: number;
 
@@ -24,7 +31,7 @@ export interface ISellItem {
 
 export interface ISell {
   id: string;
-
+deliveryDate: string;
   invoiceNo: string;
 imageUrl?: string;
 documentUrl?: string;

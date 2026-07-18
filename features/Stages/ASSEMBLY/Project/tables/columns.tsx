@@ -130,7 +130,7 @@ export const projectColumns: ColumnDef<IProject>[] = [
       const actual = stage.actualWorkUnits || 0;
 
       return (
-        <div className="min-w-[150px] space-y-1">
+        <div className="min-w-37.5 space-y-1">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">
               {actual} / {planned} units
@@ -168,11 +168,6 @@ export const projectColumns: ColumnDef<IProject>[] = [
 
       return (
         <div className="space-y-1">
-          {/* <div className="flex items-center gap-2 text-xs">
-            <CalendarDays className="h-3 w-3 text-muted-foreground" />
-            <span className="text-muted-foreground">Start:</span>
-            <span>{startDate}</span>
-          </div> */}
           <div className="flex items-center gap-2 text-xs">
             <Clock className="h-3 w-3 text-muted-foreground" />
             <span className="text-muted-foreground">End:</span>
@@ -192,74 +187,23 @@ export const projectColumns: ColumnDef<IProject>[] = [
       );
     }
   },
-  {
-    id: 'recentWorkLogs',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Recent Work Logs' />
-    ),
-    cell: ({ row }) => {
-      const project = row.original;
-      const workLogs = getWorkLogSummary(project);
-      
-      if (workLogs.length === 0) {
-        return <span className="text-muted-foreground text-sm">No work logs yet</span>;
-      }
-
-      return (
-        <div className="space-y-2">
-          <TooltipProvider>
-            {workLogs.map((log, index) => (
-              <Tooltip key={log.id}>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 text-xs p-1 rounded hover:bg-muted/50 cursor-pointer">
-                    <Badge variant="outline" className="h-5">
-                      +{log.doneUnits} units
-                    </Badge>
-                    {log.hours && (
-                      <span className="text-muted-foreground">
-                        {log.hours}h
-                      </span>
-                    )}
-                    {log.doneBy?.name && (
-                      <span className="text-muted-foreground">
-                        by {log.doneBy.name}
-                      </span>
-                    )}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="max-w-xs space-y-1">
-                    <p className="font-medium">Work Log Entry</p>
-                    <p className="text-xs text-muted-foreground">
-                      Date: {new Date(log.createdAt).toLocaleString()}
-                    </p>
-                    {log.note && (
-                      <p className="text-xs">{log.note}</p>
-                    )}
-                    <p className="text-xs">
-                      Units: {log.doneUnits}
-                      {log.hours && ` | Hours: ${log.hours}h`}
-                    </p>
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </TooltipProvider>
-          {workLogs.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              Showing last {workLogs.length} log{workLogs.length > 1 ? 's' : ''}
-            </div>
-          )}
-        </div>
-      );
-    }
-  },
 {
   id: 'actions',
   cell: ({ row, table }) => {
     // Get the refresh function from table meta
     const meta = table.options.meta as { onRefresh?: () => void };
+    
+    // You can't limit rows here, but you can conditionally render
+    // based on row index if needed
+    const rowIndex = row.index;
+    
+    // This doesn't limit the data, just shows/hides the action button
+    if (rowIndex >= 3) {
+      return null; // Hide actions for rows beyond index 2
+    }
+    
     return <ProjectCellAction data={row.original} onRefresh={meta?.onRefresh} />;
   }
 }
 ];
+

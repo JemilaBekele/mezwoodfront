@@ -348,6 +348,16 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
                     </div>
                   </div>
                 )}
+                {sale.deliveryDate && (
+                                                                <div className='flex items-start gap-2'>
+                                                                                    <Calendar className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
+              
+                                                                   <p>
+                                                  <span className='font-medium'>Delivery Date:</span>{' '}
+                                                  {formatDate(sale.deliveryDate || '')}
+                                                </p>
+                                                                </div>
+                                                              )}
                 {sale.createdBy && (
                   <div className='flex items-start gap-2'>
                     <User className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
@@ -522,81 +532,165 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
             </div>
           )}
           {/* Sale Items Table */}
-          {sale.items && sale.items.length > 0 ? (
-            <div className='space-y-4'>
-              <h3 className='text-base font-semibold sm:text-lg'>Sale Items</h3>
+       {sale.items && sale.items.length > 0 ? (
+  <div className='space-y-4'>
+    <h3 className='text-base font-semibold sm:text-lg'>Sale Products</h3>
 
-              {/* Mobile Card View */}
-              <div className='space-y-3 sm:hidden'>
-                {sale.items.map((item: ISellItem, index: number) => {
-                  
-                  return (
-                    <Card key={item.id} className='overflow-hidden'>
-                
-                      <CardContent className='pt-4'>
-                        <h4 className='font-semibold'>{item.item?.name || 'Unknown Product'}</h4>
-                    
-                        <div className='mt-3 grid grid-cols-2 gap-2'>
-                          <div>
-                            <p className='text-xs text-muted-foreground'>Quantity</p>
-                            <p className='font-medium'>{item.quantity}</p>
-                          </div>
-                          <div>
-                            <p className='text-xs text-muted-foreground'>Unit Price</p>
-                            <p className='font-medium'>{item.unitPrice.toFixed(2)}</p>
-                          </div>
-                        </div>
-                        <div className='mt-2 flex justify-between items-center border-t pt-2'>
-                          <span className='text-sm font-medium'>Total:</span>
-                          <span className='font-bold'>{item.totalPrice.toFixed(2)}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+    {/* Mobile Card View */}
+    <div className='space-y-3 sm:hidden'>
+      {sale.items.map((item: ISellItem, index: number) => {
+        // Get location display
+        const getLocationDisplay = () => {
+          if (item.store && item.showroom) {
+            return `${item.store.name} → ${item.showroom.name}`;
+          } else if (item.store) {
+            return item.store.name;
+          } else if (item.showroom) {
+            return item.showroom.name;
+          }
+          return 'No Location';
+        };
+
+        // Get location icon
+        const getLocationIcon = () => {
+          if (item.store && item.showroom) return '🏪';
+          if (item.store) return '🏬';
+          if (item.showroom) return '🏪';
+          return '📍';
+        };
+
+        return (
+          <Card key={item.id} className='overflow-hidden'>
+            <CardContent className='pt-4'>
+              <h4 className='font-semibold'>{item.item?.name || 'Unknown Product'}</h4>
+              
+              {/* Location Badge */}
+              <div className='mt-1'>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  item.store 
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                    : item.showroom
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                    : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                }`}>
+                  <span>{getLocationIcon()}</span>
+                  <span>{getLocationDisplay()}</span>
+                </span>
               </div>
 
-              {/* Desktop Table View */}
-              <div className='hidden sm:block overflow-x-auto'>
-                <div className='inline-block min-w-full align-middle'>
-                  <div className='overflow-hidden border rounded-lg'>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>#</TableHead>
-                          <TableHead>Product</TableHead>
-                          <TableHead className='text-center'>Quantity</TableHead>
-                          <TableHead className='text-right'>Unit Price</TableHead>
-                          <TableHead className='text-right'>Total Price</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sale.items.map((item: ISellItem, index: number) => (
-                          <TableRow key={item.id}>
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell className='font-medium'>
-                              {item.item?.name || 'Unknown Product'}
-                            </TableCell>
-                          
-                            <TableCell className='text-center'>{item.quantity}</TableCell>
-                            <TableCell className='text-right'>{item.unitPrice.toFixed(2)}</TableCell>
-                            <TableCell className='text-right font-bold'>{item.totalPrice.toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+              <div className='mt-3 grid grid-cols-2 gap-2'>
+                <div>
+                  <p className='text-xs text-muted-foreground'>Quantity</p>
+                  <p className='font-medium'>{item.quantity}</p>
+                </div>
+                <div>
+                  <p className='text-xs text-muted-foreground'>Unit Price</p>
+                  <p className='font-medium'>{item.unitPrice.toFixed(2)}</p>
                 </div>
               </div>
+              <div className='mt-2 flex justify-between items-center border-t pt-2'>
+                <span className='text-sm font-medium'>Total:</span>
+                <span className='font-bold'>{item.totalPrice.toFixed(2)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
 
-            
-            </div>
-          ) : (
-            <div className='text-muted-foreground py-8 text-center'>
-              <Package className='mx-auto h-12 w-12 opacity-20' />
-              <p className='mt-2'>No items found in this sale</p>
-            </div>
-          )}
+    {/* Desktop Table View */}
+    <div className='hidden sm:block overflow-x-auto'>
+      <div className='inline-block min-w-full align-middle'>
+        <div className='overflow-hidden border rounded-lg'>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>#</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead className='text-center'>Quantity</TableHead>
+                <TableHead className='text-right'>Unit Price</TableHead>
+                <TableHead className='text-right'>Total Price</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sale.items.map((item: ISellItem, index: number) => {
+                // Get location display
+                const getLocationDisplay = () => {
+                  if (item.store && item.showroom) {
+                    return `${item.store.name} → ${item.showroom.name}`;
+                  } else if (item.store) {
+                    return item.store.name;
+                  } else if (item.showroom) {
+                    return item.showroom.name;
+                  }
+                  return 'No Location';
+                };
+
+                // Get location icon and color
+                const getLocationStyle = () => {
+                  if (item.store && item.showroom) {
+                    return {
+                      icon: '🏪',
+                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                      textColor: 'text-purple-700 dark:text-purple-300',
+                      borderColor: 'border-purple-200 dark:border-purple-800'
+                    };
+                  } else if (item.store) {
+                    return {
+                      icon: '🏬',
+                      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+                      textColor: 'text-blue-700 dark:text-blue-300',
+                      borderColor: 'border-blue-200 dark:border-blue-800'
+                    };
+                  } else if (item.showroom) {
+                    return {
+                      icon: '🏪',
+                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                      textColor: 'text-purple-700 dark:text-purple-300',
+                      borderColor: 'border-purple-200 dark:border-purple-800'
+                    };
+                  }
+                  return {
+                    icon: '📍',
+                    bgColor: 'bg-gray-50 dark:bg-gray-800',
+                    textColor: 'text-gray-500 dark:text-gray-400',
+                    borderColor: 'border-gray-200 dark:border-gray-700'
+                  };
+                };
+
+                const locationStyle = getLocationStyle();
+
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell className='font-medium'>
+                      {item.item?.name || 'Unknown Product'}
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
+                        <span>{locationStyle.icon}</span>
+                        <span>{getLocationDisplay()}</span>
+                      </span>
+                    </TableCell>
+                    <TableCell className='text-center'>{item.quantity}</TableCell>
+                    <TableCell className='text-right'>{item.unitPrice.toFixed(2)}</TableCell>
+                    <TableCell className='text-right font-bold'>{item.totalPrice.toFixed(2)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  </div>
+) : (
+  <div className='text-muted-foreground py-8 text-center'>
+    <Package className='mx-auto h-12 w-12 opacity-20' />
+    <p className='mt-2'>No items found in this sale</p>
+  </div>
+)}
         </CardContent>
       </Card>
     </div>
