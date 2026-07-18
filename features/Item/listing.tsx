@@ -56,9 +56,10 @@ interface StockDetails {
   stock: number;
 }
 
-interface ExtendedItem extends IItem {
+// Make stockDetails optional compared to IItem's definition
+type ExtendedItem = Omit<IItem, 'stockDetails'> & {
   stockDetails?: StockDetails;
-}
+};
 
 interface ItemCardProps {
   item: ExtendedItem;

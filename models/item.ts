@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { IMaterial } from "./material";
 import { IProductCategory, IProductType, ISize } from "./productConfiguration";
 
