@@ -340,8 +340,9 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
 
   const grandTotal = sale.grandTotal || 0;
   const totalPaid = sale.totalPaid || 0;
-  const balance = sale.balance || grandTotal;
-
+const balance = sale?.balance !== undefined && sale?.balance !== null 
+    ? sale.balance 
+    : grandTotal;
   // Check for attached files
 
   return (

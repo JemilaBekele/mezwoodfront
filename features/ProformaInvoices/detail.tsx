@@ -517,12 +517,18 @@ const formatDescription = (text: string, limit = 80) => {
   );
 };
   // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'ETB',
-    }).format(amount);
-  };
+// Format currency with safety checks
+const formatCurrency = (amount: number | undefined | null) => {
+  // Handle undefined, null, or NaN
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return 'ETB 0.00';
+  }
+  
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'ETB',
+  }).format(amount);
+};
 
   // Handle create project button click
   const handleCreateProject = () => {
@@ -1540,31 +1546,31 @@ const formatDescription = (text: string, limit = 80) => {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="amount">Amount</Label>
-                     <Input
-  id="amount"
-  type="text"
-  value={
-    paymentData.amountPaid
-      ? paymentData.amountPaid.toLocaleString("")
-      : ""
-  }
-  onChange={(e) => {
-    // Remove commas and any non-numeric characters except decimal point
-    const rawValue = e.target.value.replace(/,/g, "").replace(/[^\d.]/g, "");
+                       <div className="space-y-2">
+  <Label htmlFor="amount">Amount</Label>
+  <Input
+    id="amount"
+    type="text"
+    value={
+      paymentData.amountPaid
+        ? paymentData.amountPaid.toLocaleString('en-US')
+        : ""
+    }
+    onChange={(e) => {
+      // Remove commas and any non-numeric characters except decimal point
+      const rawValue = e.target.value.replace(/,/g, "").replace(/[^\d.]/g, "");
 
-    setPaymentData({
-      ...paymentData,
-      amountPaid: parseFloat(rawValue) || 0,
-    });
-  }}
-  placeholder="Enter payment amount"
-/>
-                          <p className="text-xs text-muted-foreground">
-                            Balance due: {formatCurrency(invoice.balance)}
-                          </p>
-                        </div>
+      setPaymentData({
+        ...paymentData,
+        amountPaid: parseFloat(rawValue) || 0,
+      });
+    }}
+    placeholder="Enter payment amount"
+  />
+  <p className="text-xs text-muted-foreground">
+    Balance due: {formatCurrency(invoice.balance)}
+  </p>
+</div>
                         
                         <div className="space-y-2">
                           <Label htmlFor="date">Payment Date</Label>

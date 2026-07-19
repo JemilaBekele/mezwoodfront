@@ -1,21 +1,25 @@
 'use client';
 
-import { StageProjectListing } from '../../listlibrary';
+import { StageProjectListing } from '../deliver';
 import { projectColumns } from './tables/columns';
-import { getdeliveryProjects } from '@/service/Stages';
+import { getdeliverysProjects } from '@/service/Stages';
 import { useEffect, useState, useCallback } from 'react';
 import { IProject } from '@/models/Projects';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+type DeliveryStatus = 'not-finished' | 'partially-delivered' | 'approved';
 
 export default function DeliveryProjectListingPage() {
   const [projects, setProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeStatus, setActiveStatus] = useState<DeliveryStatus>('not-finished');
 
-  const fetchProjects = useCallback(async () => {
+  const fetchProjects = useCallback(async (status: DeliveryStatus = 'not-finished') => {
     try {
       setLoading(true);
-      const result = await getdeliveryProjects({ status: 'not-finished' });
+      const result = await getdeliverysProjects({ status });
       setProjects(result.projects);
       setError(null);
     } catch (err) {
@@ -27,15 +31,18 @@ export default function DeliveryProjectListingPage() {
   }, []);
 
   const handleRefresh = useCallback(() => {
-    // Increment refresh key to force re-render of the table
     setRefreshKey(prev => prev + 1);
-    // Fetch fresh data
-    fetchProjects();
+    fetchProjects(activeStatus);
+  }, [fetchProjects, activeStatus]);
+
+  const handleStatusChange = useCallback((status: DeliveryStatus) => {
+    setActiveStatus(status);
+    fetchProjects(status);
   }, [fetchProjects]);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    fetchProjects('not-finished');
+  }, []);
 
   if (loading) {
     return (
@@ -57,17 +64,38 @@ export default function DeliveryProjectListingPage() {
   }
 
   return (
-    <StageProjectListing
-      key={refreshKey} // Force re-render when refreshKey changes
-      projects={projects}
-      projectColumns={projectColumns}
-      stageName="Delivery"
-      emptyStateMessages={{
-        today: 'No delivery projects due today',
-        tomorrow: 'No delivery projects due tomorrow',
-        other: 'No other delivery projects found'
-      }}
-      onRefresh={handleRefresh} // Pass refresh function to the listing component
-    />
+    <div className="space-y-4">
+      <Tabs 
+        defaultValue="not-finished" 
+        onValueChange={(value) => handleStatusChange(value as DeliveryStatus)}
+      >
+        <TabsList>
+          <TabsTrigger value="not-finished">
+            Not Finished
+          </TabsTrigger>
+          <TabsTrigger value="partially-delivered">
+            Partially Delivered
+          </TabsTrigger>
+          <TabsTrigger value="approved">
+            Approved
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeStatus} className="mt-4">
+          <StageProjectListing
+            key={refreshKey}
+            projects={projects}
+            projectColumns={projectColumns}
+            stageName="Delivery"
+            emptyStateMessages={{
+              today: `No ${activeStatus.replace('-', ' ')} delivery projects due today`,
+              tomorrow: `No ${activeStatus.replace('-', ' ')} delivery projects due tomorrow`,
+              other: `No ${activeStatus.replace('-', ' ')} delivery projects found`
+            }}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

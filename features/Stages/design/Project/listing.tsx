@@ -1,7 +1,6 @@
 'use client';
 
 import { StageProjectListing } from '../../allstages';
-import { projectColumns } from './tables/columns';
 import { getdesignProjects } from '@/service/Stages';
 import { useEffect, useState } from 'react';
 import { IProject } from '@/models/Projects';

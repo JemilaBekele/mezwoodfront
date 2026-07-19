@@ -22,6 +22,8 @@ export enum ProjectStatus {
   INSTALLATION = 'INSTALLATION',
 }
 export enum DesignStatus {
+    DESIGN_FINISHED = 'DESIGN_FINISHED',
+
     INITIATED = 'INITIATED',
 
   MODELING = 'MODELING',
@@ -29,7 +31,6 @@ export enum DesignStatus {
   CUTLIST = 'CUTLIST',
   BOQ = 'BOQ',
   FINISHED = 'FINISHED',
-  DESIGN_FINISHED = 'DESIGN_FINISHED',
 }
 
 

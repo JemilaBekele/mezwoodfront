@@ -113,6 +113,14 @@ export const sellColumns: ColumnDef<ISell>[] = [
     cell: ({ cell }) => <div>{cell.getValue<ISell['grandTotal']>()}</div>,
     enableColumnFilter: false
   },
+    {
+    accessorKey: 'balance',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Balance' />
+    ),
+    cell: ({ cell }) => <div>{cell.getValue<ISell['balance']>()}</div>,
+    enableColumnFilter: false
+  },
 
   {
     accessorKey: 'saleStatus',
@@ -142,51 +150,6 @@ export const sellColumns: ColumnDef<ISell>[] = [
     },
     enableColumnFilter: true
   },
-// {
-//   accessorKey: 'SellStockCorrection',
-//   header: ({ column }) => (
-//     <DataTableColumnHeader column={column} title='Sell Correction' />
-//   ),
-//   cell: ({ cell }) => {
-//     const corrections = cell.getValue<ISell['SellStockCorrection']>();
-    
-//     // If no corrections or empty array
-//     if (!corrections || corrections.length === 0) {
-//       return <div>-</div>;
-//     }
-
-//     // Get the first correction (assuming there might be multiple)
-//     const firstCorrection = corrections[0];
-    
-//     // Format the status display
-//     const getStatusBadge = (status: string) => {
-//       switch (status) {
-//         case 'PENDING':
-//           return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
-//         case 'APPROVED':
-//           return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Approved</Badge>;
-//         case 'PARTIAL':
-//           return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Partial</Badge>;
-//         case 'REJECTED':
-//           return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>;
-//         default:
-//           return <Badge variant="outline">{status}</Badge>;
-//       }
-//     };
-
-//     return (
-//       <div className="flex items-center gap-2">
-//         {getStatusBadge(firstCorrection.status)}
-//         {corrections.length > 1 && (
-//           <Badge variant="secondary" className="ml-1">
-//             +{corrections.length - 1}
-//           </Badge>
-//         )}
-//       </div>
-//     );
-//   },
-//   enableColumnFilter: true
-// },
   {
     id: 'actions',
     cell: ({ row }) => <SellCellAction data={row.original} />

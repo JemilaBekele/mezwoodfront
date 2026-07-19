@@ -45,6 +45,14 @@ interface MetalWorkProjectsResponse {
   projects: IProject[];
   count: number;
   total: number;
+  breakdown?: Record<string, number>;
+  summary?: {
+    totalProjects: number;
+    finishedProjects: number;
+    notFinishedProjects: number;
+    partiallyDeliveredProjects: number;
+    approvedProjects: number;
+  };
 }
 
 // stage/cnc-work-projects
@@ -301,7 +309,7 @@ export const getfinishedProjects = async (params?: {
 };
 
 export const getdeliveryProjects = async (params?: {
-  status?: 'finished' | 'not-finished' | 'all';
+  status?: 'all' | 'finished' | 'not-finished' | 'pending' | 'partially-delivered' | 'approved' | 'in-progress';
   sortOrder?: 'asc' | 'desc';
 }) => {
   try {
@@ -321,11 +329,13 @@ export const getdeliveryProjects = async (params?: {
       projects,
       totalCount: response?.data?.count ?? projects.length,
       total: response?.data?.total ?? 0,
-      success: response?.data?.success ?? false
+      success: response?.data?.success ?? false,
+      breakdown: response?.data?.breakdown,
+      summary: response?.data?.summary
     };
 
   } catch (error) {
-    console.error('Error fetching metal work projects:', error);
+    console.error('Error fetching delivery projects:', error);
 
     return {
       projects: [] as IProject[],
@@ -335,7 +345,43 @@ export const getdeliveryProjects = async (params?: {
     };
   }
 };
+export const getdeliverysProjects = async (params?: {
+  status?: 'all' | 'finished' | 'not-finished' | 'pending' | 'partially-delivered' | 'approved' | 'in-progress';
+  sortOrder?: 'asc' | 'desc';
+}) => {
+  try {
+    const response = await axiosInstance.get<MetalWorkProjectsResponse>(
+      `/stage/delivery-projects`,
+      {
+        params: {
+          status: params?.status || 'all',
+          sortOrder: params?.sortOrder || 'desc'
+        }
+      }
+    );
+console.log('Response from getdeliverysProjects:', response.data);
+    const projects = response?.data?.projects ?? [];
 
+    return {
+      projects,
+      totalCount: response?.data?.count ?? projects.length,
+      total: response?.data?.total ?? 0,
+      success: response?.data?.success ?? false,
+      breakdown: response?.data?.breakdown,
+      summary: response?.data?.summary
+    };
+
+  } catch (error) {
+    console.error('Error fetching delivery projects:', error);
+
+    return {
+      projects: [] as IProject[],
+      totalCount: 0,
+      total: 0,
+      success: false
+    };
+  }
+};
 export const getinstalationProjects = async (params?: {
   status?: 'finished' | 'not-finished' | 'all';
   sortOrder?: 'asc' | 'desc';

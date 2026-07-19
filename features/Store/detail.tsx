@@ -21,6 +21,7 @@ import {
   CreditCard,
   Printer,
   ZoomIn,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Table,
@@ -87,6 +88,8 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
       setLoading(true);
       try {
         const saleData = await getSellById(id);
+                console.log('Sale data refreshed after delivery error',saleData);
+
         setSale(saleData);
       } catch {
         toast.error('Failed to fetch sale details');
@@ -444,8 +447,9 @@ const handleConfirmDelivery = async () => {
 
   const grandTotal = sale.grandTotal || 0;
   const totalPaid = sale.totalPaid || 0;
-  const balance = sale.balance || grandTotal;
-
+const balance = sale?.balance !== undefined && sale?.balance !== null 
+    ? sale.balance 
+    : grandTotal;
   return (
     <div className='container mx-auto space-y-6 p-4 md:p-8'>
       <div className='flex flex-wrap justify-end gap-2'>
@@ -517,16 +521,15 @@ const handleConfirmDelivery = async () => {
                     </div>
                   </div>
                 )}
-                   {sale.deliveryDate && (
-                                                                   <div className='flex items-start gap-2'>
-                                                                                       <Calendar className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
-                 
-                                                                      <p>
-                                                     <span className='font-medium'>Delivery Date:</span>{' '}
-                                                     {formatDate(sale.deliveryDate || '')}
-                                                   </p>
-                                                                   </div>
-                                                                 )}
+                {sale.deliveryDate && (
+                  <div className='flex items-start gap-2'>
+                    <Calendar className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
+                    <p>
+                      <span className='font-medium'>Delivery Date:</span>{' '}
+                      {formatDate(sale.deliveryDate || '')}
+                    </p>
+                  </div>
+                )}
                 {sale.createdBy && (
                   <div className='flex items-start gap-2'>
                     <User className='text-muted-foreground mt-0.5 h-4 w-4 shrink-0' />
@@ -602,290 +605,316 @@ const handleConfirmDelivery = async () => {
                     {sale.totalProducts}
                   </p>
                 </div>
+                
+                {/* Delivery Button with Balance Check */}
                 {canDeliver() && (
-                  <Button
-                    onClick={handleDeliverClick}
-                    variant='default'
-                    className='flex items-center gap-2'
-                    disabled={selectedItems.size === 0}
-                  >
-                    <Truck className='h-4 w-4' />
-                    Deliver Selected ({selectedItems.size})
-                  </Button>
+                  <div className="space-y-2">
+                    {balance > 0 && (
+                      <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>
+                          Cannot deliver until full payment is received. Balance due: {balance.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <Button
+                      onClick={handleDeliverClick}
+                      variant='default'
+                      className='flex items-center gap-2 w-full sm:w-auto'
+                      disabled={selectedItems.size === 0 || balance > 0}
+                    >
+                      <Truck className='h-4 w-4' />
+                      Deliver Selected ({selectedItems.size})
+                      {balance > 0 && " (Payment Required)"}
+                    </Button>
+                    {balance > 0 && selectedItems.size > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        💡 Please complete payment before delivering items.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
           {/* Sale Items Table with Checkboxes and Images */}
-        {sale.items && sale.items.length > 0 ? (
-  <div className='space-y-4'>
-    <h3 className='text-base font-semibold sm:text-lg'>Sale Items</h3>
+          {sale.items && sale.items.length > 0 ? (
+            <div className='space-y-4'>
+              <h3 className='text-base font-semibold sm:text-lg'>Sale Items</h3>
 
-    {/* Mobile Card View with Images */}
-    <div className='space-y-3 sm:hidden'>
-      {sale.items.map((item: ISellItem) => {
-        const isSelected = selectedItems.has(item.id);
-        const canSelect = item.itemSaleStatus !== 'DELIVERED';
-        const productImage = normalizeImagePath(item.item?.imageUrl);
-        
-        // Get location display
-        const getLocationDisplay = () => {
-          if (item.store && item.showroom) {
-            return `${item.store.name} → ${item.showroom.name}`;
-          } else if (item.store) {
-            return item.store.name;
-          } else if (item.showroom) {
-            return item.showroom.name;
-          }
-          return 'No Location';
-        };
-
-        // Get location style
-        const getLocationStyle = () => {
-          if (item.store && item.showroom) {
-            return {
-              icon: '🏪',
-              bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-              textColor: 'text-purple-700 dark:text-purple-300',
-            };
-          } else if (item.store) {
-            return {
-              icon: '🏬',
-              bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-              textColor: 'text-blue-700 dark:text-blue-300',
-            };
-          } else if (item.showroom) {
-            return {
-              icon: '🏪',
-              bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-              textColor: 'text-purple-700 dark:text-purple-300',
-            };
-          }
-          return {
-            icon: '📍',
-            bgColor: 'bg-gray-50 dark:bg-gray-800',
-            textColor: 'text-gray-500 dark:text-gray-400',
-          };
-        };
-
-        const locationStyle = getLocationStyle();
-
-        return (
-          <Card 
-            key={item.id} 
-            className={`overflow-hidden transition-colors ${
-              isSelected && canSelect ? 'border-green-500 bg-green-50' : ''
-            }`}
-          >
-            <CardContent className='pt-4'>
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2 flex-1">
-                  {canSelect && (
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleItemSelection(item.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                    />
-                  )}
-                  <h4 className='font-semibold'>{item.item?.name || 'Unknown Product'}</h4>
-                </div>
-                {getItemStatusBadge(item.itemSaleStatus)}
-              </div>
-              
-              {/* Location Badge - Mobile */}
-              <div className='mt-2'>
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor}`}>
-                  <span>{locationStyle.icon}</span>
-                  <span>{getLocationDisplay()}</span>
-                </span>
-              </div>
-              
-              {/* Product Image */}
-              {productImage && (
-                <div className='mt-3 flex justify-center'>
-                  <div 
-                    className='relative cursor-pointer group'
-                    onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
-                  >
-                    <div className='relative h-32 w-32'>
-                      <img 
-                        src={productImage} 
-                        alt={item.item?.name || 'Product'}
-                        className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
-                        style={{ display: 'block' }}
-                      />
-                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
-                        <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-          
-              <div className='mt-3 grid grid-cols-2 gap-2'>
-                <div>
-                  <p className='text-xs text-muted-foreground'>Quantity</p>
-                  <p className='font-medium'>{item.quantity}</p>
-                </div>
-                <div>
-                  <p className='text-xs text-muted-foreground'>Unit Price</p>
-                  <p className='font-medium'>{item.unitPrice.toFixed(2)}</p>
-                </div>
-              </div>
-              <div className='mt-2 flex justify-between items-center border-t pt-2'>
-                <span className='text-sm font-medium'>Total:</span>
-                <span className='font-bold'>{item.totalPrice.toFixed(2)}</span>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-
-    {/* Desktop Table View with Images */}
-    <div className='block overflow-x-auto'>
-      <div className='inline-block min-w-full align-middle'>
-        <div className='overflow-hidden border rounded-lg'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">Select</TableHead>
-                <TableHead>#</TableHead>
-                <TableHead>Product Image</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className='text-center'>Quantity</TableHead>
-                <TableHead className='text-right'>Unit Price</TableHead>
-                <TableHead className='text-right'>Total Price</TableHead>
-                <TableHead className='text-center'>Delivery Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sale.items.map((item: ISellItem, index: number) => {
-                const isSelected = selectedItems.has(item.id);
-                const canSelect = item.itemSaleStatus !== 'DELIVERED';
-                const productImage = normalizeImagePath(item.item?.imageUrl);
-                
-                // Get location display
-                const getLocationDisplay = () => {
-                  if (item.store && item.showroom) {
-                    return `${item.store.name} → ${item.showroom.name}`;
-                  } else if (item.store) {
-                    return item.store.name;
-                  } else if (item.showroom) {
-                    return item.showroom.name;
-                  }
-                  return 'No Location';
-                };
-
-                // Get location style
-                const getLocationStyle = () => {
-                  if (item.store && item.showroom) {
-                    return {
-                      icon: '🏪',
-                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-                      textColor: 'text-purple-700 dark:text-purple-300',
-                      borderColor: 'border-purple-200 dark:border-purple-800'
-                    };
-                  } else if (item.store) {
-                    return {
-                      icon: '🏬',
-                      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-                      textColor: 'text-blue-700 dark:text-blue-300',
-                      borderColor: 'border-blue-200 dark:border-blue-800'
-                    };
-                  } else if (item.showroom) {
-                    return {
-                      icon: '🏪',
-                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-                      textColor: 'text-purple-700 dark:text-purple-300',
-                      borderColor: 'border-purple-200 dark:border-purple-800'
-                    };
-                  }
-                  return {
-                    icon: '📍',
-                    bgColor: 'bg-gray-50 dark:bg-gray-800',
-                    textColor: 'text-gray-500 dark:text-gray-400',
-                    borderColor: 'border-gray-200 dark:border-gray-700'
+              {/* Mobile Card View with Images */}
+              <div className='space-y-3 sm:hidden'>
+                {sale.items.map((item: ISellItem) => {
+                  const isSelected = selectedItems.has(item.id);
+                  const canSelect = item.itemSaleStatus !== 'DELIVERED';
+                  const productImage = normalizeImagePath(item.item?.imageUrl);
+                  
+                  // Get location display
+                  const getLocationDisplay = () => {
+                    if (item.store && item.showroom) {
+                      return `${item.store.name} → ${item.showroom.name}`;
+                    } else if (item.store) {
+                      return item.store.name;
+                    } else if (item.showroom) {
+                      return item.showroom.name;
+                    }
+                    return 'No Location';
                   };
-                };
 
-                const locationStyle = getLocationStyle();
-                
-                return (
-                  <TableRow 
-                    key={item.id}
-                    className={isSelected && canSelect ? 'bg-green-50' : ''}
-                  >
-                    <TableCell>
-                      {canSelect && (
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleItemSelection(item.id)}
-                          className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className="p-2">
-                      {productImage ? (
-                        <div
-                          className="relative cursor-pointer group w-14 h-14 overflow-hidden rounded-md border bg-white"
-                          onClick={() =>
-                            handleImageClick(productImage, item.item?.name || 'Product')
-                          }
-                        >
-                          <img
-                            src={productImage}
-                            alt={item.item?.name || 'Product'}
-                            className="w-full h-full object-cover"
-                            draggable={false}
-                            onError={(e) => {
-                              console.error('Image failed to load:', productImage);
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          <div className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/20">
-                            <ZoomIn className="h-4 w-4 text-white" />
+                  // Get location style
+                  const getLocationStyle = () => {
+                    if (item.store && item.showroom) {
+                      return {
+                        icon: '🏪',
+                        bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                        textColor: 'text-purple-700 dark:text-purple-300',
+                      };
+                    } else if (item.store) {
+                      return {
+                        icon: '🏬',
+                        bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+                        textColor: 'text-blue-700 dark:text-blue-300',
+                      };
+                    } else if (item.showroom) {
+                      return {
+                        icon: '🏪',
+                        bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                        textColor: 'text-purple-700 dark:text-purple-300',
+                      };
+                    }
+                    return {
+                      icon: '📍',
+                      bgColor: 'bg-gray-50 dark:bg-gray-800',
+                      textColor: 'text-gray-500 dark:text-gray-400',
+                    };
+                  };
+
+                  const locationStyle = getLocationStyle();
+
+                  return (
+                    <Card 
+                      key={item.id} 
+                      className={`overflow-hidden transition-colors ${
+                        isSelected && canSelect ? 'border-green-500 bg-green-50' : ''
+                      } ${balance > 0 ? 'opacity-75' : ''}`}
+                    >
+                      <CardContent className='pt-4'>
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-2 flex-1">
+                            {canSelect && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleItemSelection(item.id)}
+                                disabled={balance > 0}
+                                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            )}
+                            <h4 className='font-semibold'>{item.item?.name || 'Unknown Product'}</h4>
+                          </div>
+                          {getItemStatusBadge(item.itemSaleStatus)}
+                        </div>
+                        
+                        {/* Location Badge - Mobile */}
+                        <div className='mt-2'>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor}`}>
+                            <span>{locationStyle.icon}</span>
+                            <span>{getLocationDisplay()}</span>
+                          </span>
+                        </div>
+                        
+                        {/* Product Image */}
+                        {productImage && (
+                          <div className='mt-3 flex justify-center'>
+                            <div 
+                              className='relative cursor-pointer group'
+                              onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                            >
+                              <div className='relative h-32 w-32'>
+                                <img 
+                                  src={productImage} 
+                                  alt={item.item?.name || 'Product'}
+                                  className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                                  style={{ display: 'block' }}
+                                />
+                                <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                                  <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                    
+                        <div className='mt-3 grid grid-cols-2 gap-2'>
+                          <div>
+                            <p className='text-xs text-muted-foreground'>Quantity</p>
+                            <p className='font-medium'>{item.quantity}</p>
+                          </div>
+                          <div>
+                            <p className='text-xs text-muted-foreground'>Unit Price</p>
+                            <p className='font-medium'>{item.unitPrice.toFixed(2)}</p>
                           </div>
                         </div>
-                      ) : (
-                        <div className="h-14 w-14 bg-gray-100 rounded-md border flex items-center justify-center">
-                          <Package className="h-6 w-6 text-gray-400" />
+                        <div className='mt-2 flex justify-between items-center border-t pt-2'>
+                          <span className='text-sm font-medium'>Total:</span>
+                          <span className='font-bold'>{item.totalPrice.toFixed(2)}</span>
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell className='font-medium'>
-                      {item.item?.name || 'Unknown Product'}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
-                        <span>{locationStyle.icon}</span>
-                        <span>{getLocationDisplay()}</span>
-                      </span>
-                    </TableCell>
-                    <TableCell className='text-center'>{item.quantity}</TableCell>
-                    <TableCell className='text-right'>{item.unitPrice.toFixed(2)}</TableCell>
-                    <TableCell className='text-right font-bold'>{item.totalPrice.toFixed(2)}</TableCell>
-                    <TableCell className='text-center'>{getItemStatusBadge(item.itemSaleStatus)}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </div>
-  </div>
-) : (
-  <div className='text-muted-foreground py-8 text-center'>
-    <Package className='mx-auto h-12 w-12 opacity-20' />
-    <p className='mt-2'>No items found in this sale</p>
-  </div>
-)}
+                        {balance > 0 && (
+                          <div className="mt-2 text-xs text-yellow-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            Payment required before delivery
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View with Images */}
+              <div className='block overflow-x-auto'>
+                <div className='inline-block min-w-full align-middle'>
+                  <div className='overflow-hidden border rounded-lg'>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">Select</TableHead>
+                          <TableHead>#</TableHead>
+                          <TableHead>Product Image</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead className='text-center'>Quantity</TableHead>
+                          <TableHead className='text-right'>Unit Price</TableHead>
+                          <TableHead className='text-right'>Total Price</TableHead>
+                          <TableHead className='text-center'>Delivery Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sale.items.map((item: ISellItem, index: number) => {
+                          const isSelected = selectedItems.has(item.id);
+                          const canSelect = item.itemSaleStatus !== 'DELIVERED';
+                          const productImage = normalizeImagePath(item.item?.imageUrl);
+                          
+                          // Get location display
+                          const getLocationDisplay = () => {
+                            if (item.store && item.showroom) {
+                              return `${item.store.name} → ${item.showroom.name}`;
+                            } else if (item.store) {
+                              return item.store.name;
+                            } else if (item.showroom) {
+                              return item.showroom.name;
+                            }
+                            return 'No Location';
+                          };
+
+                          // Get location style
+                          const getLocationStyle = () => {
+                            if (item.store && item.showroom) {
+                              return {
+                                icon: '🏪',
+                                bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                                textColor: 'text-purple-700 dark:text-purple-300',
+                                borderColor: 'border-purple-200 dark:border-purple-800'
+                              };
+                            } else if (item.store) {
+                              return {
+                                icon: '🏬',
+                                bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+                                textColor: 'text-blue-700 dark:text-blue-300',
+                                borderColor: 'border-blue-200 dark:border-blue-800'
+                              };
+                            } else if (item.showroom) {
+                              return {
+                                icon: '🏪',
+                                bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                                textColor: 'text-purple-700 dark:text-purple-300',
+                                borderColor: 'border-purple-200 dark:border-purple-800'
+                              };
+                            }
+                            return {
+                              icon: '📍',
+                              bgColor: 'bg-gray-50 dark:bg-gray-800',
+                              textColor: 'text-gray-500 dark:text-gray-400',
+                              borderColor: 'border-gray-200 dark:border-gray-700'
+                            };
+                          };
+
+                          const locationStyle = getLocationStyle();
+                          
+                          return (
+                            <TableRow 
+                              key={item.id}
+                              className={`${isSelected && canSelect ? 'bg-green-50' : ''} ${balance > 0 ? 'opacity-75' : ''}`}
+                            >
+                              <TableCell>
+                                {canSelect && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleItemSelection(item.id)}
+                                    disabled={balance > 0}
+                                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell className="p-2">
+                                {productImage ? (
+                                  <div
+                                    className="relative cursor-pointer group w-14 h-14 overflow-hidden rounded-md border bg-white"
+                                    onClick={() =>
+                                      handleImageClick(productImage, item.item?.name || 'Product')
+                                    }
+                                  >
+                                    <img
+                                      src={productImage}
+                                      alt={item.item?.name || 'Product'}
+                                      className="w-full h-full object-cover"
+                                      draggable={false}
+                                      onError={(e) => {
+                                        console.error('Image failed to load:', productImage);
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                    <div className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/20">
+                                      <ZoomIn className="h-4 w-4 text-white" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="h-14 w-14 bg-gray-100 rounded-md border flex items-center justify-center">
+                                    <Package className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className='font-medium'>
+                                {item.item?.name || 'Unknown Product'}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
+                                  <span>{locationStyle.icon}</span>
+                                  <span>{getLocationDisplay()}</span>
+                                </span>
+                              </TableCell>
+                              <TableCell className='text-center'>{item.quantity}</TableCell>
+                              <TableCell className='text-right'>{item.unitPrice.toFixed(2)}</TableCell>
+                              <TableCell className='text-right font-bold'>{item.totalPrice.toFixed(2)}</TableCell>
+                              <TableCell className='text-center'>{getItemStatusBadge(item.itemSaleStatus)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className='text-muted-foreground py-8 text-center'>
+              <Package className='mx-auto h-12 w-12 opacity-20' />
+              <p className='mt-2'>No items found in this sale</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -898,11 +927,11 @@ const handleConfirmDelivery = async () => {
           <div className="relative flex items-center justify-center min-h-100">
             {selectedImage && (
               <div className="relative w-full h-[85vh] min-h-100">
-             <img
-  src={selectedImage}
-  alt={selectedProductName}
-  className="object-contain w-full h-full"
-/>
+                <img
+                  src={selectedImage}
+                  alt={selectedProductName}
+                  className="object-contain w-full h-full"
+                />
               </div>
             )}
             {/* Lightweight overlay for product name */}
