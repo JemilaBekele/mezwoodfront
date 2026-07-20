@@ -44,7 +44,8 @@ import { IProject, ProjectStatus, DifficultyLevel, StageStatus, WorkShift, Sched
 import { getProjectId, setProjectScheduleMode, getProjectScheduleHistory } from '@/service/Project';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
 // Define the variant type to match your Badge component
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 
@@ -801,6 +802,8 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                   <Badge variant="secondary" className="text-xs">{project.stages!.length}</Badge>
                 )}
               </div>
+                                    <PermissionGuard requiredPermission={PERMISSIONS.PROJECT.UPDATE_STAGE.name}>
+              
               {hasStages && (
                 <Button
                   onClick={() => router.push(`/dashboard/Project/stage?id=${project.id}`)}
@@ -812,6 +815,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                   Manage
                 </Button>
               )}
+              </PermissionGuard>
             </CardHeader>
             <CardContent>
               {hasStages ? (

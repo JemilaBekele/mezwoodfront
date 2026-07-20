@@ -62,6 +62,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getMaterialStockById } from '@/service/StockCorrection';
 import { normalizeImagePath } from '@/lib/norm';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
 
 
 
@@ -1003,6 +1005,8 @@ return (
                   <Badge variant="secondary" className="text-xs">{project.stages!.length}</Badge>
                 )}
               </div>
+                                                <PermissionGuard requiredPermission={PERMISSIONS.PROJECT.UPDATE_STAGE.name}>
+              
               {hasStages && (
                 <Button
                   onClick={() => router.push(`/dashboard/Project/stage?id=${project.id}`)}
@@ -1014,6 +1018,7 @@ return (
                   Manage
                 </Button>
               )}
+              </PermissionGuard>
             </CardHeader>
             <CardContent>
               {hasStages ? (

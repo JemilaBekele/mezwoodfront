@@ -123,7 +123,7 @@ export const navItems: NavItem[] = [
     icon: 'layers',
     permission: 'VIEW_PROJECT_STAGES_DASHBOARD',
     items: [
-      { title: 'View all Design', url: '/dashboard/Stage/Design', icon: 'penTool', shortcut: ['m', 'm'], permission: 'VIEW_DESIGN_PROJECTS' },
+      { title: 'View all Design', url: '/dashboard/Stage/Design', icon: 'penTool', shortcut: ['m', 'm'], permission: 'MANAGE_ALL_STAGES' },
       { title: 'Unassigned Design', url: '/dashboard/Stage/Design/unassigned', icon: 'userX', shortcut: ['m', 'm'], permission: 'VIEW_UNASSIGNED_DESIGN_PROJECTS' },
       { title: 'My Design', url: '/dashboard/Stage/Design/mydesign', icon: 'userCheck', shortcut: ['m', 'm'], permission: 'VIEW_DESIGN_PROJECTS_BY_DESIGNER' },
       { title: 'Purchase', url: '/dashboard/Stage/Purchase', icon: 'shoppingCart', shortcut: ['m', 'm'], permission: 'VIEW_PURCHASING_PROJECTS' },

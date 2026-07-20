@@ -67,6 +67,8 @@ import { getMaterialStockById } from '@/service/StockCorrection';
 import { updateProformaMaterialStatus } from '@/service/material';
 import { getAllEmploy } from '@/service/employee';
 import { Input } from '@/components/ui/input';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
 
 // Helper function for image URLs
 
@@ -1085,6 +1087,8 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                           </div>
                         </TableCell>
                         <TableCell>
+                                  <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ISSUE_STOCK_MATERIALS.name}>
+
                           <div className="flex gap-2">
                             {(
                               material.status === MaterialIssueStatus.PENDING ||
@@ -1107,6 +1111,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                               </Button>
                             )}
                           </div>
+                          </PermissionGuard>
                         </TableCell>
                       </TableRow>
                     );
