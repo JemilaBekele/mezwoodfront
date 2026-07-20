@@ -480,7 +480,7 @@ export const PERMISSIONS = {
     },
 
     MANAGE_ALL_STAGES: {
-      name: 'MANAGE_ALL_STAGES',
+      name: 'MANAGE_ALL_STAGES', //why 
     },
 
     VIEW_DESIGN_PROJECTS_BY_DESIGNER: {
