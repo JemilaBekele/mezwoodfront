@@ -743,7 +743,7 @@ export default function SignInViewPage() {
         }
         @media (max-width: 1023px) {
           .login-form-panel::before {
-            content: 'ikiz curtain'; display: block; position: absolute; top: 32px; left: 50%;
+            content: 'Rosewood'; display: block; position: absolute; top: 32px; left: 50%;
             transform: translateX(-50%); font-size: 20px; font-weight: 600;
             color: var(--login-mobile-brand); letter-spacing: 0.5px; font-family: 'Inter', sans-serif;
           }

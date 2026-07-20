@@ -344,7 +344,7 @@ export const SellCellAction: React.FC<SellCellActionProps> = ({ data }) => {
               </DropdownMenuItem>
             </PermissionGuard>
           )}
-          <PermissionGuard requiredPermission={PERMISSIONS.SELL.UPDATE.name}>
+          <PermissionGuard requiredPermission={PERMISSIONS.SELL.ADD_PAYMENT.name}>
             <DropdownMenuItem onClick={() => setOpenPaymentModal(true)}>
               <IconWallet className='mr-2 h-4 w-4' /> Add Payment
             </DropdownMenuItem>

@@ -188,9 +188,7 @@ export const PERMISSIONS = {
     },
   },
   SELL: {
-    VIEW_DASHBOARD: {
-      name: 'VIEW_SELL_DASHBOARD',
-    },
+   
 
     CREATE: {
       name: 'CREATE_SELL',

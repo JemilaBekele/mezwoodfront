@@ -42,6 +42,8 @@ import {
 
 import { ISell, ISellItem, SaleStatus, ItemSaleStatus } from '@/models/Sell';
 import { deliverSaleItems, getSellById } from '@/service/Sell';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
 
 export const normalizeImagePath = (path?: string) => {
   if (!path) return undefined;
@@ -605,7 +607,8 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
                     {sale.totalProducts}
                   </p>
                 </div>
-                
+                          <PermissionGuard requiredPermission={PERMISSIONS.PROJECT.VIEW.name}>
+
                 {/* Delivery Button with Balance Check */}
                 {canDeliver() && (
                   <div className="space-y-2">
@@ -634,6 +637,7 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
                     )}
                   </div>
                 )}
+                </PermissionGuard>
               </div>
             </div>
           </div>

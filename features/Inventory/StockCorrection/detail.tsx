@@ -487,7 +487,7 @@ const StockCorrectionDetailPage: React.FC<StockCorrectionViewProps> = ({
                   <div>
                     <p className='font-medium text-sm'>Short Code:</p>
                     <p className='text-muted-foreground text-sm'>
-                      {stockCorrection.shortCode || 'N/A'}
+                      {stockCorrection.shortCode || ''}
                     </p>
                   </div>
                 </div>
@@ -497,7 +497,7 @@ const StockCorrectionDetailPage: React.FC<StockCorrectionViewProps> = ({
                   <div>
                     <p className='font-medium text-sm'>Reference:</p>
                     <p className='text-muted-foreground text-sm truncate'>
-                      {stockCorrection.reference || 'N/A'}
+                      {stockCorrection.reference || ''}
                     </p>
                   </div>
                 </div>

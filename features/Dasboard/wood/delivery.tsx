@@ -274,7 +274,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
             Check if project delivery dates match stage delivery dates and customer requests
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Generated: {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : 'N/A'}
+            Generated: {report.generatedAt ? new Date(report.generatedAt).toLocaleString() : ''}
           </p>
         </div>
         <Button onClick={fetchReport}>
@@ -384,8 +384,8 @@ const DeliveryDateComparisonReport: React.FC = () => {
                     const comparisons = getComparisons(project);
                     return (
                       <TableRow key={project.projectId}>
-                        <TableCell className="font-medium">{project.customerName || 'N/A'}</TableCell>
-                        <TableCell>{project.piNumber || 'N/A'}</TableCell>
+                        <TableCell className="font-medium">{project.customerName || ''}</TableCell>
+                        <TableCell>{project.piNumber || ''}</TableCell>
                         <TableCell>
                           {formatDate(project.dates?.projectFinalDelivery)}
                         </TableCell>
@@ -436,7 +436,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
                                   variant={getEarlierBadgeColor(comp.whichIsEarlier, comp.type) as any}
                                   className="text-xs"
                                 >
-                                  {comp.whichIsEarlier || 'N/A'}
+                                  {comp.whichIsEarlier || ''}
                                 </Badge>
                               ))
                             ) : (
@@ -444,7 +444,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
                                 variant={getEarlierBadgeColor(project.comparison?.whichIsEarlier || '') as any}
                                 className="text-xs"
                               >
-                                {project.comparison?.whichIsEarlier || 'N/A'}
+                                {project.comparison?.whichIsEarlier || ''}
                               </Badge>
                             )}
                           </div>
@@ -487,8 +487,8 @@ const DeliveryDateComparisonReport: React.FC = () => {
                 <TableBody>
                   {requestedDeliveryMismatchProjects.map((project: RequestedDeliveryMismatchProject) => (
                     <TableRow key={project.projectId}>
-                      <TableCell className="font-medium">{project.customerName || 'N/A'}</TableCell>
-                      <TableCell>{project.piNumber || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">{project.customerName || ''}</TableCell>
+                      <TableCell>{project.piNumber || ''}</TableCell>
                       <TableCell>
                         {formatDate(project.dates?.requestedDelivery)}
                       </TableCell>
@@ -508,7 +508,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
                           ) as any}
                           className="text-xs"
                         >
-                          {project.comparison?.requestedVsStage?.whichIsEarlier || 'N/A'}
+                          {project.comparison?.requestedVsStage?.whichIsEarlier || ''}
                         </Badge>
                       </TableCell>
                     </TableRow>

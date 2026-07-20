@@ -305,11 +305,11 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
             <div className="p-3 bg-muted rounded-md space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Project:</span>
-                <span className="font-medium">{data.invoice?.piNumber || 'N/A'}</span>
+                <span className="font-medium">{data.invoice?.piNumber || ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Customer:</span>
-                <span className="font-medium">{data.customer?.name || 'N/A'}</span>
+                <span className="font-medium">{data.customer?.name || ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Remaining:</span>
@@ -469,7 +469,7 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
                
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Customer:</span>
-                  <span className="font-medium">{data.customer?.name || 'N/A'}</span>
+                  <span className="font-medium">{data.customer?.name || ''}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Remaining Units:</span>

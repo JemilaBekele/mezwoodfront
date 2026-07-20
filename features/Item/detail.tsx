@@ -687,7 +687,7 @@ const ProductDetailPage: React.FC<ProductViewProps> = ({ id }) => {
                 <div>
                   <p className='text-sm font-medium'>Category</p>
                   <p className='text-sm text-muted-foreground'>
-                    {product.category?.name || 'N/A'}
+                    {product.category?.name || ''}
                   </p>
                 </div>
               </div>
@@ -789,7 +789,7 @@ const ProductDetailPage: React.FC<ProductViewProps> = ({ id }) => {
                         <span className='text-sm text-muted-foreground'>-</span>
                       )}
                     </TableCell>
-                    <TableCell>{movement.reference || 'N/A'}</TableCell>
+                    <TableCell>{movement.reference || ''}</TableCell>
                     <TableCell>{formatDate(movement.createdAt)}</TableCell>
                     <TableCell>{movement.user?.name || 'System'}</TableCell>
                     <TableCell className='max-w-50 truncate'>
@@ -865,7 +865,7 @@ const ProductDetailPage: React.FC<ProductViewProps> = ({ id }) => {
                 {product.recentProformaInvoices.map((pi) => (
                   <TableRow key={pi.id}>
                     <TableCell className='font-medium'>
-                      {pi.invoice?.piNumber || 'N/A'}
+                      {pi.invoice?.piNumber || ''}
                     </TableCell>
                     <TableCell className='max-w-48 truncate'>
                       {pi.description}
@@ -877,7 +877,7 @@ const ProductDetailPage: React.FC<ProductViewProps> = ({ id }) => {
                     </TableCell>
                     <TableCell>
                       <Badge variant={pi.invoice?.status === 'APPROVED' ? 'default' : 'secondary'}>
-                        {pi.invoice?.status || 'N/A'}
+                        {pi.invoice?.status || ''}
                       </Badge>
                     </TableCell>
                     <TableCell>

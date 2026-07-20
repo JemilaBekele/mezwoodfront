@@ -512,7 +512,7 @@ const MaterialDetailPage: React.FC<MaterialViewProps> = ({ id }) => {
                   <div>
                     <p className='text-sm font-medium'>Category</p>
                     <p className='text-sm text-muted-foreground'>
-                      {material.materialType?.name || 'N/A'}
+                      {material.materialType?.name || ''}
                     </p>
                   </div>
                 </div>
@@ -521,7 +521,7 @@ const MaterialDetailPage: React.FC<MaterialViewProps> = ({ id }) => {
                   <div>
                     <p className='text-sm font-medium'>Unit of Measure</p>
                     <p className='text-sm text-muted-foreground'>
-                      {material.unitOfMeasure?.name || 'N/A'}
+                      {material.unitOfMeasure?.name || ''}
                       {material.unitOfMeasure?.symbol && ` (${material.unitOfMeasure.symbol})`}
                     </p>
                   </div>
@@ -632,7 +632,7 @@ const MaterialDetailPage: React.FC<MaterialViewProps> = ({ id }) => {
                           <span className='text-sm text-muted-foreground'>-</span>
                         )}
                       </TableCell>
-                      <TableCell>{movement.reference || 'N/A'}</TableCell>
+                      <TableCell>{movement.reference || ''}</TableCell>
                       <TableCell>{formatDate(movement.movementDate)}</TableCell>
                       <TableCell>{movement.user?.name || 'System'}</TableCell>
                       <TableCell className='max-w-50 truncate'>

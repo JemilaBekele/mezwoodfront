@@ -209,15 +209,15 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
           checks.push({
             materialId: material.materialId,
             materialName: material.material?.name || 'Unknown Material',
-            color: material.material?.color || 'N/A',
-            size: material.material?.size || 'N/A',
+            color: material.material?.color || '',
+            size: material.material?.size || '',
             requiredQuantity: totalRequired,
             alreadyIssued: alreadyIssued,
             remainingNeeded: remainingNeeded,
             availableStock: availableStock,
             shortfall: shortfall,
             unit: 'units',
-            itemDescription: material.note || 'N/A',
+            itemDescription: material.note || '',
             isAvailable: shortfall === 0,
           });
         } catch (error) {
@@ -225,8 +225,8 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
           checks.push({
             materialId: material.materialId,
             materialName: material.material?.name || 'Unknown Material',
-            color: material.material?.color || 'N/A',
-            size: material.material?.size || 'N/A',
+            color: material.material?.color || '',
+            size: material.material?.size || '',
             requiredQuantity: 0,
             alreadyIssued: 0,
             remainingNeeded: 0,
@@ -1122,7 +1122,7 @@ return (
                               case WorkShift.AFTERNOON: return 'Afternoon';
                               case WorkShift.FULL_DAY: return 'Full Day';
                               case WorkShift.CUSTOM: return 'Custom';
-                              default: return 'N/A';
+                              default: return '';
                             }
                           };
 
@@ -1268,7 +1268,7 @@ return (
                                     <div key={item.id} className="border rounded-lg p-3">
                                       <div className="flex justify-between items-start mb-2">
                                         <div className="flex-1 min-w-0">
-                                          <h4 className="font-semibold text-sm">{item?.item?.name || 'N/A'}</h4>
+                                          <h4 className="font-semibold text-sm">{item?.item?.name || ''}</h4>
                                           {item.size && item.size !== "" && (
                                             <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                                           )}
@@ -1339,8 +1339,8 @@ return (
                                       <TableBody>
                                         {proformaInvoice.items.map((item) => (
                                           <TableRow key={item.id}>
-                                            <TableCell className="text-sm font-medium">{item?.item?.name || 'N/A'}</TableCell>
-                                            <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+                                            <TableCell className="text-sm font-medium">{item?.item?.name || ''}</TableCell>
+                                            <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : ''}</TableCell>
                                             <TableCell className="text-sm">{item.quantity}</TableCell>
                                             <TableCell>
                                               {item.images && item.images.length > 0 ? (
@@ -1399,7 +1399,7 @@ return (
                                   return (
                                     <div key={item.id} className="border rounded-lg overflow-hidden">
                                       <div className="bg-muted/30 p-3 border-b">
-                                        <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                                        <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
                                         {item.size && item.size !== "" && (
                                           <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                                         )}
@@ -1422,11 +1422,11 @@ return (
                                                 <TableRow key={material.id}>
                                                   <TableCell className="text-sm">
                                                     <p className="font-medium">
-                                                      {material.material?.name || 'N/A'}
+                                                      {material.material?.name || ''}
                                                     </p>
                                                   </TableCell>
-                                                  <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
-                                                  <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
+                                                  <TableCell className="text-sm">{material.material?.color || ''}</TableCell>
+                                                  <TableCell className="text-sm">{material.material?.size || ''}</TableCell>
                                                   <TableCell className="text-sm">
                                                     <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
                                                   </TableCell>
@@ -1468,7 +1468,7 @@ return (
                                   return (
                                     <div key={item.id} className="border rounded-lg overflow-hidden">
                                       <div className="bg-muted/30 p-3 border-b">
-                                        <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                                        <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
                                         {item.size && item.size !== "" && (
                                           <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                                         )}
@@ -1589,7 +1589,7 @@ return (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Name</p>
-                <p className="font-medium text-sm md:text-base">{project.customer.name || 'N/A'}</p>
+                <p className="font-medium text-sm md:text-base">{project.customer.name || ''}</p>
               </div>
               {project.customer.phone1 && (
                 <div>

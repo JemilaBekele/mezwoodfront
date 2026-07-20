@@ -674,7 +674,7 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  {item.material?.unitOfMeasure?.name || 'N/A'}
+                                  {item.material?.unitOfMeasure?.name || ''}
                                 </TableCell>
                               </TableRow>
                             ))}

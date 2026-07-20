@@ -40,8 +40,8 @@ export const formatProductDataForExcel = (products: IProduct[]) => {
   return products.map((product) => ({
     'Product Code': product.productCode,
     'Product Name': product.name,
-    'Description': product.description || 'N/A',
-    'Category': product.category?.name || 'N/A',
+    'Description': product.description || '',
+    'Category': product.category?.name || '',
     'Status': product.isActive ? 'Active' : 'Inactive',
     'Created Date': new Date(product.createdAt).toLocaleDateString('en-US'),
   }));

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 
 interface StageProjectListingProps {
   projects: IProject[];
+  allProjects?: IProject[]; // Added to have access to all projects for counting
   projectColumns: any;
   stageName: string;
   reload?: () => Promise<void>;
@@ -85,6 +86,7 @@ function categorizeProjects(projects: IProject[], searchQuery: string) {
 
 function StageProjectListing({
   projects,
+  allProjects = [],
   projectColumns,
   stageName,
   reload,
@@ -107,6 +109,17 @@ function StageProjectListing({
   );
 
   const defaultTab = todayProjects.length > 0 ? 'today' : tomorrowProjects.length > 0 ? 'tomorrow' : 'other';
+
+  // Calculate the correct count for "Total Design Finished"
+  const totalDesignFinishedCount = useMemo(() => {
+    // When filter is ON, projects already contains only DESIGN_FINISHED
+    // When filter is OFF, count DESIGN_FINISHED from allProjects
+    if (showDesignFinishedFilter) {
+      return projects.length;
+    } else {
+      return allProjects.filter(p => p.designStatus === 'DESIGN_FINISHED').length;
+    }
+  }, [allProjects, projects, showDesignFinishedFilter]);
 
   const renderProjectTable = (projectsList: IProject[]) => {
     const startIndex = (page - 1) * limit;
@@ -178,7 +191,7 @@ function StageProjectListing({
             <CheckCircle2 className="h-5 w-5 text-green-500" />
             <h3 className="font-medium">Total Design Finished</h3>
           </div>
-          <p className="mt-2 text-2xl font-bold">{projects.length}</p>
+          <p className="mt-2 text-2xl font-bold">{totalDesignFinishedCount}</p>
           <p className="text-xs text-muted-foreground">Projects ready for delivery</p>
         </div>
         <div className="rounded-lg border bg-card p-4 shadow-sm">
@@ -216,7 +229,8 @@ function StageProjectListing({
               ✅ {projects.length} project{projects.length !== 1 ? 's' : ''} have completed design!
             </p>
             <p className="text-xs text-green-700">
-These projects are ready for the final stage. Please review, stock the materials, and mark the projects as finished.            </p>
+              These projects are ready for the final stage. Please review, stock the materials, and mark the projects as finished.
+            </p>
           </div>
         </div>
       )}
@@ -360,6 +374,7 @@ export default function MyDesignProjectListingPage() {
   return (
     <StageProjectListing
       projects={projects}
+      allProjects={allProjects}
       projectColumns={projectColumns}
       stageName="My Design"
       reload={fetchProjects}

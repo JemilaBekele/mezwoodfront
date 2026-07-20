@@ -183,15 +183,15 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
           neededItems.push({
             materialId: material.materialId,
             materialName: material.material?.name || 'Unknown Material',
-            color: material.material?.color || 'N/A',
-            size: material.material?.size || 'N/A',
+            color: material.material?.color || '',
+            size: material.material?.size || '',
             requiredQuantity: totalRequired,
             alreadyIssued: alreadyIssued,
             remainingNeeded: remainingNeeded,
             availableStock: availableStock,
             shortfall: shortfall,
             unit: 'units',
-            itemDescription: material.note || 'N/A'
+            itemDescription: material.note || ''
           });
         }
       } catch (error) {
@@ -949,9 +949,9 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                         <TableBody>
                           {proformaInvoice.items.map((item) => (
                             <TableRow key={item.id}>
-                                                         <TableCell>{item.item?.name || 'N/A'}</TableCell>
+                                                         <TableCell>{item.item?.name || ''}</TableCell>
 
-                              <TableCell>{item.size || 'N/A'}</TableCell>
+                              <TableCell>{item.size || ''}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>
                                 {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
@@ -1025,10 +1025,10 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                     return (
                       <TableRow key={material.id}>
                         <TableCell>
-                          <p className="font-medium">{material.material?.name || 'N/A'}</p>
+                          <p className="font-medium">{material.material?.name || ''}</p>
                         </TableCell>
-                        <TableCell>{material.material?.color || 'N/A'}</TableCell>
-                        <TableCell>{material.material?.size || 'N/A'}</TableCell>
+                        <TableCell>{material.material?.color || ''}</TableCell>
+                        <TableCell>{material.material?.size || ''}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{material.quantity} units</Badge>
                         </TableCell>
@@ -1064,7 +1064,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                     <User className="h-3 w-3 text-blue-500" />
                                     <span className="font-medium">{issue.issuedBy?.name || 'Unknown'}</span>
                                     <span className="text-muted-foreground">→</span>
-                                    <span className="font-medium">{issue.givenTo?.name || 'N/A'}</span>
+                                    <span className="font-medium">{issue.givenTo?.name || ''}</span>
                                   </div>
                                   <div className="flex justify-between items-center mt-1">
                                     <Badge variant="outline" className="text-xs">
@@ -1148,7 +1148,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Name</p>
-                  <p className="font-medium">{project.customer.name || 'N/A'}</p>
+                  <p className="font-medium">{project.customer.name || ''}</p>
                 </div>
                 {project.customer.phone1 && (
                   <div>

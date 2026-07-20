@@ -403,7 +403,7 @@ export default function ProfileViewPage() {
                     </span>
                   </div>
                   <div className="mt-3 text-xs text-blue-100">
-                    User Code: {profile.userCode || 'N/A'}
+                    User Code: {profile.userCode || ''}
                   </div>
                 </div>
               </div>

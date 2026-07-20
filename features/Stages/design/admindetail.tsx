@@ -941,11 +941,11 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
                                     <TableRow key={material.id}>
                                       <TableCell>
                                         <p className="font-medium">
-                                          {material.material?.name || 'N/A'}
+                                          {material.material?.name || ''}
                                         </p>
                                       </TableCell>
-                                      <TableCell>{material.material?.color || 'N/A'}</TableCell>
-                                      <TableCell>{material.material?.size || 'N/A'}</TableCell>
+                                      <TableCell>{material.material?.color || ''}</TableCell>
+                                      <TableCell>{material.material?.size || ''}</TableCell>
                                       <TableCell>
                                         <Badge variant="outline">{material.quantity} units</Badge>
                                       </TableCell>
@@ -1088,7 +1088,7 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Name</p>
-                  <p className="font-medium">{project.customer.name || 'N/A'}</p>
+                  <p className="font-medium">{project.customer.name || ''}</p>
                 </div>
                 {project.customer.phone1 && (
                   <div>

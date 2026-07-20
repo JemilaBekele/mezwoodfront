@@ -522,7 +522,7 @@ const isStageActuallyComplete = useCallback((stage: IProjectStage): boolean => {
         } : null;
         
         toast.info(`Stage: ${task.name}`, {
-          description: `Progress: ${task.progress}% | Work: ${stageWorkProgress ? `${stageWorkProgress.completed}/${stageWorkProgress.total} units` : 'N/A'} | Status: ${stage.status}`,
+          description: `Progress: ${task.progress}% | Work: ${stageWorkProgress ? `${stageWorkProgress.completed}/${stageWorkProgress.total} units` : ''} | Status: ${stage.status}`,
           duration: 3000,
           action: {
             label: 'View Project',
@@ -595,9 +595,9 @@ const isStageActuallyComplete = useCallback((stage: IProjectStage): boolean => {
         'Total Work Units': workProgress.totalWorkUnits,
         'Remaining Work Units': workProgress.remainingWorkUnits,
         'Project Complete': isFinished ? 'Yes' : 'No',
-        'Requested Delivery': project.requestedDelivery || 'N/A',
-        'Calculated Delivery': project.calculatedDelivery || 'N/A',
-        'Manual Delivery': project.manualDelivery || 'N/A',
+        'Requested Delivery': project.requestedDelivery || '',
+        'Calculated Delivery': project.calculatedDelivery || '',
+        'Manual Delivery': project.manualDelivery || '',
         'Total Days': project.totalDays || 0,
         'Total Quantity': project.totalProjectQuantity || 0,
         'Total Stages': project.stages?.length || 0,

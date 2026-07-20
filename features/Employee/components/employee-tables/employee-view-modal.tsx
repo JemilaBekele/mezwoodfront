@@ -58,7 +58,7 @@ export const EmployeeViewModal: React.FC<EmployeeViewModalProps> = ({
                 <Phone className="h-4 w-4 text-gray-500 mt-0.5" />
                 <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Phone</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{data.phone || 'N/A'}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{data.phone || ''}</p>
                 </div>
               </div>
 
@@ -66,7 +66,7 @@ export const EmployeeViewModal: React.FC<EmployeeViewModalProps> = ({
                 <Shield className="h-4 w-4 text-gray-500 mt-0.5" />
                 <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Role</p>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{data.role?.name || 'N/A'}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{data.role?.name || ''}</p>
                 </div>
               </div>
 

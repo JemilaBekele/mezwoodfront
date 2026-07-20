@@ -1224,7 +1224,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                                   }}
                                 />
                                 <span className="text-sm capitalize">
-                                  {material.materialColor || 'N/A'}
+                                  {material.materialColor || ''}
                                 </span>
                               </div>
                             </TableCell>

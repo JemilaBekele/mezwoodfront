@@ -559,7 +559,7 @@ export default function DeliveryEstimationForm({
   };
 // Add this with your other helper functions
 const formatMinutes = (minutes: number): string => {
-  if (!minutes && minutes !== 0) return 'N/A';
+  if (!minutes && minutes !== 0) return '';
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   if (hours === 0) return `${mins} min`;
@@ -1094,7 +1094,7 @@ const watchedCustomerName = form.watch('customerName');
               <Calendar className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">Start:</span>
               <span className="font-medium">
-                {data.startDateTime ? new Date(data.startDateTime).toLocaleString() : 'N/A'}
+                {data.startDateTime ? new Date(data.startDateTime).toLocaleString() : ''}
               </span>
             </div>
             
@@ -1103,7 +1103,7 @@ const watchedCustomerName = form.watch('customerName');
               <Calendar className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">End:</span>
               <span className="font-medium">
-                {data.endDateTime ? new Date(data.endDateTime).toLocaleString() : 'N/A'}
+                {data.endDateTime ? new Date(data.endDateTime).toLocaleString() : ''}
               </span>
             </div>
             

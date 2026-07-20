@@ -158,7 +158,7 @@ const formatNumber = (num: number) => {
 };
 
 const formatDate = (date: Date | null) => {
-  if (!date) return 'N/A';
+  if (!date) return '';
   return new Date(date).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -493,7 +493,7 @@ const FinishedProductsReportDashboard: React.FC = () => {
                         {filteredProducts.map((product) => (
                           <TableRow key={product.productId} >
                             <TableCell className="font-medium">{product.productName}</TableCell>
-                            <TableCell>{product.size || 'N/A'}</TableCell>
+                            <TableCell>{product.size || ''}</TableCell>
                             <TableCell className="font-semibold">{formatNumber(product.productQuantity)}</TableCell>
                             <TableCell>{formatDate(product.finishedDate)}</TableCell>
                             <TableCell className="text-amber-600 font-semibold">{formatNumber(product.plainMDF)}</TableCell>
@@ -606,7 +606,7 @@ const FinishedProductsReportDashboard: React.FC = () => {
                   </TableCell>
 
                   <TableCell className="text-muted-foreground">
-                    {product.size || 'N/A'}
+                    {product.size || ''}
                   </TableCell>
 
                   <TableCell className="text-foreground">

@@ -1221,7 +1221,7 @@ const formatDescription = (text: string, limit = 80) => {
                         <div key={item.id} className="border rounded-lg p-3">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm">{item?.item?.name || 'N/A'}</h4>
+                              <h4 className="font-semibold text-sm">{item?.item?.name || ''}</h4>
                               {item.size && item.size !== "" && (
                                 <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                               )}
@@ -1292,8 +1292,8 @@ const formatDescription = (text: string, limit = 80) => {
                           <TableBody>
                             {proformaInvoice.items.map((item) => (
                               <TableRow key={item.id}>
-                                <TableCell className="text-sm font-medium">{item?.item?.name || 'N/A'}</TableCell>
-                                <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : 'N/A'}</TableCell>
+                                <TableCell className="text-sm font-medium">{item?.item?.name || ''}</TableCell>
+                                <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : ''}</TableCell>
                                 <TableCell className="text-sm">{item.quantity}</TableCell>
                                 <TableCell>
                                   {item.images && item.images.length > 0 ? (
@@ -1352,7 +1352,7 @@ const formatDescription = (text: string, limit = 80) => {
                       return (
                         <div key={item.id} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
                             {item.size && item.size !== "" && (
                               <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                             )}
@@ -1375,11 +1375,11 @@ const formatDescription = (text: string, limit = 80) => {
                                     <TableRow key={material.id}>
                                       <TableCell className="text-sm">
                                         <p className="font-medium">
-                                          {material.material?.name || 'N/A'}
+                                          {material.material?.name || ''}
                                         </p>
                                       </TableCell>
-                                      <TableCell className="text-sm">{material.material?.color || 'N/A'}</TableCell>
-                                      <TableCell className="text-sm">{material.material?.size || 'N/A'}</TableCell>
+                                      <TableCell className="text-sm">{material.material?.color || ''}</TableCell>
+                                      <TableCell className="text-sm">{material.material?.size || ''}</TableCell>
                                       <TableCell className="text-sm">
                                         <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
                                       </TableCell>
@@ -1421,7 +1421,7 @@ const formatDescription = (text: string, limit = 80) => {
                       return (
                         <div key={item.id} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || 'N/A'}</h4>
+                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
                             {item.size && item.size !== "" && (
                               <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                             )}
@@ -1533,7 +1533,7 @@ const formatDescription = (text: string, limit = 80) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Name</p>
-                <p className="font-medium text-sm md:text-base">{project.customer.name || 'N/A'}</p>
+                <p className="font-medium text-sm md:text-base">{project.customer.name || ''}</p>
               </div>
               {project.customer.phone1 && (
                 <div>
