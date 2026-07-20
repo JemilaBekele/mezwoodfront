@@ -95,6 +95,7 @@ export const PERMISSIONS = {
     },
     DELETE: { name: 'DELETE_COMPANY' },
   },
+  
   SUPPLIER: {
     CREATE: {
       name: 'CREATE_SUPPLIER',

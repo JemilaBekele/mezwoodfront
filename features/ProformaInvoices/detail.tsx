@@ -745,6 +745,7 @@ const formatCurrency = (amount: number | undefined | null) => {
             </Button>
           )}          </PermissionGuard>
 
+                      <PermissionGuard requiredPermission={PERMISSIONS.DELIVERY_ESTIMATION.CREATE.name}>
 
                 <Button 
               variant="default" 
@@ -755,6 +756,7 @@ const formatCurrency = (amount: number | undefined | null) => {
               <ArrowRight className="mr-2 h-4 w-4" />
               Create Delivery Estimation
             </Button>
+            </PermissionGuard>
 
         </div>
       </div>

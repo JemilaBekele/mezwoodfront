@@ -937,7 +937,7 @@ const materialOptions: SelectOption[] = useMemo(
         toast.success('Proforma Invoice created successfully');
       }
       
-      router.push('/dashboard/ProformaInvoice');
+      router.push('/dashboard/ProformaInvoice/my');
       router.refresh();
     } catch (error: any) {
       toast.error(error?.message || 'Error saving proforma invoice');

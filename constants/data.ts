@@ -26,7 +26,7 @@ export const navItems: NavItem[] = [
     title: 'Report',
     url: '/dashboard/CombinedReportDashboard',
     icon: 'fileText',
-    permission: 'VIEW_COMPANY',
+    permission: 'VIEW_REPORT',
     items: [
       {
         title: 'Combined Report',
@@ -68,10 +68,17 @@ export const navItems: NavItem[] = [
 
   {
     title: 'Projects',
-    url: '/dashboard/',
+    url: '#',
     icon: 'folderKanban',
     permission: 'VIEW_PROJECT_DASHBOARD',
     items: [
+       {
+        title: 'MY Proforma Invoice',
+        url: '/dashboard/ProformaInvoice/my',
+        icon: 'fileText',
+        shortcut: ['ps', 'ps'],
+        permission: 'VIEW_PROFORMA'
+      },
       {
         title: 'Proforma Invoice',
         url: '/dashboard/ProformaInvoice',
@@ -79,13 +86,7 @@ export const navItems: NavItem[] = [
         shortcut: ['ps', 'ps'],
         permission: 'VIEW_ALL_PROFORMA'
       },
-        {
-        title: 'MY Proforma Invoice',
-        url: '/dashboard/ProformaInvoice/my',
-        icon: 'fileText',
-        shortcut: ['ps', 'ps'],
-        permission: 'VIEW_PROFORMA'
-      },
+      
       {
         title: 'Project',
         url: '/dashboard/Project',
