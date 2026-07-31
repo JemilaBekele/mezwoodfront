@@ -1162,7 +1162,7 @@ const formatCurrency = (amount: number | undefined | null) => {
                       
                       return (
                         <TableRow key={item.id || index}>
-                                                  <TableCell>{item.item?.name || ''}</TableCell>
+                                                  <TableCell>{item.item?.name || item.category?.name || '' }</TableCell>
 
                           <TableCell>{item.size || ''}</TableCell>
                           <TableCell>{item.quantity}</TableCell>

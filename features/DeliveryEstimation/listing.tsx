@@ -1,59 +1,113 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { searchParamsCache } from '@/lib/searchparams';
-import { deliveryEstimationColumns } from './tables/columns';
-import { DataTable } from '@/components/ui/table/data-table';
-import { getAllDeliveryEstimations } from '@/service/delivery-estimation';
+
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { DataTable } from "@/components/ui/table/data-table";
+import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
+import { useTableQueryParams } from "@/hooks/use-table-query-params";
+
+import type { IDeliveryEstimation } from "@/models/delivery-estimation";
+import { getAllDeliveryEstimations } from "@/service/delivery-estimation";
+
+import { deliveryEstimationColumns } from "./tables/columns";
 
 type DeliveryEstimationsListingPageProps = object;
 
-export default async function DeliveryEstimationsListingPage(
-  {}: DeliveryEstimationsListingPageProps
+export default function DeliveryEstimationsListingPage(
+  {}: DeliveryEstimationsListingPageProps,
 ) {
-  // ────────────────────────────────────────────────────────────────
-  // Query-string inputs
-  // ────────────────────────────────────────────────────────────────
-  const page = Number(searchParamsCache.get('page') || 1);
-  const search = String(searchParamsCache.get('q') || '');
-  const limit = Number(searchParamsCache.get('limit') || 10);
+  const { page, search, limit } = useTableQueryParams();
 
-  try {
-    // Fetch data from API
-    const { estimations, totalCount } =
-      await getAllDeliveryEstimations({ page, limit });
+  const [estimations, setEstimations] = useState<IDeliveryEstimation[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
-    // ────────────────────────────────────────────────────────────────
-    // Client-side search filter (customer name / phone)
-    // ────────────────────────────────────────────────────────────────
-    const filteredData = estimations.filter((item) =>
-      [
-        item.customerName,
-        item.phone
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    // ────────────────────────────────────────────────────────────────
-    // Client-side pagination
-    // ────────────────────────────────────────────────────────────────
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedData = filteredData.slice(startIndex, endIndex);
+  useEffect(() => {
+    let cancelled = false;
 
+    const loadDeliveryEstimations = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await getAllDeliveryEstimations({
+          page,
+          limit,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setEstimations(response.estimations || []);
+        setTotalCount(response.totalCount || 0);
+      } catch (error) {
+        console.error("Error loading delivery estimations:", error);
+
+        if (!cancelled) {
+          setError(
+            "Error loading delivery estimations. Please try again later.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDeliveryEstimations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, limit]);
+
+  if (loading) {
     return (
-      // eslint-disable-next-line react-hooks/error-boundaries
-      <DataTable
-        data={paginatedData}
-        totalItems={totalCount}
-        columns={deliveryEstimationColumns}
+      <DataTableSkeleton
+        columnCount={5}
+        rowCount={8}
+        filterCount={2}
       />
     );
-  } catch {
+  }
+
+  if (error) {
     return (
-      <div className='p-4 text-red-500'>
-        Error loading delivery estimations. Please try again later.
+      <div className="p-4 text-red-500">
+        {error}
       </div>
     );
   }
+
+  const filteredData = estimations.filter((item) =>
+    [
+      item.customerName,
+      item.phone,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+
+  const paginatedData = filteredData.slice(
+    startIndex,
+    endIndex,
+  );
+
+  return (
+    <DataTable
+      data={paginatedData}
+      totalItems={totalCount}
+      columns={deliveryEstimationColumns}
+    />
+  );
 }
+

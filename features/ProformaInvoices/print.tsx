@@ -201,7 +201,7 @@ export const ProformaInvoicePrinter: React.FC<PDFGeneratorProps> = ({
 
       // --- AUTO-TABLE SPECIFICATION ---
       const tableData = itemsWithImages.map((item, index) => {
-        const baseDescription = item.description || item.size || 'No description provided';
+        const baseDescription = item.description ||  '';
         // Append 8 newlines when an image exists so autoTable natively reserves ~36mm of space
         const descriptionWithSpace = item.loadedImage 
           ? `${baseDescription}\n\n\n\n\n\n\n\n` 
@@ -209,7 +209,7 @@ export const ProformaInvoicePrinter: React.FC<PDFGeneratorProps> = ({
 
         return [
           (index + 1).toString(),
-          (item.item?.name || 'ITEM').toUpperCase(),
+              (item.item?.name || item.category?.name || '').toUpperCase(),
           descriptionWithSpace,
           formatCurrency(item.unitPrice),
           item.quantity.toString(),

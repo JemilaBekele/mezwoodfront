@@ -26,7 +26,6 @@ import { getCustomer } from '@/service/customer';
 import { getMaterials } from '@/service/material';
 import { getAllItemsimple } from '@/service/item';
 import { normalizeImagePath } from '@/lib/norm';
-import MaterialModal from '../material/modal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { getCategories, getSizes, getTypes } from '@/service/productConfiguration';
@@ -71,8 +70,27 @@ interface ImageFileWithPreview {
   preview: string;
   isExisting: boolean;
   existingUrl?: string;
-  id?: string; // For existing images that have an ID
+  id?: string;
 }
+
+// Helper function to safely extract string from possible object
+const safeString = (value: any): string => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    // If it has a 'name' property, use that
+    if (value.name && typeof value.name === 'string') return value.name;
+    // If it has a 'id' property, use that as fallback
+    if (value.id && typeof value.id === 'string') return value.id;
+    // Otherwise convert to string or return empty
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '';
+    }
+  }
+  return String(value);
+};
 
 export default function ProformaInvoiceForm({
   initialData,
@@ -89,15 +107,20 @@ export default function ProformaInvoiceForm({
   const [priceAutoFilled, setPriceAutoFilled] = useState<Map<number, boolean>>(new Map());
   const [isStore, setIsStore] = useState<boolean>(initialData?.store || false);
   const [selectedItemIds, setSelectedItemIds] = useState<Map<number, string>>(new Map());
+  // Track which items have auto-filled size (to disable manual size input)
+  const [sizeAutoFilled, setSizeAutoFilled] = useState<Map<number, boolean>>(new Map());
 
-  // Hierarchical data states - use objects/maps for per-row filtering
+  // Hierarchical data states
   const [categories, setCategories] = useState<IProductCategory[]>([]);
   const [sizes, setSizes] = useState<ISize[]>([]);
   const [types, setTypes] = useState<IProductType[]>([]);
-  const [filteredSizes, setFilteredSizes] = useState<Map<number, ISize[]>>(new Map());
-  const [filteredTypes, setFilteredTypes] = useState<Map<number, IProductType[]>>(new Map());
   const [filteredItems, setFilteredItems] = useState<Map<number, any[]>>(new Map());
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+
+
+  const [selectedMaterialImage, setSelectedMaterialImage] = useState<string | null>(null);
+const [showMaterialImageModal, setShowMaterialImageModal] = useState(false);
+const [materialImageMap, setMaterialImageMap] = useState<Map<string, string>>(new Map());
 
   // Track hierarchical selection per item row
   const [hierarchicalSelections, setHierarchicalSelections] = useState<Map<number, HierarchicalSelection>>(new Map());
@@ -112,23 +135,38 @@ export default function ProformaInvoiceForm({
       total: initialData?.total || 0,
       amountDate: initialData?.amountDate || new Date(),
       store: initialData?.store || false,
-      items: initialData?.items?.map((item) => ({
-        ...item,
-        itemId: item.itemId || '',
-        size: item.size || '',
-        additionalDescription: item.additionalDescription || '',
-        materials: item.proformaItemMaterials?.map((material) => ({
-          ...material,
-          materialId: material.materialId,
-          quantity: material.quantity,
-          note: material.note || '',
-        })) || [],
-        images: item.images || []
-      })) || [
+      items: initialData?.items?.map((item) => {
+        // Safely extract description and size as strings
+        const description = safeString(item.description);
+        const size = safeString(item.size);
+        
+        return {
+          id: item.id || '',
+          invoiceId: item.invoiceId || '',
+          itemId: item.itemId || '',
+                    categoryId: item.categoryId || '',
+          description: description,
+          size: size,
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          amount: item.amount || 0,
+          additionalDescription: item.additionalDescription || '',
+          materials: item.proformaItemMaterials?.map((material) => ({
+            ...material,
+            id: material.id || '',
+            itemId: material.itemId || '',
+            materialId: material.materialId || '',
+            quantity: material.quantity || 1,
+            note: material.note || '',
+          })) || [],
+          images: item.images || []
+        };
+      }) || [
         {
           id: '',
           invoiceId: '',
           itemId: '',
+          categoryId: '',
           description: '',
           size: '',
           quantity: 1,
@@ -144,70 +182,153 @@ export default function ProformaInvoiceForm({
     [initialData]
   );
 
-  const form = useForm<ProformaInvoiceFormValues>({
-    defaultValues
-  });
+// Update the resolver to validate materials
+const form = useForm<ProformaInvoiceFormValues>({
+  defaultValues,
+  mode: 'onChange',
+  resolver: async (data) => {
+    const errors: any = {};
+    
+    // Validate each item
+    if (data.items && data.items.length > 0) {
+      data.items.forEach((item, index) => {
+        // Get the categoryId from hierarchical selections
+        const selection = hierarchicalSelections.get(index);
+        const categoryId = selection?.categoryId || '';
+        
+        // Category is mandatory
+        if (!categoryId || categoryId === '') {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            categoryId: {
+              type: 'required',
+              message: 'Category is required'
+            }
+          };
+        }
+        
+        // Description is required
+        if (!item.description || item.description.trim() === '') {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            description: {
+              type: 'required',
+              message: 'Description is required'
+            }
+          };
+        }
+        
+        // Unit Price is required (must be > 0)
+        if (!item.unitPrice || item.unitPrice <= 0) {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            unitPrice: {
+              type: 'required',
+              message: 'Unit price must be greater than 0'
+            }
+          };
+        }
+        
+        // ✅ At least one material is required
+        const materials = item.materials || [];
+        const hasValidMaterial = materials.some(m => m.materialId && m.materialId !== '');
+        
+        if (!hasValidMaterial) {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            materials: {
+              type: 'required',
+              message: 'At least one material is required'
+            }
+          };
+        }
+      });
+    }
+    
+    return {
+      values: data,
+      errors: errors
+    };
+  }
+});
 
   const { fields: itemFields, append: appendItem, remove: removeItem } = useFieldArray({
     control: form.control,
     name: 'items'
   });
-
-  // ✅ NEW: Initialize item images from initial data
-  // ✅ NEW: Initialize item images from initial data
-useEffect(() => {
-  if (initialData?.items && initialData.items.length > 0) {
-    const newItemImages = new Map<number, ImageFileWithPreview[]>();
-    
-    initialData.items.forEach((item, index) => {
-      if (item.images && item.images.length > 0) {
-        const imagePreviews = item.images
-          .map((img: any) => {
-            // Use the normalizeImagePath helper to get the full URL
-            const normalizedUrl = normalizeImagePath(img.imageUrl);
-            
-            // ✅ Skip images that don't have a valid URL
-            if (!normalizedUrl) {
-              return null;
-            }
-            
-            return {
-              preview: normalizedUrl, // ✅ Now guaranteed to be a string
-              isExisting: true,
-              existingUrl: img.imageUrl, // Store the original path
-              id: img.id // Store the image ID if available
-            } as ImageFileWithPreview;
-          })
-          .filter((img): img is ImageFileWithPreview => img !== null); // ✅ Filter out null values
-        
-        if (imagePreviews.length > 0) {
-          newItemImages.set(index, imagePreviews);
-        }
-      }
-    });
-    
-    setItemImages(newItemImages);
+const getMaterialImage = useCallback(async (materialId: string) => {
+  if (!materialId) return;
+  
+  // Check if we already have the image in cache
+  if (materialImageMap.has(materialId)) {
+    return;
   }
-}, [initialData]);
+  
+  try {
+    const material = materials.find(m => m.id === materialId);
+    if (material?.imageUrl) {
+      const normalizedUrl = normalizeImagePath(material.imageUrl);
+      if (normalizedUrl) {
+        setMaterialImageMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(materialId, normalizedUrl);
+          return newMap;
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load material image:', error);
+  }
+}, [materials, materialImageMap]);
+  // Initialize item images from initial data
+  useEffect(() => {
+    if (initialData?.items && initialData.items.length > 0) {
+      const newItemImages = new Map<number, ImageFileWithPreview[]>();
+      
+      initialData.items.forEach((item, index) => {
+        if (item.images && item.images.length > 0) {
+          const imagePreviews = item.images
+            .map((img: any) => {
+              const normalizedUrl = normalizeImagePath(img.imageUrl);
+              if (!normalizedUrl) {
+                return null;
+              }
+              return {
+                preview: normalizedUrl,
+                isExisting: true,
+                existingUrl: img.imageUrl,
+                id: img.id
+              } as ImageFileWithPreview;
+            })
+            .filter((img): img is ImageFileWithPreview => img !== null);
+          
+          if (imagePreviews.length > 0) {
+            newItemImages.set(index, imagePreviews);
+          }
+        }
+      });
+      
+      setItemImages(newItemImages);
+    }
+  }, [initialData]);
 
   // Initialize hierarchical selections from existing items when editing
   useEffect(() => {
-    // Only run when we have initialData with items AND the items list is loaded
     if (initialData?.items && initialData.items.length > 0 && items.length > 0) {
       const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
       
       initialData.items.forEach((item, index) => {
-        // The item data is nested in the 'item' property from the backend
-        // Or we can find it in the items list by itemId
-        let fullItem = item.item; // Direct from backend
+        let fullItem = item.item;
         
-        // If not found directly, try to find by itemId in the items list
         if (!fullItem && item.itemId) {
           fullItem = items.find(i => i.id === item.itemId);
         }
         
         if (fullItem) {
-          // Set the hierarchical selection with the item's data
           newHierarchicalSelections.set(index, {
             categoryId: fullItem.categoryId || '',
             sizeId: fullItem.sizeId || '',
@@ -215,14 +336,12 @@ useEffect(() => {
             selectedItem: fullItem
           });
           
-          // Set the selected item ID
           setSelectedItemIds(prev => {
             const newMap = new Map(prev);
             newMap.set(index, fullItem.id);
             return newMap;
           });
           
-          // Auto-fill price if available
           if (fullItem.price && fullItem.price > 0) {
             setPriceAutoFilled(prev => {
               const newMap = new Map(prev);
@@ -230,10 +349,17 @@ useEffect(() => {
               return newMap;
             });
           }
-          
-          // Ensure materials are set from the item's materials if not already set
-          const currentMaterials = form.getValues(`items.${index}.materials`);
 
+          // Track if size was auto-filled
+          if (fullItem.size) {
+            setSizeAutoFilled(prev => {
+              const newMap = new Map(prev);
+              newMap.set(index, true);
+              return newMap;
+            });
+          }
+          
+          const currentMaterials = form.getValues(`items.${index}.materials`);
           if (!currentMaterials?.length) {
             const materialsList = Array.isArray(fullItem.itemMaterials)
               ? fullItem.itemMaterials.map((im: any) => ({
@@ -257,7 +383,7 @@ useEffect(() => {
     }
   }, [initialData, items, form]);
 
-  // Fetch customers, materials, items, categories, sizes, types on component mount
+  // Fetch data on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -321,98 +447,60 @@ useEffect(() => {
   );
 
   // Material options
-const materialOptions: SelectOption[] = useMemo(
-  () => [
-    { value: '', label: 'Select a material' },
-    ...materials.map((material) => {
-      const details: string[] = [];
+  const materialOptions: SelectOption[] = useMemo(
+    () => [
+      { value: '', label: 'Select a material' },
+      ...materials.map((material) => {
+        const details: string[] = [];
 
-      if (material.color?.trim()) {
-        details.push(material.color);
-      }
-
-      if (material.size?.trim()) {
-        details.push(material.size);
-      }
-
-      // Material type
-      if (material.plainMDF) {
-        details.push('Plain MDF');
-      } else if (material.laminatedMDF) {
-        details.push('Laminated MDF');
-      } else if (material.wood) {
-        details.push('Wood');
-      } else if (material.metal) {
-        details.push('Metal');
-      } else if (material.accessory) {
-        details.push('Accessory');
-      } else if (material.other) {
-        details.push('Other');
-      }
-
-      return {
-        value: material.id,
-        label: details.length
-          ? `${material.name} (${details.join(' - ')})`
-          : material.name,
-      };
-    }),
-  ],
-  [materials]
-);
-
-  // Filter sizes based on selected category
-  useEffect(() => {
-    if (sizes.length > 0) {
-      const newFilteredSizes = new Map<number, ISize[]>();
-      hierarchicalSelections.forEach((selection, itemIndex) => {
-        if (selection.categoryId) {
-          const filtered = sizes.filter(size => size.categoryId === selection.categoryId);
-          newFilteredSizes.set(itemIndex, filtered);
-        } else {
-          newFilteredSizes.set(itemIndex, []);
+        if (material.color?.trim()) {
+          details.push(material.color);
         }
-      });
-      setFilteredSizes(newFilteredSizes);
-    }
-  }, [sizes, hierarchicalSelections]);
 
-  // Filter types based on selected size
-  useEffect(() => {
-    if (types.length > 0) {
-      const newFilteredTypes = new Map<number, IProductType[]>();
-      hierarchicalSelections.forEach((selection, itemIndex) => {
-        if (selection.sizeId) {
-          const filtered = types.filter(type => type.sizeId === selection.sizeId);
-          newFilteredTypes.set(itemIndex, filtered);
-        } else {
-          newFilteredTypes.set(itemIndex, []);
+        if (material.size?.trim()) {
+          details.push(material.size);
         }
-      });
-      setFilteredTypes(newFilteredTypes);
-    }
-  }, [types, hierarchicalSelections]);
 
-  // Filter items based on selected category, size, AND type
+        if (material.plainMDF) {
+          details.push('Plain MDF');
+        } else if (material.laminatedMDF) {
+          details.push('Laminated MDF');
+        } else if (material.wood) {
+          details.push('Wood');
+        } else if (material.metal) {
+          details.push('Metal');
+        } else if (material.accessory) {
+          details.push('Accessory');
+        } else if (material.other) {
+          details.push('Other');
+        }
+
+        return {
+          value: material.id,
+          label: details.length
+            ? `${material.name} (${details.join(' - ')})`
+            : material.name,
+        };
+      }),
+    ],
+    [materials]
+  );
+
+  // Filter items based on selected category, size, and type
   useEffect(() => {
     if (items.length > 0) {
       const newFilteredItems = new Map<number, any[]>();
       hierarchicalSelections.forEach((selection, itemIndex) => {
         const { categoryId, sizeId, typeId } = selection;
         
-        // Only filter if we have at least category selected
         if (categoryId) {
           let filtered = items;
-          
-          // Filter by category (items have categoryId)
           filtered = filtered.filter(item => item.categoryId === categoryId);
           
-          // Filter by size if selected
           if (sizeId) {
             filtered = filtered.filter(item => item.sizeId === sizeId);
           }
           
-          // Filter by type if selected
           if (typeId) {
             filtered = filtered.filter(item => item.typeId === typeId);
           }
@@ -430,7 +518,6 @@ const materialOptions: SelectOption[] = useMemo(
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
 
-    // Update hierarchical selection
     setHierarchicalSelections(prev => {
       const newMap = new Map(prev);
       const existing = newMap.get(itemIndex) || {
@@ -455,15 +542,19 @@ const materialOptions: SelectOption[] = useMemo(
     form.setValue(`items.${itemIndex}.size`, '');
     form.setValue(`items.${itemIndex}.itemId`, '');
     
-    // Clear selected item ID
     setSelectedItemIds(prev => {
       const newMap = new Map(prev);
       newMap.delete(itemIndex);
       return newMap;
     });
     
-    // Clear price auto-filled flag
     setPriceAutoFilled(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(itemIndex);
+      return newMap;
+    });
+
+    setSizeAutoFilled(prev => {
       const newMap = new Map(prev);
       newMap.delete(itemIndex);
       return newMap;
@@ -471,10 +562,15 @@ const materialOptions: SelectOption[] = useMemo(
   };
 
   const handleSizeChange = (itemIndex: number, sizeId: string) => {
+    // If size is auto-filled from an item, don't allow changing it via dropdown
+    if (sizeAutoFilled.get(itemIndex)) {
+      toast.info('Size is auto-filled from selected item. Clear the item to change size.');
+      return;
+    }
+
     const size = sizes.find(s => s.id === sizeId);
     if (!size) return;
 
-    // Update hierarchical selection
     setHierarchicalSelections(prev => {
       const newMap = new Map(prev);
       const existing = newMap.get(itemIndex) || {
@@ -500,15 +596,20 @@ const materialOptions: SelectOption[] = useMemo(
     form.setValue(`items.${itemIndex}.unitPrice`, 0);
     form.setValue(`items.${itemIndex}.itemId`, '');
     
-    // Clear selected item ID
     setSelectedItemIds(prev => {
       const newMap = new Map(prev);
       newMap.delete(itemIndex);
       return newMap;
     });
     
-    // Clear price auto-filled flag
     setPriceAutoFilled(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(itemIndex);
+      return newMap;
+    });
+
+    // Size is manually selected from dropdown, not auto-filled
+    setSizeAutoFilled(prev => {
       const newMap = new Map(prev);
       newMap.delete(itemIndex);
       return newMap;
@@ -519,7 +620,6 @@ const materialOptions: SelectOption[] = useMemo(
     const type = types.find(t => t.id === typeId);
     if (!type) return;
 
-    // Update hierarchical selection
     setHierarchicalSelections(prev => {
       const newMap = new Map(prev);
       const existing = newMap.get(itemIndex) || {
@@ -541,14 +641,12 @@ const materialOptions: SelectOption[] = useMemo(
     form.setValue(`items.${itemIndex}.unitPrice`, 0);
     form.setValue(`items.${itemIndex}.itemId`, '');
     
-    // Clear selected item ID
     setSelectedItemIds(prev => {
       const newMap = new Map(prev);
       newMap.delete(itemIndex);
       return newMap;
     });
     
-    // Clear price auto-filled flag
     setPriceAutoFilled(prev => {
       const newMap = new Map(prev);
       newMap.delete(itemIndex);
@@ -575,7 +673,6 @@ const materialOptions: SelectOption[] = useMemo(
       return;
     }
 
-    // Update hierarchical selection
     setHierarchicalSelections(prev => {
       const newMap = new Map(prev);
       const existing = newMap.get(itemIndex) || {
@@ -598,7 +695,22 @@ const materialOptions: SelectOption[] = useMemo(
     });
     
     form.setValue(`items.${itemIndex}.itemId`, selectedItem.id);
-    form.setValue(`items.${itemIndex}.description`, selectedItem.name);
+    // ✅ FIX: Ensure description is a string
+    const itemName = safeString(selectedItem.name);
+    form.setValue(`items.${itemIndex}.description`, itemName);
+    
+    // Auto-fill size from item - mark as auto-filled
+    if (selectedItem.size) {
+      const sizeValue = safeString(selectedItem.size);
+      form.setValue(`items.${itemIndex}.size`, sizeValue);
+      // Mark as auto-filled to disable manual editing
+      setSizeAutoFilled(prev => {
+        const newMap = new Map(prev);
+        newMap.set(itemIndex, true);
+        return newMap;
+      });
+      toast.success(`Size "${sizeValue}" auto-filled from item`);
+    }
     
     // Auto-fill price
     if (selectedItem.price && selectedItem.price > 0) {
@@ -711,9 +823,6 @@ const materialOptions: SelectOption[] = useMemo(
       
       return newMap;
     });
-    
-    // Note: If this is an existing image, the backend will need to handle deletion
-    // You might want to track deleted image IDs separately
   };
 
   const removeAttachment = (index: number) => {
@@ -775,7 +884,6 @@ const materialOptions: SelectOption[] = useMemo(
       images: [],
     });
     
-    // Initialize hierarchical selection for the new item
     setHierarchicalSelections(prev => {
       const newMap = new Map(prev);
       newMap.set(newIndex, {
@@ -818,25 +926,39 @@ const materialOptions: SelectOption[] = useMemo(
     }
   };
 
-  const updateMaterialInItem = (
-    itemIndex: number, 
-    materialIndex: number, 
-    field: keyof IProformaItemMaterial, 
-    value: any
-  ) => {
-    const currentItems = form.getValues('items');
-    const item = currentItems[itemIndex];
+const updateMaterialInItem = (
+  itemIndex: number, 
+  materialIndex: number, 
+  field: keyof IProformaItemMaterial, 
+  value: any
+) => {
+  const currentItems = form.getValues('items');
+  const item = currentItems[itemIndex];
+  
+  if (item && item.materials) {
+    const updatedMaterials = [...item.materials];
+    updatedMaterials[materialIndex] = {
+      ...updatedMaterials[materialIndex],
+      [field]: value
+    };
     
-    if (item && item.materials) {
-      const updatedMaterials = [...item.materials];
-      updatedMaterials[materialIndex] = {
-        ...updatedMaterials[materialIndex],
-        [field]: value
-      };
-      
-      form.setValue(`items.${itemIndex}.materials`, updatedMaterials);
+    form.setValue(`items.${itemIndex}.materials`, updatedMaterials);
+    
+    // If materialId is being set, fetch the image
+    if (field === 'materialId' && value) {
+      getMaterialImage(value);
     }
-  };
+  }
+};
+
+// Add this function to handle material image click
+const handleMaterialImageClick = (imageUrl: string | null) => {
+  if (imageUrl) {
+    setSelectedMaterialImage(imageUrl);
+    setShowMaterialImageModal(true);
+  }
+};
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -845,106 +967,112 @@ const materialOptions: SelectOption[] = useMemo(
     }).format(amount);
   };
 
-  const onSubmit = async (data: ProformaInvoiceFormValues) => {
-    if (!initialData?.id) {
-      const confirmed = window.confirm(
-        "Are you sure you want to create this Proforma Invoice?"
-      );
+// Update the onSubmit function to include categoryId in itemsWithData
+// Complete onSubmit function
+const onSubmit = async (data: ProformaInvoiceFormValues) => {
+  if (!initialData?.id) {
+    const confirmed = window.confirm(
+      "Are you sure you want to create this Proforma Invoice?"
+    );
 
-      if (!confirmed) {
-        return;
-      }
+    if (!confirmed) {
+      return;
     }
-    
-    try {
-      setIsLoading(true);
+  }
+  
+  try {
+    setIsLoading(true);
 
-      const formData = new FormData();
-      
-      // Add store field
-      formData.append('store', isStore.toString());
-      
-      Object.entries(data).forEach(([key, value]) => {
-        if (key !== 'items' && key !== 'attachments' && key !== 'store') {
-          if (value !== undefined && value !== null) {
-            if (value instanceof Date) {
-              formData.append(key, value.toISOString());
-            } else {
-              formData.append(key, value.toString());
-            }
+    const formData = new FormData();
+    
+    formData.append('store', isStore.toString());
+    
+    Object.entries(data).forEach(([key, value]) => {
+      if (key !== 'items' && key !== 'attachments' && key !== 'store') {
+        if (value !== undefined && value !== null) {
+          if (value instanceof Date) {
+            formData.append(key, value.toISOString());
+          } else {
+            formData.append(key, value.toString());
           }
         }
-      });
-
-      // Prepare items with materials, images, AND itemId
-      const itemsWithData = data.items.map((item, index) => {
-        const itemImagesData = itemImages.get(index) || [];
-        const selectedItemId = selectedItemIds.get(index);
-        
-        // Separate existing images and new uploads
-        const existingImages = itemImagesData
-          .filter(img => img.isExisting && img.existingUrl)
-          .map(img => ({
-            id: img.id || '', // Keep the image ID if it exists
-            itemId: item.id || '',
-            imageUrl: img.existingUrl!,
-            createdAt: new Date().toISOString()
-          }));
-        
-        // For new images, use placeholder - backend will handle the actual upload
-        const newImages = itemImagesData
-          .filter(img => !img.isExisting && img.file)
-          .map(img => ({
-            id: '',
-            itemId: item.id || '',
-            imageUrl: img.file!.name, // Placeholder, backend will use actual file
-            createdAt: new Date().toISOString()
-          }));
-        
-        return {
-          ...item,
-          itemId: selectedItemId || item.itemId || '', // Include the itemId for backend
-          itemIndex: index,
-          materials: item.materials?.map(material => ({
-            materialId: material.materialId,
-            quantity: material.quantity,
-            note: material.note || ''
-          })) || [],
-          images: [...existingImages, ...newImages]
-        };
-      });
-
-      formData.append('items', JSON.stringify(itemsWithData));
-
-      // Append new image files with proper field naming
-      itemImages.forEach((images, itemIndex) => {
-        images.forEach((img, imgIndex) => {
-          if (!img.isExisting && img.file) {
-            formData.append(`items[${itemIndex}].images[${imgIndex}]`, img.file);
-          }
-        });
-      });
-
-      attachments.forEach((file) => {
-        formData.append('attachments', file);
-      });
-
-      if (initialData?.id) {
-        await updateProformaInvoice(initialData.id, formData);
-        toast.success('Proforma Invoice updated successfully');
-      } else {
-        await createProformaInvoice(formData);
-        toast.success('Proforma Invoice created successfully');
       }
+    });
+
+    const itemsWithData = data.items.map((item, index) => {
+      const itemImagesData = itemImages.get(index) || [];
+      const selectedItemId = selectedItemIds.get(index);
+      const selection = hierarchicalSelections.get(index);
       
-      router.push('/dashboard/ProformaInvoice/my');
-      router.refresh();
-    } catch (error: any) {
-      toast.error(error?.message || 'Error saving proforma invoice');
-    } finally {
-      setIsLoading(false);
+      // Get categoryId from hierarchical selection
+      const categoryId = selection?.categoryId || '';
+      
+      const existingImages = itemImagesData
+        .filter(img => img.isExisting && img.existingUrl)
+        .map(img => ({
+          id: img.id || '',
+          itemId: item.id || '',
+          imageUrl: img.existingUrl!,
+          createdAt: new Date().toISOString()
+        }));
+      
+      const newImages = itemImagesData
+        .filter(img => !img.isExisting && img.file)
+        .map(img => ({
+          id: '',
+          itemId: item.id || '',
+          imageUrl: img.file!.name,
+          createdAt: new Date().toISOString()
+        }));
+      
+      return {
+        ...item,
+        itemId: selectedItemId || item.itemId || '',
+        categoryId: categoryId, // ✅ Pass categoryId to backend
+        itemIndex: index,
+        materials: item.materials?.map(material => ({
+          materialId: material.materialId,
+          quantity: material.quantity,
+          note: material.note || ''
+        })) || [],
+        images: [...existingImages, ...newImages]
+      };
+    });
+
+    formData.append('items', JSON.stringify(itemsWithData));
+
+    // ✅ Add images to form data
+    itemImages.forEach((images, itemIndex) => {
+      images.forEach((img, imgIndex) => {
+        if (!img.isExisting && img.file) {
+          formData.append(`items[${itemIndex}].images[${imgIndex}]`, img.file);
+        }
+      });
+    });
+
+    // ✅ Add attachments to form data
+    attachments.forEach((file) => {
+      formData.append('attachments', file);
+    });
+
+    // ✅ Send to backend
+    if (initialData?.id) {
+      await updateProformaInvoice(initialData.id, formData);
+      toast.success('Proforma Invoice updated successfully');
+    } else {
+      await createProformaInvoice(formData);
+      toast.success('Proforma Invoice created successfully');
     }
-  };
+    
+    router.push('/dashboard/ProformaInvoice/my');
+    router.refresh();
+  } catch (error: any) {
+    console.error('Submit error:', error);
+    toast.error(error?.message || 'Error saving proforma invoice');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const [isDark, setIsDark] = useState(false);
 
@@ -963,22 +1091,36 @@ const materialOptions: SelectOption[] = useMemo(
     return () => observer.disconnect();
   }, []);
 
+  // Updated dark styles with higher z-index and proper menu positioning
   const darkStyles = {
     control: (base: any) => ({
       ...base,
       backgroundColor: '#1f2937',
       borderColor: '#374151',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      zIndex: 1,
     }),
     menu: (base: any) => ({
       ...base,
       backgroundColor: '#1f2937',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      zIndex: 9999,
+      position: 'relative',
+    }),
+    menuList: (base: any) => ({
+      ...base,
+      backgroundColor: '#1f2937',
+      color: '#f9fafb',
+      maxHeight: '200px',
     }),
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isFocused ? '#374151' : '#1f2937',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      cursor: 'pointer',
+      '&:active': {
+        backgroundColor: '#4b5563',
+      },
     }),
     singleValue: (base: any) => ({
       ...base,
@@ -991,25 +1133,57 @@ const materialOptions: SelectOption[] = useMemo(
     placeholder: (base: any) => ({
       ...base,
       color: '#9ca3af'
-    })
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: '#9ca3af',
+    }),
+    indicatorSeparator: (base: any) => ({
+      ...base,
+      backgroundColor: '#374151',
+    }),
   };
 
-  // Helper to get filtered items for a specific row
+  // Light mode styles with higher z-index
+  const lightStyles = {
+    menu: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+      position: 'relative',
+    }),
+    menuList: (base: any) => ({
+      ...base,
+      maxHeight: '200px',
+    }),
+    control: (base: any) => ({
+      ...base,
+      zIndex: 1,
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      cursor: 'pointer',
+      '&:active': {
+        backgroundColor: '#e5e7eb',
+      },
+    }),
+  };
+
+  // Combine styles based on theme
+  const getSelectStyles = () => {
+    const base = isDark ? darkStyles : lightStyles;
+    return {
+      ...base,
+      menuPortal: (base: any) => ({
+        ...base,
+        zIndex: 9999,
+      }),
+    };
+  };
+
   const getFilteredItemsForRow = (itemIndex: number) => {
     return filteredItems.get(itemIndex) || [];
   };
 
-  // Helper to get filtered sizes for a specific row
-  const getFilteredSizesForRow = (itemIndex: number) => {
-    return filteredSizes.get(itemIndex) || [];
-  };
-
-  // Helper to get filtered types for a specific row
-  const getFilteredTypesForRow = (itemIndex: number) => {
-    return filteredTypes.get(itemIndex) || [];
-  };
-
-  // Helper to get current hierarchical selection for a row
   const getCurrentSelection = useCallback((itemIndex: number): HierarchicalSelection => {
     return hierarchicalSelections.get(itemIndex) || {
       categoryId: '',
@@ -1030,24 +1204,10 @@ const materialOptions: SelectOption[] = useMemo(
     }
   };
 
-  // Add a useEffect to suggest size when item is selected
-  useEffect(() => {
-    // For each item field, check if we have a selected item
-    itemFields.forEach((field, index) => {
-      const currentSelection = getCurrentSelection(index);
-      const currentSize = form.getValues(`items.${index}.size`);
-      
-      // If item is selected and size field is empty, suggest from item
-      if (currentSelection.selectedItem?.size && !currentSize) {
-        form.setValue(`items.${index}.size`, currentSelection.selectedItem.size);
-      }
-    });
-  }, [itemFields, hierarchicalSelections, getCurrentSelection, form]);
-
   return (
     <>
     <div className="mx-auto w-full space-y-4">
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button
@@ -1080,16 +1240,18 @@ const materialOptions: SelectOption[] = useMemo(
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {/* ════════════════════════════════════════════════════════════
-             SECTION 1 — Invoice Details
-             ════════════════════════════════════════════════════════════ */}
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" onKeyDown={(e) => {
+      // Prevent Enter key from submitting the form anywhere
+      if (e.key === 'Enter') {
+        e.preventDefault();
+      }
+    }} >
+          {/* Invoice Details */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <CardTitle className="text-sm font-semibold">Invoice Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 px-4 pb-4">
-              {/* Stock Invoice toggle */}
               <div className="flex items-center gap-2.5 rounded-md border border-dashed bg-muted/20 px-3 py-2">
                 <Checkbox
                   id="store-checkbox"
@@ -1113,7 +1275,6 @@ const materialOptions: SelectOption[] = useMemo(
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {/* Customer Field */}
                 <CustomerSelect
                   isStore={isStore}
                   form={form}
@@ -1164,9 +1325,7 @@ const materialOptions: SelectOption[] = useMemo(
             </CardContent>
           </Card>
 
-          {/* ════════════════════════════════════════════════════════════
-             SECTION 2 — Line Items
-             ════════════════════════════════════════════════════════════ */}
+          {/* Line Items */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <div className="flex items-center justify-between">
@@ -1178,22 +1337,21 @@ const materialOptions: SelectOption[] = useMemo(
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={addItem} className="gap-1.5 text-xs h-7">
                   <Plus className="h-3.5 w-3.5" />
-                  Add Item
+                  Add Product
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            <CardContent className="overflow-visible">
+              <div className="space-y-4 overflow-visible">
                 {itemFields.map((field, itemIndex) => {
                   const currentSelection = getCurrentSelection(itemIndex);
-                  const availableSizes = getFilteredSizesForRow(itemIndex);
-                  const availableTypes = getFilteredTypesForRow(itemIndex);
                   const availableItems = getFilteredItemsForRow(itemIndex);
+                  const isSizeAutoFilled = sizeAutoFilled.get(itemIndex) || false;
 
                   return (
                     <div
                       key={field.id}
-                      className="overflow-hidden rounded-xl border bg-card shadow-sm"
+                      className="rounded-xl border bg-card shadow-sm overflow-visible"
                     >
                       {/* Item Header Bar */}
                       <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5">
@@ -1201,6 +1359,21 @@ const materialOptions: SelectOption[] = useMemo(
                           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
                             {itemIndex + 1}
                           </span>
+                          {currentSelection.categoryId && (
+                            <Badge variant="outline" className="text-[10px]">
+                              Category: {categories.find(c => c.id === currentSelection.categoryId)?.name || 'Selected'}
+                            </Badge>
+                          )}
+                          {currentSelection.selectedItem && (
+                            <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                              Item: {safeString(currentSelection.selectedItem.name)}
+                            </Badge>
+                          )}
+                          {isSizeAutoFilled && (
+                            <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                              Size Auto-filled
+                            </Badge>
+                          )}
                         </div>
                         <Button
                           type="button"
@@ -1215,13 +1388,16 @@ const materialOptions: SelectOption[] = useMemo(
                         </Button>
                       </div>
 
-                      <div className="space-y-4 p-4">
+                      <div className="space-y-4 p-4 overflow-visible">
                         {/* Product Selector */}
-                        <div>
+                        <div className="overflow-visible">
                           <p className="mb-2 text-xs font-medium text-muted-foreground">Product Selection</p>
-                          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                            <div>
-                              <FormLabel className="text-xs">Category</FormLabel>
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-4 overflow-visible">
+                            {/* Category - MANDATORY */}
+                            <div className="overflow-visible">
+                              <FormLabel className="text-xs flex items-center gap-1">
+                                Category <span className="text-red-500">*</span>
+                              </FormLabel>
                               <Select
                                 options={categories.map(cat => ({
                                   value: cat.id,
@@ -1234,50 +1410,63 @@ const materialOptions: SelectOption[] = useMemo(
                                 onChange={(option: any) => handleCategoryChange(itemIndex, option?.value || '')}
                                 placeholder="Select category"
                                 isSearchable
-                                styles={isDark ? darkStyles : {}}
+                                styles={getSelectStyles()}
+                                isClearable
+                                menuPortalTarget={document.body}
                               />
                             </div>
 
-                            <div>
+                            {/* Size - Optional */}
+                            <div className="overflow-visible">
                               <FormLabel className="text-xs">Size</FormLabel>
                               <Select
-                                options={availableSizes.map((size: { id: any; name: any; }) => ({
-                                  value: size.id,
-                                  label: size.name
-                                }))}
-                                value={availableSizes.find((size: { id: string; }) => size.id === currentSelection.sizeId) ? {
+                                options={sizes
+                                  .filter(size => !currentSelection.categoryId || size.categoryId === currentSelection.categoryId)
+                                  .map(size => ({
+                                    value: size.id,
+                                    label: size.name
+                                  }))}
+                                value={sizes.find(s => s.id === currentSelection.sizeId) ? {
                                   value: currentSelection.sizeId,
-                                  label: availableSizes.find((size: { id: string; }) => size.id === currentSelection.sizeId)?.name || ''
+                                  label: sizes.find(s => s.id === currentSelection.sizeId)?.name || ''
                                 } : null}
                                 onChange={(option: any) => handleSizeChange(itemIndex, option?.value || '')}
-                                placeholder={currentSelection.categoryId ? "Select size" : "Select category first"}
+                                placeholder={currentSelection.categoryId ? "Select size (optional)" : "Select category first"}
                                 isSearchable
                                 isDisabled={!currentSelection.categoryId}
-                                styles={isDark ? darkStyles : {}}
+                                styles={getSelectStyles()}
+                                isClearable
+                                menuPortalTarget={document.body}
                               />
                             </div>
 
-                            <div>
+                            {/* Type - Optional */}
+                            <div className="overflow-visible">
                               <FormLabel className="text-xs">Type</FormLabel>
                               <Select
-                                options={availableTypes.map((type: { id: any; name: any; }) => ({
-                                  value: type.id,
-                                  label: type.name
-                                }))}
-                                value={availableTypes.find((type: { id: string; }) => type.id === currentSelection.typeId) ? {
+                                options={types
+                                  .filter(type => !currentSelection.sizeId || type.sizeId === currentSelection.sizeId)
+                                  .map(type => ({
+                                    value: type.id,
+                                    label: type.name
+                                  }))}
+                                value={types.find(t => t.id === currentSelection.typeId) ? {
                                   value: currentSelection.typeId,
-                                  label: availableTypes.find((type: { id: string; }) => type.id === currentSelection.typeId)?.name || ''
+                                  label: types.find(t => t.id === currentSelection.typeId)?.name || ''
                                 } : null}
                                 onChange={(option: any) => handleTypeChange(itemIndex, option?.value || '')}
-                                placeholder={currentSelection.sizeId ? "Select type" : "Select size first"}
+                                placeholder={currentSelection.sizeId ? "Select type (optional)" : "Select size first"}
                                 isSearchable
                                 isDisabled={!currentSelection.sizeId}
-                                styles={isDark ? darkStyles : {}}
+                                styles={getSelectStyles()}
+                                isClearable
+                                menuPortalTarget={document.body}
                               />
                             </div>
 
-                            <div>
-                              <FormLabel className="text-xs">Item</FormLabel>
+                            {/* Item - Optional */}
+                            <div className="overflow-visible">
+                              <FormLabel className="text-xs">Product</FormLabel>
                               <Select
                                 options={availableItems.map((item: any) => ({
                                   value: item.id,
@@ -1286,7 +1475,7 @@ const materialOptions: SelectOption[] = useMemo(
                                 }))}
                                 value={availableItems.find((item: any) => item.id === currentSelection.selectedItem?.id) ? {
                                   value: currentSelection.selectedItem?.id || '',
-                                  label: currentSelection.selectedItem?.name || ''
+                                  label: safeString(currentSelection.selectedItem?.name)
                                 } : null}
                                 onChange={(option: any) => {
                                   if (option?.item) {
@@ -1297,20 +1486,22 @@ const materialOptions: SelectOption[] = useMemo(
                                   !currentSelection.categoryId 
                                     ? "Select category first" 
                                     : availableItems.length === 0 
-                                      ? "No items match filters" 
-                                      : "Select item"
+                                      ? "No items available" 
+                                      : "Select item (optional)"
                                 }
                                 isSearchable
                                 isLoading={isFetchingItems}
                                 isDisabled={!currentSelection.categoryId}
-                                styles={isDark ? darkStyles : {}}
+                                styles={getSelectStyles()}
                                 noOptionsMessage={() => 
                                   currentSelection.categoryId 
                                     ? "No items available for these filters" 
                                     : "Select a category first"
                                 }
+                                isClearable
+                                menuPortalTarget={document.body}
                               />
-                              {availableItems.length > 0 && (
+                              {currentSelection.categoryId && availableItems.length > 0 && (
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {availableItems.length} item{availableItems.length > 1 ? 's' : ''} available
                                 </p>
@@ -1319,9 +1510,8 @@ const materialOptions: SelectOption[] = useMemo(
                           </div>
                         </div>
 
-                        {/* ── Pricing Row ── */}
+                        {/* Pricing Row */}
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                          {/* Quantity */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.quantity`}
@@ -1345,45 +1535,60 @@ const materialOptions: SelectOption[] = useMemo(
                             )}
                           />
 
-                          {/* Size - EDITABLE FIELD */}
+                          {/* Size (Manual) - Conditional rendering */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.size`}
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs">
-                                  Size
-                                  {field.value && (
-                                    <Badge variant="secondary" className="ml-1 text-[10px]">
-                                      Custom
+                                  Size (Manual)
+                                  {isSizeAutoFilled && (
+                                    <Badge variant="secondary" className="ml-1 text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                      Locked
                                     </Badge>
                                   )}
                                 </FormLabel>
                                 <FormControl>
-                                  <Input
-                                    type="text"
-                                    placeholder="Enter size (optional)"
-                                    {...field}
-                                    value={typeof field.value === 'string' ? field.value : ''}
-                                    onChange={(e) => {
-                                      field.onChange(e.target.value);
-                                    }}
-                                    className={field.value ? "border-blue-300 focus-visible:ring-blue-500" : ""}
-                                  />
+                                  {isSizeAutoFilled ? (
+                                    <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                      {field.value || 'Auto-filled'}
+                                    </div>
+                                  ) : (
+                                    <Input
+                                      type="text"
+                                      placeholder="Enter size"
+                                      {...field}
+                                      value={typeof field.value === 'string' ? field.value : ''}
+                                      onChange={(e) => {
+                                        field.onChange(e.target.value);
+                                      }}
+                                      className={field.value ? "border-blue-300 focus-visible:ring-blue-500" : ""}
+                                    />
+                                  )}
                                 </FormControl>
+                                {isSizeAutoFilled && (
+                                  <p className="text-[10px] text-muted-foreground mt-1">
+                                    Auto-filled from item selection. Clear the item selection to edit manually.
+                                  </p>
+                                )}
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
 
-                          {/* Unit Price */}
+                      {/* Unit Price - REQUIRED with validation */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.unitPrice`}
-                            render={({ field }) => (
+                            rules={{
+                              required: 'Unit price is required',
+                              validate: (value) => value > 0 || 'Unit price must be greater than 0'
+                            }}
+                            render={({ field, fieldState }) => (
                               <FormItem>
                                 <FormLabel className="flex items-center gap-2 text-xs">
-                                  Unit Price
+                                  Unit Price <span className="text-red-500">*</span>
                                   {priceAutoFilled.get(itemIndex) && (
                                     <Badge
                                       variant="secondary"
@@ -1393,7 +1598,6 @@ const materialOptions: SelectOption[] = useMemo(
                                     </Badge>
                                   )}
                                 </FormLabel>
-
                                 <FormControl>
                                   <Input
                                     type="text"
@@ -1410,10 +1614,8 @@ const materialOptions: SelectOption[] = useMemo(
                                     onChange={(e) => {
                                       const raw = e.target.value.replace(/,/g, "");
                                       const value = parseFloat(raw) || 0;
-
                                       field.onChange(value);
                                       calculateItemAmount(itemIndex);
-
                                       if (priceAutoFilled.get(itemIndex)) {
                                         setPriceAutoFilled((prev) => {
                                           const newMap = new Map(prev);
@@ -1422,20 +1624,20 @@ const materialOptions: SelectOption[] = useMemo(
                                         });
                                       }
                                     }}
-                                    className={
+                                    className={`${
                                       priceAutoFilled.get(itemIndex)
                                         ? "border-green-300 focus-visible:ring-green-500"
                                         : ""
-                                    }
+                                    } ${
+                                      fieldState.error ? "border-red-500 focus-visible:ring-red-500" : ""
+                                    }`}
                                   />
                                 </FormControl>
-
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
 
-                          {/* Amount */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.amount`}
@@ -1459,19 +1661,29 @@ const materialOptions: SelectOption[] = useMemo(
                           />
                         </div>
 
-                        {/* ── Descriptions ── */}
+                        {/* Descriptions */}
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          {/* Description - REQUIRED with validation */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.description`}
-                            render={({ field }) => (
+                            rules={{
+                              required: 'Description is required',
+                              validate: (value) => value.trim() !== '' || 'Description is required'
+                            }}
+                            render={({ field, fieldState }) => (
                               <FormItem>
-                                <FormLabel className="text-xs">Description</FormLabel>
+                                <FormLabel className="text-xs flex items-center gap-1">
+                                  Description <span className="text-red-500">*</span>
+                                </FormLabel>
                                 <FormControl>
                                   <Textarea
                                     placeholder="Item description"
                                     {...field}
                                     rows={2}
+                                    className={`${
+                                      fieldState.error ? "border-red-500 focus-visible:ring-red-500" : ""
+                                    }`}
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -1498,83 +1710,121 @@ const materialOptions: SelectOption[] = useMemo(
                           />
                         </div>
 
-                        {/* ── Materials ── */}
-                        <div className="mt-3 border-t pt-3">
-                          <div className="mb-2 flex items-center justify-between">
-                            <p className="text-xs font-semibold flex items-center gap-1.5">
-                              <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                              Materials
-                            </p>
-                            <div className="flex items-center gap-1.5">
-                              <Button type="button" variant="ghost" size="sm" onClick={refreshMaterials} className="h-6 text-[10px] px-2">
-                                Refresh
-                              </Button>
-                              <Button type="button" variant="outline" size="sm" onClick={() => addMaterialToItem(itemIndex)} className="h-6 gap-1 text-[10px] px-2">
-                                <Plus className="h-3 w-3" />
-                                Add
-                              </Button>
-                            </div>
-                          </div>
+                        {/* Materials */}
+{/* Materials */}
+<div className="mt-3 border-t pt-3 overflow-visible">
+  <div className="mb-2 flex items-center justify-between">
+    <p className="text-xs font-semibold flex items-center gap-1.5">
+      <Package className="h-3.5 w-3.5 text-muted-foreground" />
+      Materials <span className="text-red-500">*</span>
+    </p>
+    <div className="flex items-center gap-1.5">
+      <Button type="button" variant="ghost" size="sm" onClick={refreshMaterials} className="h-6 text-[10px] px-2">
+        Refresh
+      </Button>
+      <Button type="button" variant="outline" size="sm" onClick={() => addMaterialToItem(itemIndex)} className="h-6 gap-1 text-[10px] px-2">
+        <Plus className="h-3 w-3" />
+        Add
+      </Button>
+    </div>
+  </div>
 
-                          {(form.watch(`items.${itemIndex}.materials`)?.length || 0) > 0 ? (
-                            <div className="space-y-3">
-                              {form.watch(`items.${itemIndex}.materials`)?.map((material, materialIndex) => (
-                                <div key={materialIndex} className="grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12">
-                                  <div className="md:col-span-5">
-                                    <FormLabel>Material</FormLabel>
-                                    <Select
-                                      options={materialOptions}
-                                      value={materialOptions.find((option) => option.value === material.materialId) || null}
-                                      onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
-                                      placeholder="Select material"
-                                      isSearchable
-                                      styles={isDark ? darkStyles : {}}
-                                      noOptionsMessage={() => "No materials available"}
-                                    />
-                                  </div>
+  {/* Show validation error if no materials */}
+  {form.formState.errors?.items?.[itemIndex]?.materials && (
+    <p className="text-xs text-red-500 mb-2">
+      {form.formState.errors.items[itemIndex].materials.message as string}
+    </p>
+  )}
 
-                                  <div className="md:col-span-2">
-                                    <FormLabel>Quantity</FormLabel>
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      value={material.quantity}
-                                      onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'quantity', parseInt(e.target.value) || 1)}
-                                      placeholder="Qty"
-                                    />
-                                  </div>
+  {(form.watch(`items.${itemIndex}.materials`)?.length || 0) > 0 ? (
+    <div className="space-y-3 overflow-visible">
+      {form.watch(`items.${itemIndex}.materials`)?.map((material, materialIndex) => {
+        const materialImage = material.materialId ? materialImageMap.get(material.materialId) : null;
+        
+        return (
+          <div key={materialIndex} className="grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 overflow-visible">
+            <div className="md:col-span-4 overflow-visible">
+              <FormLabel className="text-xs">Material</FormLabel>
+              <Select
+                options={materialOptions}
+                value={materialOptions.find((option) => option.value === material.materialId) || null}
+                onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
+                placeholder="Select material"
+                isSearchable
+                styles={getSelectStyles()}
+                noOptionsMessage={() => "No materials available"}
+                menuPortalTarget={document.body}
+              />
+            </div>
 
-                                  <div className="md:col-span-3">
-                                    <FormLabel>Note</FormLabel>
-                                    <Input
-                                      value={material.note || ''}
-                                      onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'note', e.target.value)}
-                                      placeholder="Optional note"
-                                    />
-                                  </div>
+            <div className="md:col-span-2">
+              <FormLabel className="text-xs">Quantity</FormLabel>
+              <Input
+                type="number"
+                min="1"
+                value={material.quantity}
+                onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'quantity', parseInt(e.target.value) || 1)}
+                placeholder="Qty"
+              />
+            </div>
 
-                                  <div className="md:col-span-2 flex items-end">
-                                    <Button
-                                      type="button"
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() => removeMaterialFromItem(itemIndex, materialIndex)}
-                                      className="w-full"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">
-                              No materials — select an item above to auto-fill
-                            </p>
-                          )}
-                        </div>
+            <div className="md:col-span-3">
+              <FormLabel className="text-xs">Note</FormLabel>
+              <Input
+                value={material.note || ''}
+                onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'note', e.target.value)}
+                placeholder="Optional note"
+              />
+            </div>
 
-                        {/* ── Images ── */}
+            {/* Material Image Preview */}
+            <div className="md:col-span-2 flex items-end justify-center">
+              {materialImage ? (
+                <div 
+                  className="relative w-12 h-12 rounded-lg border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all group"
+                  onClick={() => handleMaterialImageClick(materialImage)}
+                >
+                  <img
+                    src={materialImage}
+                    alt="Material"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-image.png';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                    <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              ) : (
+                <div className="w-12 h-12 rounded-lg border border-dashed bg-muted/20 flex items-center justify-center text-muted-foreground">
+                  <ImageIcon className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+
+            <div className="md:col-span-1 flex items-end">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => removeMaterialFromItem(itemIndex, materialIndex)}
+                className="w-full"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  ) : (
+    <p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">
+      No materials — select an item above to auto-fill
+    </p>
+  )}
+</div>
+                        {/* Images */}
                         <div className="mt-3 border-t pt-3">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs font-semibold flex items-center gap-1.5">
@@ -1616,7 +1866,6 @@ const materialOptions: SelectOption[] = useMemo(
                                       }}
                                     />
                                     
-                                    {/* Image Info Badge */}
                                     {image.isExisting && (
                                       <div className="absolute top-1 left-1">
                                         <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
@@ -1625,7 +1874,6 @@ const materialOptions: SelectOption[] = useMemo(
                                       </div>
                                     )}
                                     
-                                    {/* Remove Button */}
                                     <Button
                                       type="button"
                                       variant="destructive"
@@ -1636,7 +1884,6 @@ const materialOptions: SelectOption[] = useMemo(
                                       <X className="h-3 w-3" />
                                     </Button>
                                     
-                                    {/* View Button */}
                                     <Button
                                       type="button"
                                       variant="secondary"
@@ -1648,14 +1895,12 @@ const materialOptions: SelectOption[] = useMemo(
                                     </Button>
                                   </div>
                                   
-                                  {/* Image Name for new uploads */}
                                   {!image.isExisting && image.file && (
                                     <p className="text-xs text-muted-foreground mt-1 truncate">
                                       {image.file.name}
                                     </p>
                                   )}
                                   
-                                  {/* Show existing image path for reference */}
                                   {image.isExisting && (
                                     <p className="text-[10px] text-muted-foreground mt-1 truncate">
                                       {image.existingUrl?.split('/').pop() || 'Existing image'}
@@ -1674,9 +1919,7 @@ const materialOptions: SelectOption[] = useMemo(
             </CardContent>
           </Card>
 
-          {/* ════════════════════════════════════════════════════════════
-             SECTION 3 — Summary
-             ════════════════════════════════════════════════════════════ */}
+          {/* Summary */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <CardTitle className="text-sm font-semibold">Summary</CardTitle>
@@ -1710,9 +1953,7 @@ const materialOptions: SelectOption[] = useMemo(
             </CardContent>
           </Card>
 
-          {/* ════════════════════════════════════════════════════════════
-             SECTION 4 — Attachments
-             ════════════════════════════════════════════════════════════ */}
+          {/* Attachments */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <div className="flex items-center gap-2">
@@ -1773,7 +2014,7 @@ const materialOptions: SelectOption[] = useMemo(
             </CardContent>
           </Card>
 
-          {/* ── Submit ──────────────────────────────────────────────── */}
+          {/* Submit */}
           <div className="flex items-center justify-end gap-3">
             <Button
               type="button"
@@ -1802,7 +2043,7 @@ const materialOptions: SelectOption[] = useMemo(
     <Modal
       isOpen={showCustomerModal}
       onClose={() => setShowCustomerModal(false)}
-      title='Create New Supplier'
+      title='Create New Customer'
       description={''}
     >
       <CreateCustomerModal
@@ -1810,6 +2051,28 @@ const materialOptions: SelectOption[] = useMemo(
         onSuccess={handleCustomerCreated}
       />
     </Modal>
+    {/* Material Image Modal */}
+<Modal
+  isOpen={showMaterialImageModal}
+  onClose={() => setShowMaterialImageModal(false)}
+  title="Material Image"
+  description="View the selected material image"
+>
+  <div className="flex items-center justify-center p-4">
+    {selectedMaterialImage && (
+      <div className="relative max-w-2xl max-h-[80vh] rounded-lg overflow-hidden">
+        <img
+          src={selectedMaterialImage}
+          alt="Material"
+          className="w-full h-auto object-contain max-h-[70vh]"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/placeholder-image.png';
+          }}
+        />
+      </div>
+    )}
+  </div>
+</Modal>
     </>
   );
 }

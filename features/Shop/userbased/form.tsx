@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -28,15 +28,153 @@ import { IItem } from '@/models/item';
 import { ICustomer } from '@/models/customer';
 import { ISell, ISellItem, SaleStatus } from '@/models/Sell';
 import Select from 'react-select';
-import { getCustomer } from '@/service/customer';
+import { createCustomer, getCustomer } from '@/service/customer';
 import { updateSell } from '@/service/Sell';
 import { normalizeImagePath } from '@/lib/norm';
 import { toast } from 'sonner';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import { IProductCategory, IProductType, ISize } from '@/models/productConfiguration';
+import { getStoresAll } from '@/service/store';
+import { getShowroomsAll } from '@/service/showroom';
 
 const formatPrice = (price: unknown): string => {
   if (price === null || price === undefined) return '0.00';
   const numericPrice = typeof price === 'string' ? parseFloat(price) : Number(price);
   return isNaN(numericPrice) ? '0.00' : `${numericPrice.toFixed(2)}`;
+};
+
+// ==================== CREATE CUSTOMER MODAL ====================
+interface CreateCustomerModalProps {
+  closeModal: () => void;
+  onSuccess: () => void;
+}
+
+const CreateCustomerModal = ({ closeModal, onSuccess }: CreateCustomerModalProps) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    companyName: '',
+    phone1: '',
+    phone2: '',
+    email: '',
+    address: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.id]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await createCustomer(formData);
+      toast.success('Customer created successfully');
+      onSuccess();
+      closeModal();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create customer');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      title='Create New Customer'
+      description='Fill in the customer details'
+      isOpen={true}
+      onClose={closeModal}
+      size='lg'
+    >
+      <form onSubmit={handleSubmit} className='space-y-4'>
+        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+          <div className='space-y-2'>
+            <Label htmlFor='name'>Name *</Label>
+            <Input
+              id='name'
+              required
+              value={formData.name}
+              onChange={handleChange}
+              placeholder='Customer name'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='companyName'>Company Name</Label>
+            <Input
+              id='companyName'
+              value={formData.companyName}
+              onChange={handleChange}
+              placeholder='Company name'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='phone1'>Phone 1 *</Label>
+            <Input
+              id='phone1'
+              required
+              value={formData.phone1}
+              onChange={handleChange}
+              placeholder='Primary phone number'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='phone2'>Phone 2</Label>
+            <Input
+              id='phone2'
+              value={formData.phone2}
+              onChange={handleChange}
+              placeholder='Secondary phone number'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='email'>Email</Label>
+            <Input
+              id='email'
+              type='email'
+              value={formData.email}
+              onChange={handleChange}
+              placeholder='Email address'
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='city'>City</Label>
+            <Input
+              id='city'
+              value={formData.city}
+              onChange={handleChange}
+              placeholder='City'
+            />
+          </div>
+        </div>
+        <div className='space-y-2'>
+          <Label htmlFor='address'>Address</Label>
+          <Textarea
+            id='address'
+            value={formData.address}
+            onChange={handleChange}
+            placeholder='Full address'
+            rows={2}
+          />
+        </div>
+        <div className='flex justify-end space-x-2 pt-4'>
+          <Button variant='outline' type='button' onClick={closeModal}>
+            Cancel
+          </Button>
+          <Button type='submit' disabled={loading}>
+            {loading ? 'Creating...' : 'Create Customer'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
 };
 
 // ==================== ITEM CARD COMPONENT ====================
@@ -49,9 +187,113 @@ interface ItemCardProps {
 const ItemCard = ({ item, onSelectItem, isInCart }: ItemCardProps) => {
   const [imageError, setImageError] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Carousel state for card
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+  
+  // Carousel state for modal
+  const [modalImageIndex, setModalImageIndex] = useState(0);
 
-  const imageUrl = imageError ? '/placeholder-image.jpg' : normalizeImagePath(item.imageUrl) || '/placeholder-image.jpg';
+  // Get all images (main + additional)
+  const getAllImages = useMemo(() => {
+    const images: string[] = [];
+    
+    // Add main image first
+    if (item.imageUrl) {
+      const normalized = normalizeImagePath(item.imageUrl);
+      if (normalized) {
+        images.push(normalized);
+      }
+    }
+    
+    // Add additional images
+    if (item.itemImages && item.itemImages.length > 0) {
+      item.itemImages.forEach(img => {
+        const normalized = normalizeImagePath(img.imageUrl);
+        if (normalized) {
+          images.push(normalized);
+        }
+      });
+    }
+    
+    return images;
+  }, [item.imageUrl, item.itemImages]);
+
+  const allImages = getAllImages;
+  const hasMultipleImages = allImages.length > 1;
+
+  // Auto-rotate carousel on card
+  useEffect(() => {
+    if (!isHovering || !hasMultipleImages) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [isHovering, hasMultipleImages, allImages.length]);
+
+  const currentImage = allImages[currentImageIndex] || (imageError ? '/placeholder-image.jpg' : '/placeholder-image.jpg');
   const formattedPrice = formatPrice(item.price);
+
+  // Handle carousel navigation
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
+
+  // Handle modal carousel navigation
+  const nextModalImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setModalImageIndex((prev) => (prev + 1) % allImages.length);
+  };
+
+  const prevModalImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setModalImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
+
+  // Open modal with carousel
+  const openModal = () => {
+    setIsModalOpen(true);
+    setModalImageIndex(currentImageIndex);
+  };
+
+  // Get stock by location
+  const getStockByLocation = useMemo(() => {
+    const stores: { name: string; quantity: number; isMain?: boolean }[] = [];
+    const showrooms: { name: string; quantity: number; isMain?: boolean }[] = [];
+
+    if (item.stockDetails?.stores) {
+      item.stockDetails.stores.forEach((store: any) => {
+        stores.push({
+          name: store.storeName,
+          quantity: store.quantity,
+          isMain: store.isMain
+        });
+      });
+    }
+
+    if (item.stockDetails?.showrooms) {
+      item.stockDetails.showrooms.forEach((showroom: any) => {
+        showrooms.push({
+          name: showroom.showroomName,
+          quantity: showroom.quantity,
+          isMain: showroom.isMain
+        });
+      });
+    }
+
+    return { stores, showrooms, totalStock: item.stockDetails?.totalQuantity || 0 };
+  }, [item.stockDetails]);
+
+  const hasStock = getStockByLocation.totalStock > 0;
 
   return (
     <>
@@ -59,30 +301,161 @@ const ItemCard = ({ item, onSelectItem, isInCart }: ItemCardProps) => {
         className={`group flex h-full w-full flex-col cursor-pointer overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${
           isInCart ? 'ring-2 ring-blue-500 ring-offset-2' : ''
         }`}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
         onClick={() => onSelectItem(item)}
       >
         <CardHeader className="relative p-0">
           <div className="relative aspect-video w-full overflow-hidden bg-gray-50 dark:bg-gray-800">
-            <Image
-              src={imageUrl}
-              alt={item.name}
-              fill
-              className="object-contain p-2 transition-transform duration-500 group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              onError={() => setImageError(true)}
-            />
-            {isInCart && (
-              <div className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs">
-                In Cart
+            <div 
+              className="relative w-full h-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                openModal();
+              }}
+            >
+              <Image
+                src={currentImage}
+                alt={item.name}
+                fill
+                className="object-contain p-2 transition-transform duration-500 group-hover:scale-105"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                onError={() => setImageError(true)}
+              />
+              
+              {/* Stock Status Badge */}
+              <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
+                hasStock 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+              }`}>
+                {hasStock ? `In Stock (${getStockByLocation.totalStock})` : 'Out of Stock'}
               </div>
-            )}
+              
+              {/* In Cart Badge */}
+              {isInCart && (
+                <div className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs">
+                  In Cart
+                </div>
+              )}
+              
+              {/* Image counter badge */}
+              {hasMultipleImages && (
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                  {currentImageIndex + 1} / {allImages.length}
+                </div>
+              )}
+              
+              {/* Navigation arrows - only show on hover */}
+              {hasMultipleImages && isHovering && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                    aria-label="Previous image"
+                  >
+                    <IconChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                    aria-label="Next image"
+                  >
+                    <IconChevronRight className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+              
+              {/* Dot indicators */}
+              {hasMultipleImages && (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                  {allImages.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${
+                        index === currentImageIndex
+                          ? 'bg-white w-3'
+                          : 'bg-white/50'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
 
         <CardContent className="flex-1 p-3 pb-1">
+          {/* Product Name */}
           <h3 className="line-clamp-1 text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
             {item.name}
           </h3>
+          
+          {/* Category, Type, Size Badges */}
+          <div className="mt-2 flex flex-wrap gap-1">
+            {item.category && (
+              <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                {item.category.name}
+              </span>
+            )}
+            {item.type && (
+              <span className="inline-flex items-center rounded-full bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-300">
+                {item.type.name}
+              </span>
+            )}
+            {item.size && (
+              <span className="inline-flex items-center rounded-full bg-green-50 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-300">
+                {item.size.name}
+              </span>
+            )}
+          </div>
+          
+          {/* Color */}
+          {item.color && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Color: {item.color}
+            </p>
+          )}
+
+          {/* Stock by Location - Store */}
+          {getStockByLocation.stores.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                Stores:
+              </p>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {getStockByLocation.stores.map((store, index) => (
+                  <span key={index} className="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 text-xs text-blue-700 dark:text-blue-300">
+                    <span>{store.name}</span>
+                    <span className="font-semibold">({store.quantity})</span>
+                    {store.isMain && (
+                      <span className="text-[10px] bg-blue-200 dark:bg-blue-800 px-1 rounded">Main</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stock by Location - Showroom */}
+          {getStockByLocation.showrooms.length > 0 && (
+            <div className="mt-1">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                Showrooms:
+              </p>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {getStockByLocation.showrooms.map((showroom, index) => (
+                  <span key={index} className="inline-flex items-center gap-1 rounded bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 text-xs text-purple-700 dark:text-purple-300">
+                    <span>{showroom.name}</span>
+                    <span className="font-semibold">({showroom.quantity})</span>
+                    {showroom.isMain && (
+                      <span className="text-[10px] bg-purple-200 dark:bg-purple-800 px-1 rounded">Main</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="flex items-center justify-between p-3 pt-2">
@@ -91,18 +464,25 @@ const ItemCard = ({ item, onSelectItem, isInCart }: ItemCardProps) => {
           </span>
 
           <button
-            className="rounded-lg bg-[#0f172a] dark:bg-blue-600 px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-gray-800 dark:hover:bg-blue-500"
+            className={`rounded-lg px-4 py-1.5 text-[13px] font-medium text-white transition-colors ${
+              hasStock
+                ? 'bg-[#0f172a] dark:bg-blue-600 hover:bg-gray-800 dark:hover:bg-blue-500'
+                : 'bg-gray-400 cursor-not-allowed dark:bg-gray-600'
+            }`}
             onClick={(e) => {
               e.stopPropagation();
-              setIsModalOpen(true);
+              if (hasStock) {
+                openModal();
+              }
             }}
+            disabled={!hasStock}
           >
-            View
+            {hasStock ? 'View' : 'Out of Stock'}
           </button>
         </CardFooter>
       </Card>
 
-      {/* View Modal */}
+      {/* View Modal with Carousel */}
       {isModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 dark:bg-black/90 backdrop-blur-sm"
@@ -121,27 +501,133 @@ const ItemCard = ({ item, onSelectItem, isInCart }: ItemCardProps) => {
               </svg>
             </button>
 
-            <div className="relative bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+            <div className="relative bg-white dark:bg-gray-900 rounded-lg overflow-hidden max-h-[90vh] overflow-y-auto">
+              {/* Modal Image Carousel */}
               <div className="relative aspect-video w-full bg-gray-900 dark:bg-black">
                 <Image
-                  src={imageUrl}
+                  src={allImages[modalImageIndex] || '/placeholder-image.jpg'}
                   alt={item.name}
                   fill
                   className="object-contain"
                   sizes="90vw"
                 />
+                
+                {/* Modal Navigation Arrows */}
+                {allImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevModalImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                    >
+                      <IconChevronLeft className="h-6 w-6" />
+                    </button>
+                    <button
+                      onClick={nextModalImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                    >
+                      <IconChevronRight className="h-6 w-6" />
+                    </button>
+                  </>
+                )}
+                
+                {/* Modal Image Counter */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-white text-sm px-3 py-1 rounded-full">
+                  {modalImageIndex + 1} / {allImages.length}
+                </div>
               </div>
 
               <div className="p-4 bg-white dark:bg-gray-900">
+                {/* Product Name */}
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {item.name}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Stock: {item.stock}
-                </p>
-                <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-2">
+                
+                {/* Category, Type, Size Details */}
+                <div className="mt-2 space-y-1">
+                  {item.category && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Category:</span> {item.category.name}
+                    </p>
+                  )}
+                  {item.type && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Type:</span> {item.type.name}
+                    </p>
+                  )}
+                  {item.size && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Size:</span> {item.size.name}
+                    </p>
+                  )}
+                  {item.color && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Color:</span> {item.color}
+                    </p>
+                  )}
+                </div>
+
+                {/* Stock Details by Location - Modal */}
+                <div className="mt-3 border-t pt-3">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Stock by Location:
+                  </p>
+                  
+                  {/* Stores Stock */}
+                  {getStockByLocation.stores.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Stores:</p>
+                      <div className="space-y-1 mt-1">
+                        {getStockByLocation.stores.map((store, index) => (
+                          <div key={index} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {store.name} {store.isMain && <span className="text-xs text-blue-500">(Main)</span>}
+                            </span>
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                              {store.quantity} units
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Showrooms Stock */}
+                  {getStockByLocation.showrooms.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Showrooms:</p>
+                      <div className="space-y-1 mt-1">
+                        {getStockByLocation.showrooms.map((showroom, index) => (
+                          <div key={index} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {showroom.name} {showroom.isMain && <span className="text-xs text-purple-500">(Main)</span>}
+                            </span>
+                            <span className="font-semibold text-gray-900 dark:text-gray-100">
+                              {showroom.quantity} units
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Total Stock */}
+                  <div className="mt-2 pt-2 border-t flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Stock:</span>
+                    <span className={`text-sm font-bold ${hasStock ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {getStockByLocation.totalStock} units
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Price */}
+                <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-3">
                   {formattedPrice}
                 </p>
+
+                {/* Out of Stock warning */}
+                {!hasStock && (
+                  <p className="text-sm text-red-500 mt-2">⚠️ This item is currently out of stock</p>
+                )}
               </div>
             </div>
           </div>
@@ -156,67 +642,153 @@ interface ItemModalProps {
   item: IItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onAddToCart: (item: IItem, quantity: number, customPrice?: number) => void;
+  onAddToCart: (
+    item: IItem, 
+    quantity: number, 
+    customPrice?: number, 
+    storeId?: string, 
+    showroomId?: string
+  ) => void;
   existingQuantity?: number;
 }
 
 const ItemModal = ({ item, isOpen, onClose, onAddToCart, existingQuantity = 0 }: ItemModalProps) => {
   const [quantity, setQuantity] = useState<number>(() => (existingQuantity > 0 ? existingQuantity : 1));
   const [customPrice, setCustomPrice] = useState<string>('');
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  const [selectedShowroomId, setSelectedShowroomId] = useState<string>('');
+  const [stores, setStores] = useState<any[]>([]);
+  const [showrooms, setShowrooms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [locationType, setLocationType] = useState<'store' | 'showroom'>('store');
+
+  // Fetch stores and showrooms when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchStoresAndShowrooms();
+      // Reset selections but keep quantity if updating
+      setSelectedStoreId('');
+      setSelectedShowroomId('');
+      setLocationType('store');
+      // If existing quantity is 0, reset to 1, else keep existing
+      if (existingQuantity === 0) {
+        setQuantity(1);
+      }
+    }
+  }, [isOpen, existingQuantity]);
+
+  const fetchStoresAndShowrooms = async () => {
+    setLoading(true);
+    try {
+      const [storesData, showroomsData] = await Promise.all([
+        getStoresAll(),
+        getShowroomsAll()
+      ]);
+      setStores(storesData || []);
+      setShowrooms(showroomsData || []);
+    } catch (error) {
+      console.error('Error fetching stores/showrooms:', error);
+      toast.error('Failed to load stores and showrooms');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get available stock for selected location
+  const getAvailableStock = useMemo(() => {
+    if (!item?.stockDetails) return 0;
+
+    if (locationType === 'store' && selectedStoreId) {
+      const storeStock = item.stockDetails.stores?.find(
+        (s: any) => s.storeId === selectedStoreId
+      );
+      return storeStock?.quantity || 0;
+    }
+
+    if (locationType === 'showroom' && selectedShowroomId) {
+      const showroomStock = item.stockDetails.showrooms?.find(
+        (s: any) => s.showroomId === selectedShowroomId
+      );
+      return showroomStock?.quantity || 0;
+    }
+
+    return 0;
+  }, [item, locationType, selectedStoreId, selectedShowroomId]);
+
+  // Get available locations with stock
+  const availableStores = useMemo(() => {
+    if (!item?.stockDetails?.stores) return [];
+    return item.stockDetails.stores.filter((s: any) => s.quantity > 0);
+  }, [item]);
+
+  const availableShowrooms = useMemo(() => {
+    if (!item?.stockDetails?.showrooms) return [];
+    return item.stockDetails.showrooms.filter((s: any) => s.quantity > 0);
+  }, [item]);
 
   const handleAddToCart = () => {
     if (!item) return;
-
-    const stock = item.stock ?? 0;
+    
     const price = customPrice ? parseFloat(customPrice) : item.price;
-
+    const availableStock = getAvailableStock;
+    
     if (isNaN(price) || price <= 0) {
-      alert('Please enter a valid price');
+      toast.error('Please enter a valid price');
       return;
     }
-
+    
     if (quantity <= 0) {
-      alert('Please enter a valid quantity');
+      toast.error('Please enter a valid quantity');
+      return;
+    }
+    
+    if (quantity > availableStock) {
+      toast.error(`Not enough stock. Only ${availableStock} available.`);
       return;
     }
 
-    if (quantity > stock) {
-      alert(`Not enough stock. Only ${stock} available.`);
+    // Validate location selection
+    if (locationType === 'store' && !selectedStoreId) {
+      toast.error('Please select a store');
       return;
     }
 
-    onAddToCart(item, quantity, price);
+    if (locationType === 'showroom' && !selectedShowroomId) {
+      toast.error('Please select a showroom');
+      return;
+    }
+    
+    onAddToCart(
+      item, 
+      quantity, 
+      price, 
+      locationType === 'store' ? selectedStoreId : undefined,
+      locationType === 'showroom' ? selectedShowroomId : undefined
+    );
     onClose();
     setQuantity(1);
     setCustomPrice('');
+    setSelectedStoreId('');
+    setSelectedShowroomId('');
+    setLocationType('store');
   };
 
   if (!item) return null;
 
+  const hasAvailableStock = availableStores.length > 0 || availableShowrooms.length > 0;
+
   return (
     <Modal
       title={`${existingQuantity > 0 ? 'Update' : 'Add'} ${item.name} to Cart`}
-      description='Set quantity and price'
+      description='Select location and set quantity'
       isOpen={isOpen}
       onClose={onClose}
       size='md'
     >
       <div className='space-y-4 py-4'>
+        {/* Price Section */}
         <div className='space-y-2'>
-          <Label htmlFor='quantity'>Quantity</Label>
-          <Input
-            id='quantity'
-            type='number'
-            min='1'
-            max={item.stock}
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-          />
-          <p className='text-xs text-gray-500'>Available stock: {item.stock}</p>
-        </div>
-
-        <div className='space-y-2'>
-          <Label htmlFor='price'>Unit Price (Optional override)</Label>
+          <Label htmlFor='price'>Unit Price</Label>
           <Input
             id='price'
             type='number'
@@ -231,11 +803,187 @@ const ItemModal = ({ item, isOpen, onClose, onAddToCart, existingQuantity = 0 }:
           </p>
         </div>
 
+        {/* Location Type Selection - Radio Buttons */}
+        <div className='space-y-2'>
+          <Label>Select Location Type</Label>
+          <div className='flex gap-4'>
+            <label className='flex items-center gap-2 cursor-pointer'>
+              <input
+                type='radio'
+                value='store'
+                checked={locationType === 'store'}
+                onChange={() => {
+                  setLocationType('store');
+                  setSelectedStoreId('');
+                  setSelectedShowroomId('');
+                  setQuantity(1);
+                }}
+                disabled={availableStores.length === 0}
+                className='w-4 h-4 text-blue-600'
+              />
+              <span className={`text-sm ${availableStores.length === 0 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                Store ({availableStores.length} available)
+              </span>
+            </label>
+            <label className='flex items-center gap-2 cursor-pointer'>
+              <input
+                type='radio'
+                value='showroom'
+                checked={locationType === 'showroom'}
+                onChange={() => {
+                  setLocationType('showroom');
+                  setSelectedStoreId('');
+                  setSelectedShowroomId('');
+                  setQuantity(1);
+                }}
+                disabled={availableShowrooms.length === 0}
+                className='w-4 h-4 text-purple-600'
+              />
+              <span className={`text-sm ${availableShowrooms.length === 0 ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                Showroom ({availableShowrooms.length} available)
+              </span>
+            </label>
+          </div>
+          {!hasAvailableStock && (
+            <p className='text-xs text-red-500'>⚠️ This item is out of stock in all locations</p>
+          )}
+        </div>
+
+        {/* Location Selection based on type */}
+        {locationType === 'store' && availableStores.length > 0 && (
+          <div className='space-y-2'>
+            <Label htmlFor='store'>Select Store</Label>
+            <div className='space-y-2 max-h-40 overflow-y-auto'>
+              {availableStores.map((store: any) => (
+                <label
+                  key={store.storeId}
+                  className={`flex items-center justify-between p-2 rounded border cursor-pointer transition-colors ${
+                    selectedStoreId === store.storeId
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <div className='flex items-center gap-3 flex-1'>
+                    <input
+                      type='radio'
+                      name='store'
+                      value={store.storeId}
+                      checked={selectedStoreId === store.storeId}
+                      onChange={() => {
+                        setSelectedStoreId(store.storeId);
+                        setQuantity(1);
+                      }}
+                      className='w-4 h-4 text-blue-600'
+                    />
+                    <div>
+                      <span className='font-medium text-sm text-gray-700 dark:text-gray-300'>
+                        {store.storeName}
+                      </span>
+                      {store.isMain && (
+                        <span className='ml-2 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 px-1.5 py-0.5 rounded'>
+                          Main
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className='text-sm font-semibold text-gray-900 dark:text-gray-100'>
+                    {store.quantity} units
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {locationType === 'showroom' && availableShowrooms.length > 0 && (
+          <div className='space-y-2'>
+            <Label htmlFor='showroom'>Select Showroom</Label>
+            <div className='space-y-2 max-h-40 overflow-y-auto'>
+              {availableShowrooms.map((showroom: any) => (
+                <label
+                  key={showroom.showroomId}
+                  className={`flex items-center justify-between p-2 rounded border cursor-pointer transition-colors ${
+                    selectedShowroomId === showroom.showroomId
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                      : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <div className='flex items-center gap-3 flex-1'>
+                    <input
+                      type='radio'
+                      name='showroom'
+                      value={showroom.showroomId}
+                      checked={selectedShowroomId === showroom.showroomId}
+                      onChange={() => {
+                        setSelectedShowroomId(showroom.showroomId);
+                        setQuantity(1);
+                      }}
+                      className='w-4 h-4 text-purple-600'
+                    />
+                    <div>
+                      <span className='font-medium text-sm text-gray-700 dark:text-gray-300'>
+                        {showroom.showroomName}
+                      </span>
+                      {showroom.isMain && (
+                        <span className='ml-2 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 px-1.5 py-0.5 rounded'>
+                          Main
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className='text-sm font-semibold text-gray-900 dark:text-gray-100'>
+                    {showroom.quantity} units
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Selected Location Stock Info */}
+        {getAvailableStock > 0 && (
+          <div className='rounded-md bg-green-50 dark:bg-green-900/20 p-2'>
+            <p className='text-sm text-green-700 dark:text-green-300'>
+              ✅ Selected: <span className='font-bold'>{locationType === 'store' ? 'Store' : 'Showroom'}</span> - Available stock: <span className='font-bold'>{getAvailableStock} units</span>
+            </p>
+          </div>
+        )}
+
+        {/* Quantity Section */}
+        <div className='space-y-2'>
+          <Label htmlFor='quantity'>Quantity</Label>
+          <Input
+            id='quantity'
+            type='number'
+            min='1'
+            max={getAvailableStock || 1}
+            value={quantity}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (val >= 1 && val <= (getAvailableStock || 1)) {
+                setQuantity(val);
+              }
+            }}
+            disabled={!getAvailableStock}
+          />
+          <div className='flex justify-between text-xs text-gray-500'>
+            <span>Available: {getAvailableStock || 0} units</span>
+            {selectedStoreId || selectedShowroomId ? (
+              <span className='text-green-600 dark:text-green-400'>✓ Location selected</span>
+            ) : (
+              <span className='text-yellow-600 dark:text-yellow-400'>Please select a location</span>
+            )}
+          </div>
+        </div>
+
         <div className='flex justify-end space-x-2 pt-4'>
           <Button variant='outline' onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleAddToCart}>
+          <Button 
+            onClick={handleAddToCart}
+            disabled={!getAvailableStock || !(selectedStoreId || selectedShowroomId) || quantity > getAvailableStock}
+          >
             {existingQuantity > 0 ? 'Update Cart' : 'Add to Cart'}
           </Button>
         </div>
@@ -251,6 +999,10 @@ interface CartItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  storeId?: string;
+  showroomId?: string;
+  store?: any;
+  showroom?: any;
   sellItemId?: string;
 }
 
@@ -259,10 +1011,12 @@ interface CartProps {
   items: CartItem[];
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemoveItem: (id: string) => void;
-  onUpdateOrder: () => void;
+  onResetCart: () => void;
+  onUpdateOrderSuccess: () => void;
   initialCustomerId?: string;
   initialDiscount?: number;
   initialNotes?: string;
+  initialDeliveryDate?: string;
   sellId: string;
 }
 
@@ -270,10 +1024,12 @@ const Cart = ({
   items, 
   onUpdateQuantity, 
   onRemoveItem, 
-  onUpdateOrder,
+  onResetCart,
+  onUpdateOrderSuccess,
   initialCustomerId = '',
   initialDiscount = 0,
   initialNotes = '',
+  initialDeliveryDate = '',
   sellId
 }: CartProps) => {
   const [customers, setCustomers] = useState<ICustomer[]>([]);
@@ -281,30 +1037,78 @@ const Cart = ({
   const [discount, setDiscount] = useState<number>(initialDiscount);
   const [notes, setNotes] = useState<string>(initialNotes);
   const [loading, setLoading] = useState(false);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [isOrderConfirmModalOpen, setIsOrderConfirmModalOpen] = useState(false);
   const [customerError, setCustomerError] = useState<string>('');
+  const [stores, setStores] = useState<any[]>([]);
+  const [showrooms, setShowrooms] = useState<any[]>([]);
+  const [deliveryDate, setDeliveryDate] = useState<string>(initialDeliveryDate);
+  const [deliveryDateError, setDeliveryDateError] = useState<string>('');
 
   const validateForm = () => {
+    let isValid = true;
+    
     if (!selectedCustomer) {
       setCustomerError('Customer selection is required');
-      return false;
+      isValid = false;
+    } else {
+      setCustomerError('');
     }
-    setCustomerError('');
-    return true;
+    
+    if (!deliveryDate) {
+      setDeliveryDateError('Delivery date is required');
+      isValid = false;
+    } else {
+      setDeliveryDateError('');
+    }
+    
+    return isValid;
   };
 
   useEffect(() => {
-    const fetchCustomers = async () => {
+    const fetchData = async () => {
       try {
-        const customersData = await getCustomer();
+        const [customersData, storesData, showroomsData] = await Promise.all([
+          getCustomer(),
+          getStoresAll(),
+          getShowroomsAll()
+        ]);
         setCustomers(customersData);
+        setStores(storesData || []);
+        setShowrooms(showroomsData || []);
+        
+        // Set default delivery date if not provided
+        if (!initialDeliveryDate) {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          setDeliveryDate(tomorrow.toISOString().split('T')[0]);
+        }
       } catch (err: any) {
-        toast.error(err.message || 'Failed to fetch customers');
+        toast.error(err.message || 'Failed to fetch data');
       }
     };
 
-    fetchCustomers();
-  }, []);
+    fetchData();
+  }, [initialDeliveryDate]);
+
+  const handleRefreshCustomers = async () => {
+    try {
+      setLoading(true);
+      const [customersData, storesData, showroomsData] = await Promise.all([
+        getCustomer(),
+        getStoresAll(),
+        getShowroomsAll()
+      ]);
+      setCustomers(customersData);
+      setStores(storesData || []);
+      setShowrooms(showroomsData || []);
+      toast.success('Data refreshed');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to refresh data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const grandTotal = subtotal - discount;
@@ -326,6 +1130,7 @@ const Cart = ({
       notes: notes || undefined,
       saleStatus: SaleStatus.NOT_APPROVED,
       saleDate: new Date().toISOString(),
+      deliveryDate: new Date(deliveryDate).toISOString(),
       totalProducts: items.length,
       items: items.map(cartItem => ({
         id: cartItem.sellItemId,
@@ -333,6 +1138,8 @@ const Cart = ({
         quantity: cartItem.quantity,
         unitPrice: cartItem.unitPrice,
         totalPrice: cartItem.totalPrice,
+        storeId: cartItem.storeId || null,
+        showroomId: cartItem.showroomId || null,
       })),
     };
 
@@ -341,7 +1148,7 @@ const Cart = ({
       await updateSell(sellId, orderData);
       toast.success('Order updated successfully!');
       setIsOrderConfirmModalOpen(false);
-      onUpdateOrder();
+      onUpdateOrderSuccess();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update order');
     } finally {
@@ -356,6 +1163,10 @@ const Cart = ({
     }
     if (!selectedCustomer) {
       setCustomerError('Please select a customer first');
+      return;
+    }
+    if (!deliveryDate) {
+      setDeliveryDateError('Please select a delivery date');
       return;
     }
     setIsOrderConfirmModalOpen(true);
@@ -386,6 +1197,124 @@ const Cart = ({
     }
   };
 
+  // Helper function to get location details
+  const getLocationDetails = (cartItem: CartItem) => {
+    // Check if we have the full store object
+    if (cartItem.store) {
+      return {
+        type: 'store' as const,
+        name: cartItem.store.name || 'Store',
+        icon: '🏬',
+        color: 'text-blue-600 dark:text-blue-400',
+        bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+        borderColor: 'border-blue-200 dark:border-blue-800'
+      };
+    }
+
+    // Check if we have the full showroom object
+    if (cartItem.showroom) {
+      return {
+        type: 'showroom' as const,
+        name: cartItem.showroom.name || 'Showroom',
+        icon: '🏪',
+        color: 'text-purple-600 dark:text-purple-400',
+        bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+        borderColor: 'border-purple-200 dark:border-purple-800'
+      };
+    }
+
+    // If we only have storeId, try to find in stores list
+    if (cartItem.storeId) {
+      const store = stores.find(s => s.id === cartItem.storeId);
+      if (store) {
+        return {
+          type: 'store' as const,
+          name: store.name,
+          icon: '🏬',
+          color: 'text-blue-600 dark:text-blue-400',
+          bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+          borderColor: 'border-blue-200 dark:border-blue-800'
+        };
+      }
+    }
+
+    // If we only have showroomId, try to find in showrooms list
+    if (cartItem.showroomId) {
+      const showroom = showrooms.find(s => s.id === cartItem.showroomId);
+      if (showroom) {
+        return {
+          type: 'showroom' as const,
+          name: showroom.name,
+          icon: '🏪',
+          color: 'text-purple-600 dark:text-purple-400',
+          bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+          borderColor: 'border-purple-200 dark:border-purple-800'
+        };
+      }
+    }
+    
+    // If no location found, check item's stock details
+    if (cartItem.item?.stockDetails) {
+      const stores = cartItem.item.stockDetails.stores || [];
+      const showrooms = cartItem.item.stockDetails.showrooms || [];
+      
+      if (stores.length > 0) {
+        const store = stores[0];
+        return {
+          type: 'store' as const,
+          name: store.storeName || 'Store',
+          icon: '🏬',
+          color: 'text-blue-600 dark:text-blue-400',
+          bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+          borderColor: 'border-blue-200 dark:border-blue-800'
+        };
+      }
+      
+      if (showrooms.length > 0) {
+        const showroom = showrooms[0];
+        return {
+          type: 'showroom' as const,
+          name: showroom.showroomName || 'Showroom',
+          icon: '🏪',
+          color: 'text-purple-600 dark:text-purple-400',
+          bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+          borderColor: 'border-purple-200 dark:border-purple-800'
+        };
+      }
+    }
+    
+    // Default fallback
+    return {
+      type: 'default' as const,
+      name: '⚠️ No Location',
+      icon: '⚠️',
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-50 dark:bg-red-900/20',
+      borderColor: 'border-red-200 dark:border-red-800'
+    };
+  };
+
+  // Get max quantity based on location stock
+  const getMaxQuantity = (cartItem: CartItem) => {
+    if (!cartItem.item?.stockDetails) return cartItem.item?.stock || 0;
+
+    if (cartItem.storeId) {
+      const storeStock = cartItem.item.stockDetails.stores?.find(
+        (s: any) => s.storeId === cartItem.storeId
+      );
+      return storeStock?.quantity || 0;
+    }
+
+    if (cartItem.showroomId) {
+      const showroomStock = cartItem.item.stockDetails.showrooms?.find(
+        (s: any) => s.showroomId === cartItem.showroomId
+      );
+      return showroomStock?.quantity || 0;
+    }
+
+    return cartItem.item?.stock || 0;
+  };
+
   if (items.length === 0) {
     return (
       <Card className='mx-auto w-full'>
@@ -406,7 +1335,17 @@ const Cart = ({
     <>
       <Card className='mx-auto w-full'>
         <CardHeader className='py-3 sm:py-4'>
-          <h2 className='text-lg font-bold sm:text-xl'>Shopping Cart ({items.length} items)</h2>
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
+            <h2 className='text-lg font-bold sm:text-xl'>Shopping Cart ({items.length} items)</h2>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={onResetCart}
+              className='text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
+            >
+              Clear Cart
+            </Button>
+          </div>
         </CardHeader>
         
         <CardContent className='space-y-3 px-2 sm:space-y-4 sm:px-4'>
@@ -459,6 +1398,49 @@ const Cart = ({
                 <p className='mt-1 text-xs text-red-500 dark:text-red-400'>{customerError}</p>
               )}
             </div>
+            
+            <div className='mt-2 flex w-full space-x-2 sm:mt-0 sm:w-auto'>
+              <Button
+                variant='outline'
+                onClick={handleRefreshCustomers}
+                disabled={loading}
+                className='w-full py-2 text-sm sm:w-auto sm:py-2.5 sm:text-base'
+              >
+                {loading ? '...' : 'Refresh'}
+              </Button>
+              <Button
+                onClick={() => setIsCustomerModalOpen(true)}
+                className='w-full py-2 text-sm sm:w-auto sm:py-2.5 sm:text-base'
+              >
+                + New
+              </Button>
+            </div>
+          </div>
+
+          {/* Delivery Date - Required */}
+          <div className='space-y-2'>
+            <Label htmlFor='deliveryDate' className='text-sm sm:text-base dark:text-gray-300'>
+              Delivery Date <span className='text-red-500'>*</span>
+            </Label>
+            <Input
+              id='deliveryDate'
+              type='date'
+              value={deliveryDate}
+              onChange={(e) => {
+                setDeliveryDate(e.target.value);
+                if (deliveryDateError) {
+                  setDeliveryDateError('');
+                }
+              }}
+              min={new Date().toISOString().split('T')[0]}
+              className='w-full'
+            />
+            {deliveryDateError && (
+              <p className='mt-1 text-xs text-red-500 dark:text-red-400'>{deliveryDateError}</p>
+            )}
+            <p className='text-xs text-red-500'>
+              Please select a delivery date for this order
+            </p>
           </div>
 
           {/* Cart Items Table */}
@@ -468,6 +1450,7 @@ const Cart = ({
                 <TableRow>
                   <TableHead className='w-10'>#</TableHead>
                   <TableHead>Product</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead className='text-right'>Total</TableHead>
@@ -475,48 +1458,64 @@ const Cart = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, index) => (
-                  <TableRow key={item.id}>
-                    <TableCell className='font-medium'>{index + 1}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className='font-medium'>{item.item.name}</div>
-                        <div className='text-xs text-gray-500'>
-                          Stock: {item.item.stock}
+                {items.map((item, index) => {
+                  const location = getLocationDetails(item);
+                  const maxQty = getMaxQuantity(item);
+                  
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className='font-medium'>{index + 1}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className='font-medium'>{item.item.name}</div>
+                          <div className='text-xs text-gray-500'>
+                            {item.item.color && `Color: ${item.item.color}`}
+                          </div>
+                          {item.sellItemId && (
+                            <div className='text-xs text-blue-500'>Existing item</div>
+                          )}
                         </div>
-                        {item.sellItemId && (
-                          <div className='text-xs text-blue-500'>Existing item</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{formatPrice(item.unitPrice)}</TableCell>
-                    <TableCell>
-                      <Input
-                        type='number'
-                        min='1'
-                        max={item.item.stock}
-                        value={item.quantity}
-                        onChange={(e) =>
-                          onUpdateQuantity(item.id, Number(e.target.value))
-                        }
-                        className='w-16 text-sm sm:w-20 sm:text-base'
-                      />
-                    </TableCell>
-                    <TableCell className='text-right font-medium'>
-                      {formatPrice(item.totalPrice)}
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      <Button
-                        variant='destructive'
-                        size='sm'
-                        onClick={() => onRemoveItem(item.id)}
-                        className='px-2 py-1 text-xs sm:text-sm'
-                      >
-                        Remove
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${location.bgColor} ${location.color} border ${location.borderColor}`}>
+                          <span>{location.icon}</span>
+                          <span>{location.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{formatPrice(item.unitPrice)}</TableCell>
+                      <TableCell>
+                        <div className='flex flex-col gap-1'>
+                          <Input
+                            type='number'
+                            min='1'
+                            max={maxQty}
+                            value={item.quantity}
+                            onChange={(e) =>
+                              onUpdateQuantity(item.id, Number(e.target.value))
+                            }
+                            className='w-16 text-sm sm:w-20 sm:text-base'
+                          />
+                          <span className='text-[10px] text-gray-400'>
+                            Max: {maxQty}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className='text-right font-medium'>
+                        {formatPrice(item.totalPrice)}
+                      </TableCell>
+                      <TableCell className='text-center'>
+                        <Button
+                          variant='destructive'
+                          size='sm'
+                          onClick={() => onRemoveItem(item.id)}
+                          className='px-2 py-1 text-xs sm:text-sm'
+                        >
+                          Remove
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -573,6 +1572,13 @@ const Cart = ({
             {loading ? 'Processing...' : 'Update Order'}
           </Button>
         </CardFooter>
+
+        {isCustomerModalOpen && (
+          <CreateCustomerModal
+            closeModal={() => setIsCustomerModalOpen(false)}
+            onSuccess={handleRefreshCustomers}
+          />
+        )}
       </Card>
 
       {/* Order Confirmation Modal */}
@@ -615,6 +1621,17 @@ const Cart = ({
             )}
           </div>
 
+          {/* Delivery Date */}
+          <div className='rounded-md bg-blue-50 p-3 sm:p-4 dark:bg-blue-900/20'>
+            <h3 className='mb-2 text-sm font-semibold text-blue-900 sm:text-base dark:text-blue-100'>
+              📦 Delivery Information
+            </h3>
+            <p className='text-sm text-blue-800 dark:text-blue-200'>
+              <span className='font-medium'>Delivery Date:</span>{' '}
+              {deliveryDate ? new Date(deliveryDate).toLocaleDateString() : 'Not set'}
+            </p>
+          </div>
+
           {/* Order Items Summary */}
           <div className='overflow-hidden rounded-md border border-gray-200 dark:border-gray-700'>
             <Table>
@@ -622,45 +1639,55 @@ const Cart = ({
                 <TableRow className='bg-gray-50 dark:bg-gray-800'>
                   <TableHead className='text-xs'>#</TableHead>
                   <TableHead className='text-xs'>Product</TableHead>
+                  <TableHead className='text-xs'>Location</TableHead>
                   <TableHead className='text-right text-xs'>Qty</TableHead>
                   <TableHead className='text-right text-xs'>Price</TableHead>
                   <TableHead className='text-right text-xs'>Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, index) => (
-                  <TableRow key={item.id}>
-                    <TableCell className='text-xs'>{index + 1}</TableCell>
-                    <TableCell className='text-xs'>
-                      <div>
-                        <div className='font-medium'>{item.item.name}</div>
-                        {item.sellItemId && (
-                          <div className='text-[10px] text-gray-500'>Existing item</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className='text-right text-xs'>
-                      {item.quantity}
-                    </TableCell>
-                    <TableCell className='text-right text-xs'>
-                      {formatPrice(item.unitPrice)}
-                    </TableCell>
-                    <TableCell className='text-right text-xs font-medium'>
-                      {formatPrice(item.totalPrice)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {items.map((item, index) => {
+                  const location = getLocationDetails(item);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className='text-xs'>{index + 1}</TableCell>
+                      <TableCell className='text-xs'>
+                        <div>
+                          <div className='font-medium'>{item.item.name}</div>
+                          {item.sellItemId && (
+                            <div className='text-[10px] text-gray-500'>Existing item</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className='text-xs'>
+                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${location.bgColor} ${location.color}`}>
+                          <span>{location.icon}</span>
+                          <span>{location.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className='text-right text-xs'>
+                        {item.quantity}
+                      </TableCell>
+                      <TableCell className='text-right text-xs'>
+                        {formatPrice(item.unitPrice)}
+                      </TableCell>
+                      <TableCell className='text-right text-xs font-medium'>
+                        {formatPrice(item.totalPrice)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
               <TableFooter>
                 <TableRow className='bg-gray-50 dark:bg-gray-800'>
-                  <TableCell colSpan={4} className='text-right font-medium'>
+                  <TableCell colSpan={5} className='text-right font-medium'>
                     Subtotal:
                   </TableCell>
                   <TableCell className='text-right'>{formatPrice(subtotal)}</TableCell>
                 </TableRow>
                 {discount > 0 && (
                   <TableRow className='bg-gray-50 dark:bg-gray-800'>
-                    <TableCell colSpan={4} className='text-right font-medium'>
+                    <TableCell colSpan={5} className='text-right font-medium'>
                       Discount:
                     </TableCell>
                     <TableCell className='text-right text-red-600'>
@@ -669,7 +1696,7 @@ const Cart = ({
                   </TableRow>
                 )}
                 <TableRow className='bg-gray-50 dark:bg-gray-800'>
-                  <TableCell colSpan={4} className='text-right font-bold'>
+                  <TableCell colSpan={5} className='text-right font-bold'>
                     Grand Total:
                   </TableCell>
                   <TableCell className='text-right font-bold text-blue-600'>
@@ -721,17 +1748,34 @@ interface ProductSearchProps {
   items: IItem[];
   initialSellData?: ISell;
   sellId: string;
+  categories?: IProductCategory[];
+  sizes?: ISize[];
+  types?: IProductType[];
 }
 
 interface SearchFilters {
   itemName: string;
+  categoryId: string;
+  sizeId: string;
+  typeId: string;
 }
 
-export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchProps) => {
+export const ProductSearch = ({ 
+  items, 
+  initialSellData, 
+  sellId,
+  categories = [], 
+  sizes = [], 
+  types = [] 
+}: ProductSearchProps) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
-    itemName: ''
+    itemName: searchParams?.get('searchTerm') || '',
+    categoryId: searchParams?.get('category') || '',
+    sizeId: searchParams?.get('size') || '',
+    typeId: searchParams?.get('type') || ''
   });
   
   const [selectedItem, setSelectedItem] = useState<IItem | null>(null);
@@ -751,6 +1795,10 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
           quantity: sellItem.quantity,
           unitPrice: sellItem.unitPrice,
           totalPrice: sellItem.totalPrice,
+          storeId: sellItem.storeId || undefined,
+          showroomId: sellItem.showroomId || undefined,
+          store: sellItem.store || undefined,
+          showroom: sellItem.showroom || undefined,
         };
       })
       .filter(Boolean) as CartItem[];
@@ -760,15 +1808,109 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
   const [orderUpdated, setOrderUpdated] = useState(false);
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
+  // Get available sizes based on selected category
+  const availableSizes = useMemo(() => {
+    if (!searchFilters.categoryId) return [];
+    return sizes.filter(size => size.categoryId === searchFilters.categoryId);
+  }, [sizes, searchFilters.categoryId]);
+
+  // Get available types based on selected category and size
+  const typesForSelectedSize = useMemo(() => {
+    let filtered = [...types];
+    
+    if (searchFilters.categoryId) {
+      filtered = filtered.filter(type => {
+        const size = sizes.find(s => s.id === type.sizeId);
+        return size?.categoryId === searchFilters.categoryId;
+      });
+    }
+    
+    if (searchFilters.sizeId) {
+      filtered = filtered.filter(type => type.sizeId === searchFilters.sizeId);
+    }
+    
+    return filtered;
+  }, [types, sizes, searchFilters.categoryId, searchFilters.sizeId]);
+
+  // Prepare options for react-select
+  const categoryOptions = useMemo(() => {
+    return [
+      { value: '', label: 'All Categories' },
+      ...categories.map(category => ({
+        value: category.id,
+        label: category.name
+      }))
+    ];
+  }, [categories]);
+
+  const sizeOptions = useMemo(() => {
+    const options = [
+      { value: '', label: 'All Sizes' }
+    ];
+    
+    if (searchFilters.categoryId) {
+      availableSizes.forEach(size => {
+        options.push({
+          value: size.id,
+          label: size.name
+        });
+      });
+    }
+    
+    return options;
+  }, [availableSizes, searchFilters.categoryId]);
+
+  const typeOptions = useMemo(() => {
+    const options = [
+      { value: '', label: 'All Types' }
+    ];
+    
+    if (searchFilters.categoryId) {
+      typesForSelectedSize.forEach(type => {
+        options.push({
+          value: type.id,
+          label: type.name
+        });
+      });
+    }
+    
+    return options;
+  }, [typesForSelectedSize, searchFilters.categoryId]);
+
   // Filter items
   const filteredItems = useMemo(() => {
     let filtered = items || [];
     
+    // Filter by name
     if (searchFilters.itemName) {
       const searchTerm = searchFilters.itemName.toLowerCase();
       filtered = filtered.filter((item) =>
         item.name.toLowerCase().includes(searchTerm)
       );
+    }
+    
+    // Filter by category
+    if (searchFilters.categoryId) {
+      filtered = filtered.filter(item => {
+        const itemCategoryId = item.categoryId || item.category?.id;
+        return itemCategoryId === searchFilters.categoryId;
+      });
+    }
+    
+    // Filter by size
+    if (searchFilters.sizeId) {
+      filtered = filtered.filter(item => {
+        const itemSizeId = item.sizeId || item.size?.id;
+        return itemSizeId === searchFilters.sizeId;
+      });
+    }
+    
+    // Filter by type
+    if (searchFilters.typeId) {
+      filtered = filtered.filter(item => {
+        const itemTypeId = item.typeId || item.type?.id;
+        return itemTypeId === searchFilters.typeId;
+      });
     }
     
     return filtered;
@@ -787,14 +1929,62 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
-  const handleFilterChange = (value: string) => {
-    setSearchFilters({ itemName: value });
+  const handleFilterChange = (key: keyof SearchFilters, value: string) => {
+    setSearchFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
+    
+    // Update URL
+    const params = new URLSearchParams(searchParams?.toString());
+    if (value) {
+      params.set(key === 'itemName' ? 'searchTerm' : key, value);
+    } else {
+      params.delete(key === 'itemName' ? 'searchTerm' : key);
+    }
+    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleCategoryChange = (selectedOption: any) => {
+    const value = selectedOption?.value || '';
+    handleFilterChange('categoryId', value);
+    // Reset dependent filters
+    setSearchFilters(prev => ({
+      ...prev,
+      sizeId: '',
+      typeId: ''
+    }));
+    // Update URL for size and type too
+    const params = new URLSearchParams(searchParams?.toString());
+    params.delete('size');
+    params.delete('type');
+    router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleSizeChange = (selectedOption: any) => {
+    const value = selectedOption?.value || '';
+    handleFilterChange('sizeId', value);
+    // Reset type filter when size changes
+    if (searchFilters.typeId) {
+      setSearchFilters(prev => ({ ...prev, typeId: '' }));
+      const params = new URLSearchParams(searchParams?.toString());
+      params.delete('type');
+      router.push(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+    }
+  };
+
+  const handleTypeChange = (selectedOption: any) => {
+    const value = selectedOption?.value || '';
+    handleFilterChange('typeId', value);
   };
 
   const clearFilters = () => {
-    setSearchFilters({ itemName: '' });
+    setSearchFilters({
+      itemName: '',
+      categoryId: '',
+      sizeId: '',
+      typeId: ''
+    });
     setCurrentPage(1);
+    router.push(window.location.pathname, { scroll: false });
   };
 
   const handleSelectItem = (item: IItem) => {
@@ -808,8 +1998,23 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
     setIsModalOpen(true);
   };
 
-  const handleAddToCart = (item: IItem, quantity: number, customPrice?: number) => {
+  const handleAddToCart = (
+    item: IItem, 
+    quantity: number, 
+    customPrice?: number, 
+    storeId?: string, 
+    showroomId?: string
+  ) => {
     const unitPrice = customPrice || item.price;
+    
+    // Find the full store/showroom objects
+    const store = undefined;
+    const showroom = undefined;
+    
+    // We need to fetch stores and showrooms here or pass them from parent
+    // For now, we'll just store the IDs and resolve later in Cart component
+    
+    // Check if item already exists in cart
     const existingItemIndex = cartItems.findIndex(
       (cartItem) => cartItem.item.id === item.id
     );
@@ -822,16 +2027,16 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
       setCartItems(updatedItems);
       toast.success(`Updated ${item.name} quantity`);
     } else {
-      setCartItems([
-        ...cartItems,
-        {
-          id: `cart-${Date.now()}-${item.id}`,
-          item,
-          quantity,
-          unitPrice,
-          totalPrice: unitPrice * quantity
-        }
-      ]);
+      const cartItem: CartItem = {
+        id: `cart-${Date.now()}-${item.id}`,
+        item,
+        quantity,
+        unitPrice,
+        totalPrice: unitPrice * quantity,
+        storeId: storeId || undefined,
+        showroomId: showroomId || undefined,
+      };
+      setCartItems([...cartItems, cartItem]);
       toast.success(`Added ${item.name} to cart`);
     }
     setSelectedCartItemId(null);
@@ -856,6 +2061,11 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
     }
   };
 
+  const handleResetCart = () => {
+    setCartItems([]);
+    toast.success('Cart has been reset');
+  };
+
   const handleUpdateOrderSuccess = () => {
     setOrderUpdated(true);
     setTimeout(() => {
@@ -870,28 +2080,129 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
     return item?.quantity || 0;
   };
 
+  const hasActiveFilters = 
+    searchFilters.itemName || 
+    searchFilters.categoryId || 
+    searchFilters.sizeId || 
+    searchFilters.typeId;
+
+  // Get current selected values
+  const selectedCategory = searchFilters.categoryId ? searchFilters.categoryId : null;
+  const selectedSize = searchFilters.sizeId ? searchFilters.sizeId : null;
+  const selectedType = searchFilters.typeId ? searchFilters.typeId : null;
+
   return (
     <div className='flex flex-col space-y-6 lg:flex-row lg:space-y-0 lg:space-x-6'>
       {/* Products Section */}
       <div className='flex-1 space-y-4'>
-        {/* Search Filters */}
+        {/* Search and Filters */}
         <div className='w-full rounded-lg border bg-white p-4 shadow-sm dark:bg-gray-900'>
           <h2 className='mb-3 text-xl font-bold'>Search Products</h2>
           
-          <div className='mb-3'>
-            <Input
-              type='text'
-              placeholder='Search by product name...'
-              value={searchFilters.itemName}
-              onChange={(e) => handleFilterChange(e.target.value)}
-              className='w-full'
-            />
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4'>
+            {/* Search Input */}
+            <div>
+              <Label className='text-sm font-medium mb-2 block'>Search</Label>
+              <Input
+                type='text'
+                placeholder='Search by product name...'
+                value={searchFilters.itemName}
+                onChange={(e) => handleFilterChange('itemName', e.target.value)}
+                className='w-full'
+              />
+            </div>
+            
+            {/* Category Filter */}
+            <div>
+              <Label className='text-sm font-medium mb-2 block'>Category</Label>
+              <Select
+                options={categoryOptions}
+                value={categoryOptions.find(option => option.value === selectedCategory) || null}
+                onChange={handleCategoryChange}
+                placeholder="All Categories"
+                isClearable
+                isSearchable
+                noOptionsMessage={() => 'No categories found'}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                formatOptionLabel={(option: any) => {
+                  const category = categories.find(c => c.id === option.value);
+                  if (!category || !option.value) return option.label;
+                  return (
+                    <div className="flex flex-col">
+                      <span className="font-medium dark:text-gray-100">
+                        {category.name}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            </div>
+            
+            {/* Size Filter */}
+            <div>
+              <Label className='text-sm font-medium mb-2 block'>Size</Label>
+              <Select
+                options={sizeOptions}
+                value={sizeOptions.find(option => option.value === selectedSize) || null}
+                onChange={handleSizeChange}
+                placeholder={searchFilters.categoryId ? "All Sizes" : "Select category first"}
+                isClearable
+                isSearchable
+                isDisabled={!searchFilters.categoryId}
+                noOptionsMessage={() => searchFilters.categoryId ? 'No sizes available' : 'Please select a category first'}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                formatOptionLabel={(option: any) => {
+                  const size = sizes.find(s => s.id === option.value);
+                  if (!size || !option.value) return option.label;
+                  return (
+                    <div className="flex flex-col">
+                      <span className="font-medium dark:text-gray-100">
+                        {size.name}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            </div>
+            
+            {/* Type Filter */}
+            <div>
+              <Label className='text-sm font-medium mb-2 block'>Product Type</Label>
+              <Select
+                options={typeOptions}
+                value={typeOptions.find(option => option.value === selectedType) || null}
+                onChange={handleTypeChange}
+                placeholder={searchFilters.categoryId ? "All Types" : "Select category first"}
+                isClearable
+                isSearchable
+                isDisabled={!searchFilters.categoryId}
+                noOptionsMessage={() => searchFilters.categoryId ? 'No types available' : 'Please select a category first'}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                formatOptionLabel={(option: any) => {
+                  const type = types.find(t => t.id === option.value);
+                  if (!type || !option.value) return option.label;
+                  return (
+                    <div className="flex flex-col">
+                      <span className="font-medium dark:text-gray-100">
+                        {type.name}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            </div>
           </div>
           
-          {(searchFilters.itemName) && (
-            <Button onClick={clearFilters} variant='outline' className='w-full'>
-              Clear Filters
-            </Button>
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <div className='mt-4'>
+              <Button onClick={clearFilters} variant='outline' className='w-full md:w-auto'>
+                Clear All Filters
+              </Button>
+            </div>
           )}
         </div>
 
@@ -974,10 +2285,12 @@ export const ProductSearch = ({ items, initialSellData, sellId }: ProductSearchP
           items={cartItems}
           onUpdateQuantity={handleUpdateQuantity}
           onRemoveItem={handleRemoveItem}
-          onUpdateOrder={handleUpdateOrderSuccess}
+          onResetCart={handleResetCart}
+          onUpdateOrderSuccess={handleUpdateOrderSuccess}
           initialCustomerId={initialSellData?.customerId}
           initialDiscount={initialSellData?.discount || 0}
           initialNotes={initialSellData?.notes || ''}
+          initialDeliveryDate={initialSellData?.deliveryDate?.split('T')[0] || ''}
           sellId={sellId}
         />
       </div>

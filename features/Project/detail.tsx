@@ -488,43 +488,20 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
           <CardHeader className="pb-2 pt-3 px-3">
             <CardTitle className="flex items-center gap-1.5 text-xs font-semibold">
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              Delivery
+              Time Line
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2.5">
             {/* Operative date — precedence: Final > Manual > Calculated. This is
                 the date that actually governs the project. */}
-            {(() => {
-              const operative = project.finalDelivery
-                ? { label: 'Final', value: project.finalDelivery }
-                : project.manualDelivery
-                ? { label: 'Manual', value: project.manualDelivery }
-                : project.calculatedDelivery
-                ? { label: 'Calculated', value: project.calculatedDelivery }
-                : null;
-              return (
-                <div className="flex items-center justify-between rounded-md bg-primary/5 px-2 py-1.5 text-xs">
-                  <span className="font-medium text-primary">
-                    Operative{operative ? ` (${operative.label})` : ''}
-                  </span>
-                  <div className="text-right">
-                    <span className="font-semibold">
-                      {operative ? formatDate(operative.value) : 'Pending'}
-                    </span>
-                    {operative && (
-                      <p className="text-[10px] text-muted-foreground italic">{formatDateEth(operative.value)}</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+      
             {[
               { label: 'Requested', value: project.requestedDelivery ? formatDate(project.requestedDelivery) : 'Not set', ethValue: project.requestedDelivery ? formatDateEth(project.requestedDelivery) : '', note: 'customer ask' },
               { label: 'Calculated', value: project.calculatedDelivery ? formatDate(project.calculatedDelivery) : 'Pending', ethValue: project.calculatedDelivery ? formatDateEth(project.calculatedDelivery) : '', note: 'auto-scheduled' },
               ...(project.manualDelivery ? [{ label: 'Manual', value: formatDate(project.manualDelivery), ethValue: formatDateEth(project.manualDelivery), note: 'override' }] : []),
               ...(project.finalDelivery ? [{ label: 'Final', value: formatDate(project.finalDelivery), ethValue: formatDateEth(project.finalDelivery), note: 'committed' }] : []),
-              { label: 'Created', value: formatDate(project.createdAt), ethValue: formatDateEth(project.createdAt), note: '' },
-              { label: 'Updated', value: formatDate(project.updatedAt), ethValue: formatDateEth(project.updatedAt), note: '' },
+              { label: 'Project Created', value: formatDate(project.createdAt), ethValue: formatDateEth(project.createdAt), note: '' },
+              { label: 'Last Updated', value: formatDate(project.updatedAt), ethValue: formatDateEth(project.updatedAt), note: '' },
             ].map((row) => (
               <div key={row.label} className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">
@@ -549,38 +526,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Current</span>
-              <Badge
-                variant={
-                  project.scheduleMode === ScheduleMode.LOCKED
-                    ? 'destructive'
-                    : project.scheduleMode === ScheduleMode.MANUAL
-                    ? 'outline'
-                    : 'default'
-                }
-              >
-                {project.scheduleMode || 'AUTO'}
-              </Badge>
-            </div>
-            <div className="flex gap-1.5">
-              {[ScheduleMode.AUTO, ScheduleMode.MANUAL, ScheduleMode.LOCKED].map((m) => (
-                <Button
-                  key={m}
-                  size="sm"
-                  variant={(project.scheduleMode || ScheduleMode.AUTO) === m ? 'default' : 'outline'}
-                  disabled={modeBusy || (project.scheduleMode || ScheduleMode.AUTO) === m}
-                  onClick={() => changeScheduleMode(m)}
-                  className="flex-1 text-[11px]"
-                >
-                  {m === ScheduleMode.AUTO ? 'Auto' : m === ScheduleMode.MANUAL ? 'Manual' : 'Lock'}
-                </Button>
-              ))}
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              LOCKED keeps automatic jobs away from a confirmed date. MANUAL stops the nightly
-              refresh but still allows explicit edits.
-            </p>
+       
             <Button
               variant="ghost"
               size="sm"

@@ -3,6 +3,7 @@ import { ICustomer } from "./customer";
 import { IEmployee } from "./employee";
 import { IItem } from "./item";
 import { IMaterial } from "./material";
+import { IProductCategory } from "./productConfiguration";
 import { SellPaymentStatus } from "./Sell";
 
 /* =======================
@@ -64,6 +65,9 @@ export interface IProformaInvoiceItem {
   invoice?: IProformaInvoice;
 itemId?: string; // Add this - reference to Items table
   item?: IItem; // Add this - relation to Items model
+
+  categoryId?: string;    // 👈 required now
+  category?: IProductCategory; // 👈 optional populated relation
 
   description: string;
   size?: string;

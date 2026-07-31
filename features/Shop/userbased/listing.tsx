@@ -257,7 +257,7 @@ export default function UserSellListingPage({}: SellListingPageProps) {
 
       {/* ── Tabs ────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "sale" | "payment")}>
-        <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+        <TabsList className="grid w-full max-w-100 grid-cols-2">
           <TabsTrigger value="sale">Sale Status</TabsTrigger>
           <TabsTrigger value="payment">Payment Status</TabsTrigger>
         </TabsList>

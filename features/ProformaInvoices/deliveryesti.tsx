@@ -708,7 +708,7 @@ export default function DeliveryEstimationFromPIPage({
           </div>
           <Button
             variant='outline'
-            onClick={() => router.push('/dashboard/delivery-estimation')}
+            onClick={() => router.back()}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />

@@ -440,49 +440,62 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
   };
 
   // Perform actual stage update
-  const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
-    if (!project?.id) {
-      toast.error('Project ID not found');
-      return false;
-    }
+// Perform actual stage update
+const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
+  if (!project?.id) {
+    toast.error('Project ID not found');
+    return false;
+  }
 
-    try {
-      setSaving(true);
-      const startDateTime = stage.startDate;
-      
-      const isTempStage = !stage.id || stage.isNew || stage.id.startsWith('temp-');
-      
-      // Prepare data based on whether it's a new stage or update
-      const dataToSend: any = {
-        projectId: project.id,
-        stageName: stage.stage,
-        allowOverCapacity: false,
-        customDates: {
-          startDate: startDateTime?.toISOString(),
-        },
-        timeTakenMinutes: Math.max(0, Math.round(stage.timeTaken || 0)),
-        createManualWorkLog: true,
-        manualOverride: true, // FORCE manual override to use custom dates
-        isNewStage: isTempStage,
-      };
+  try {
+    setSaving(true);
+    const startDateTime = stage.startDate;
+    
+    const isTempStage = !stage.id || stage.isNew || stage.id.startsWith('temp-');
+    
+    // Prepare data based on whether it's a new stage or update
+    const dataToSend: any = {
+      projectId: project.id,
+      stageName: stage.stage,
+      allowOverCapacity: false,
+      customDates: {
+        startDate: startDateTime?.toISOString(),
+      },
+      timeTakenMinutes: Math.max(0, Math.round(stage.timeTaken || 0)),
+      createManualWorkLog: true,
+      manualOverride: true,
+      isNewStage: isTempStage,
+    };
 
-      // Only include workUnits for NEW stages (create operation)
-      if (isTempStage || stage.isNew) {
-        dataToSend.newQuantity = stage.workUnits || 0;
+    // For NEW stages: require and send newQuantity
+    if (isTempStage || stage.isNew) {
+      if (!stage.workUnits || stage.workUnits <= 0) {
+        toast.error('Work units are required for new stages');
+        return false;
       }
-
-      await updateProjectStage(dataToSend);
-      toast.success(stage.isNew ? 'Stage added successfully' : 'Stage updated successfully');
-
-      await fetchProjectData();
-      return true;
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update stage');
-      return false;
-    } finally {
-      setSaving(false);
+      dataToSend.newQuantity = stage.workUnits || 0;
+    } else {
+      // For EDIT operations: send newQuantity as 0 or null to satisfy backend validation
+      // This tells the backend "don't update the quantity, keep the existing value"
+      dataToSend.newQuantity = 0;
+      // Also explicitly send the stage ID for edit operations
+      if (stage.id) {
+        dataToSend.stageId = stage.id;
+      }
     }
-  };
+
+    await updateProjectStage(dataToSend);
+    toast.success(stage.isNew ? 'Stage added successfully' : 'Stage updated successfully');
+
+    await fetchProjectData();
+    return true;
+  } catch (error: any) {
+    toast.error(error.message || 'Failed to update stage');
+    return false;
+  } finally {
+    setSaving(false);
+  }
+};
 
   // Handle stage update (used by both add and edit dialogs)
   const handleUpdateStage = async (stage: StageFormData): Promise<boolean> => {
@@ -581,15 +594,21 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
     });
   };
 
-  // Save the dialog (add or edit) to the backend
-  const handleSaveForm = async () => {
-    const draft: StageFormData =
-      formMode === 'add'
-        ? { ...form, id: `temp-${stages.length}-${form.stage}`, isNew: true }
-        : form;
-    const ok = await handleUpdateStage(draft);
-    if (ok) setFormOpen(false);
-  };
+// Also update the handleSaveForm function to ensure workUnits are only sent for new stages
+const handleSaveForm = async () => {
+  const draft: StageFormData =
+    formMode === 'add'
+      ? { ...form, id: `temp-${stages.length}-${form.stage}`, isNew: true }
+      : { ...form, isNew: false };
+  
+  // For edit mode, ensure workUnits is NOT sent
+  if (formMode === 'edit') {
+    delete draft.workUnits;
+  }
+  
+  const ok = await handleUpdateStage(draft);
+  if (ok) setFormOpen(false);
+};
 
   // Handle delete stage - open confirmation dialog
   const handleDeleteClick = (stage: StageFormData) => {

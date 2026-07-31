@@ -8,7 +8,7 @@ import "gantt-task-react/dist/index.css";
 import { format, parseISO, differenceInDays, addDays, isWithinInterval, isAfter, isBefore } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ZoomIn, ZoomOut, Calendar, ArrowLeft, Filter, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ZoomIn, ZoomOut, Calendar, ArrowLeft, Filter, X, CheckCircle, AlertTriangle, Maximize, Minimize } from 'lucide-react';
 import { IProjectStage, ProjectStatus, StageStatus, IProject, DesignStatus } from '@/models/Projects';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -64,6 +64,7 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [chartHeight, setChartHeight] = useState(400);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     stages: [],
     statuses: [],
@@ -309,24 +310,36 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
     let earliestDate: Date | null = null;
     let latestDate: Date | null = null;
 
-    stages.forEach(stage => {
-      if (stage.startDate && stage.endDate) {
-        const start = parseISO(stage.startDate);
-        const end = parseISO(stage.endDate);
-        if (!earliestDate || start < earliestDate) earliestDate = start;
-        if (!latestDate || end > latestDate) latestDate = end;
-      }
+    const validStages = stages.filter(stage => {
+      const hasValidStart = stage.startDate && !isNaN(new Date(stage.startDate).getTime());
+      const hasValidEnd = stage.endDate && !isNaN(new Date(stage.endDate).getTime());
+      return hasValidStart && hasValidEnd;
     });
 
-    if (!earliestDate || !latestDate) {
-      earliestDate = new Date();
-      latestDate = addDays(earliestDate, 30);
+    if (validStages.length === 0) {
+      const defaultStart = new Date();
+      const defaultEnd = addDays(defaultStart, 30);
+      earliestDate = defaultStart;
+      latestDate = defaultEnd;
+    } else {
+      validStages.forEach(stage => {
+        if (stage.startDate) {
+          const start = parseISO(stage.startDate);
+          if (!earliestDate || start < earliestDate) earliestDate = start;
+        }
+        if (stage.endDate) {
+          const end = parseISO(stage.endDate);
+          if (!latestDate || end > latestDate) latestDate = end;
+        }
+      });
     }
 
-    const startDate = earliestDate || new Date();
-    const endDate = latestDate || addDays(startDate, 30);
+    if (!earliestDate) earliestDate = new Date();
+    if (!latestDate) latestDate = addDays(earliestDate, 30);
 
-    // Project Task
+    const startDate = earliestDate;
+    const endDate = latestDate;
+
     const projectTask: Task = {
       start: startDate,
       end: endDate,
@@ -344,16 +357,29 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
     };
     ganttTasks.push(projectTask);
 
-    // Stage Tasks
     stages.forEach((stage, index) => {
+      if (!stage.startDate || !stage.endDate) {
+        console.warn(`Stage ${stage.stage} missing dates, skipping`);
+        return;
+      }
+
       let stageStartDate: Date, stageEndDate: Date;
-      if (stage.startDate && stage.endDate) {
+      
+      try {
         stageStartDate = parseISO(stage.startDate);
         stageEndDate = parseISO(stage.endDate);
-      } else {
-        const daysFromStart = stages.slice(0, index).reduce((sum, s) => sum + (s.capacityDays || 1), 0);
-        stageStartDate = addDays(startDate, daysFromStart);
-        stageEndDate = addDays(stageStartDate, stage.capacityDays || 1);
+        
+        if (isNaN(stageStartDate.getTime()) || isNaN(stageEndDate.getTime())) {
+          console.warn(`Stage ${stage.stage} has invalid dates, skipping`);
+          return;
+        }
+      } catch (error) {
+        console.warn(`Stage ${stage.stage} has invalid dates, skipping`);
+        return;
+      }
+
+      if (stageEndDate < stageStartDate) {
+        stageEndDate = addDays(stageStartDate, Math.max(stage.capacityDays || 1, 1));
       }
 
       const capacityCheck = checkDateRangeCapacity(stage.stage, stageStartDate, stageEndDate, stage.id);
@@ -380,6 +406,25 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
       };
       ganttTasks.push(task);
     });
+
+    if (ganttTasks.length === 1) {
+      const placeholderTask: Task = {
+        start: startDate,
+        end: addDays(startDate, 7),
+        name: 'No stages with valid dates',
+        id: 'placeholder',
+        type: 'task',
+        progress: 0,
+        project: 'project',
+        styles: {
+          backgroundColor: '#9CA3AF',
+          backgroundSelectedColor: '#6B7280',
+          progressColor: '#D1D5DB',
+          progressSelectedColor: '#9CA3AF',
+        },
+      };
+      ganttTasks.push(placeholderTask);
+    }
 
     return ganttTasks;
   }, [stages, projectId, projectName, getStageColor, darkenColor, formatStageName, calculateStageProgress, calculateOverallProjectCompletion, isStageOverdue, checkDateRangeCapacity]);
@@ -530,6 +575,11 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
     toast.success('Filters applied');
   }, [applyFilters, tasks, stages, updateActiveFilters]);
 
+  // Toggle fullscreen mode
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev);
+  }, []);
+
   // --- Statistics ---
   const statistics = useMemo(() => {
     if (!stages || stages.length === 0) return null;
@@ -564,7 +614,9 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
         const ganttTasks = convertStagesToTasks();
         setTasks(ganttTasks);
         setFilteredTasks(ganttTasks);
-        const newHeight = Math.min(600, Math.max(300, stages.length * 50 + 100));
+        // Calculate dynamic height based on number of tasks
+        const taskCount = ganttTasks.length;
+        const newHeight = Math.max(400, Math.min(800, taskCount * 60 + 100));
         setChartHeight(newHeight);
       } catch (error) {
         toast.error('Failed to generate Gantt chart');
@@ -585,39 +637,65 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
   // --- Render ---
   return (
     <TooltipProvider>
-      <div className="mx-auto w-full space-y-4">
-        {/* ===== HEADER ===== */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl font-bold tracking-tight">Project Timeline</h1>
-                {isProjectTrulyFinished() && (
-                  <Badge className="bg-emerald-600 text-white text-xs h-6 gap-1">
-                    <CheckCircle className="h-3 w-3" /> Complete
-                  </Badge>
-                )}
+      <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-background p-4 overflow-auto' : 'mx-auto w-full space-y-4'}`}>
+        {/* ===== FULLSCREEN CONTROLS ===== */}
+        <div className={`flex items-center justify-between ${isFullscreen ? 'mb-4' : ''}`}>
+          {!isFullscreen && (
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-xl font-bold tracking-tight">Project Timeline</h1>
+                  {isProjectTrulyFinished() && (
+                    <Badge className="bg-emerald-600 text-white text-xs h-6 gap-1">
+                      <CheckCircle className="h-3 w-3" /> Complete
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground truncate max-w-md">
+                  {projectName || `Project ${projectId.substring(0, 8)}...`}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground truncate max-w-md">
-                {projectName || `Project ${projectId.substring(0, 8)}...`}
-              </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button onClick={() => setFilterDialogOpen(true)} variant="outline" size="sm" className="gap-1.5">
-              <Filter className="h-4 w-4" /> Filter
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-0.5 h-5 w-5 p-0 justify-center text-xs">{activeFilters.length}</Badge>
+          )}
+
+          <div className={`flex items-center gap-2 ${isFullscreen ? 'ml-auto' : ''}`}>
+            {isFullscreen && (
+              <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-1.5">
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Button>
+            )}
+            {!isFullscreen && (
+              <Button onClick={() => setFilterDialogOpen(true)} variant="outline" size="sm" className="gap-1.5">
+                <Filter className="h-4 w-4" /> Filter
+                {activeFilters.length > 0 && (
+                  <Badge variant="secondary" className="ml-0.5 h-5 w-5 p-0 justify-center text-xs">{activeFilters.length}</Badge>
+                )}
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={toggleFullscreen} 
+              className="gap-1.5"
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize className="h-4 w-4" /> Exit Fullscreen
+                </>
+              ) : (
+                <>
+                  <Maximize className="h-4 w-4" /> Fullscreen
+                </>
               )}
             </Button>
           </div>
         </div>
 
-        {/* ===== ACTIVE FILTERS ===== */}
-        {activeFilters.length > 0 && (
+        {/* ===== ACTIVE FILTERS (hidden in fullscreen) ===== */}
+        {!isFullscreen && activeFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2">
             <span className="text-sm font-medium text-muted-foreground">Filters:</span>
             {activeFilters.map((filter, index) => (
@@ -629,11 +707,9 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
           </div>
         )}
 
-       
-
         {/* ===== GANTT CHART ===== */}
-        <Card>
-          <CardHeader className="pb-2 pt-3 px-4">
+        <Card className={isFullscreen ? 'min-h-[calc(100vh-120px)]' : ''}>
+          <CardHeader className={`pb-2 pt-3 px-4 ${isFullscreen ? 'hidden' : ''}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-base font-semibold">Timeline</CardTitle>
@@ -702,45 +778,45 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
               )}
             </div>
           </CardHeader>
-          <CardContent className="px-3 pb-3">
-            {loadingCapacity ? (
-              <div className="flex items-center justify-center h-80 gap-3 text-muted-foreground">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-                <span className="text-sm">Loading capacity data…</span>
-              </div>
-            ) : isLoading ? (
-              <div className="flex items-center justify-center h-80 gap-3 text-muted-foreground">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-                <span className="text-sm">Loading chart…</span>
-              </div>
-            ) : filteredTasks.length > 0 ? (
-              <div className="gantt-container overflow-x-auto rounded-lg border" style={{ height: `${chartHeight}px` }}>
-                <Gantt
-                  tasks={filteredTasks}
-                  viewMode={viewMode}
-                  listCellWidth="200px"
-                  columnWidth={80}
-                  rowHeight={50}
-                  fontSize="14px"
-                  barFill={70}
-                  onSelect={handleTaskClick}
-                  locale="en-US"
-                  todayColor="rgba(59, 130, 246, 0.1)"
-                  barCornerRadius={4}
-                  barProgressColor={darkenColor('#3B82F6', 40)}
-                  barProgressSelectedColor={darkenColor('#3B82F6', 60)}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-60 text-muted-foreground rounded-lg border border-dashed">
-                <Calendar className="h-12 w-12 mb-3" />
-                <p className="text-sm font-medium">No stages match your filters</p>
-                <Button variant="outline" size="sm" onClick={clearFilters} className="mt-3">
-                  Clear Filters
-                </Button>
-              </div>
-            )}
-          </CardContent>
+       <CardContent className={`${isFullscreen ? 'p-0' : 'px-3 pb-3'}`}>
+    {loadingCapacity ? (
+      <div className="flex items-center justify-center h-80 gap-3 text-muted-foreground">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+        <span className="text-sm">Loading capacity data…</span>
+      </div>
+    ) : isLoading ? (
+      <div className="flex items-center justify-center h-80 gap-3 text-muted-foreground">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+        <span className="text-sm">Loading chart…</span>
+      </div>
+    ) : filteredTasks.length > 0 ? (
+      <div className="gantt-container w-full border rounded-lg" style={{ minHeight: `${chartHeight}px` }}>
+        <Gantt
+          tasks={filteredTasks}
+          viewMode={viewMode}
+          listCellWidth={isFullscreen ? '140px' : '120px'}  // Reduced from 300px/220px
+          columnWidth={isFullscreen ? 65 : 50}              // Reduced from 120/90
+          rowHeight={isFullscreen ? 55 : 45}                // Reduced from 65/55
+          fontSize={isFullscreen ? '13px' : '12px'}         // Reduced font size
+          barFill={60}                                      // Reduced from 70
+          onSelect={handleTaskClick}
+          locale="en-US"
+          todayColor="rgba(59, 130, 246, 0.1)"
+          barCornerRadius={4}
+          barProgressColor={darkenColor('#3B82F6', 40)}
+          barProgressSelectedColor={darkenColor('#3B82F6', 60)}
+        />
+      </div>
+    ) : (
+      <div className="flex flex-col items-center justify-center h-60 text-muted-foreground rounded-lg border border-dashed">
+        <Calendar className="h-12 w-12 mb-3" />
+        <p className="text-sm font-medium">No stages match your filters</p>
+        <Button variant="outline" size="sm" onClick={clearFilters} className="mt-3">
+          Clear Filters
+        </Button>
+      </div>
+    )}
+  </CardContent>
         </Card>
 
         {/* ===== FILTER DIALOG ===== */}
