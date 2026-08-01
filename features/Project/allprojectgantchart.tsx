@@ -228,7 +228,11 @@ const isStageActuallyComplete = useCallback((stage: IProjectStage): boolean => {
       [ProjectStatus.PAINTING]: '#6366F1',
       [ProjectStatus.FINISHING]: '#EAB308',
       [ProjectStatus.DELIVERY]: '#10B981',
-      [ProjectStatus.INSTALLATION]: '#047857',
+      [ProjectStatus.INSTALLATION]: '#000857',
+
+            [ProjectStatus.COMPLETED]: '#059669',
+            [ProjectStatus.CANCELLED]: '#EF4444',
+
     };
     return colorMap[stage] || '#6B7280';
   }, []);
