@@ -20,12 +20,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IProformaInvoice, IProformaInvoiceItem, IProformaItemMaterial } from '@/models/ProformaInvoice';
 import { Textarea } from '@/components/ui/textarea';
 import Select from 'react-select';
-import { Plus, Trash2, Image as ImageIcon, Package, Eye, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Package, RefreshCw, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { getCustomer } from '@/service/customer';
 import { getMaterials, getMaterialStockById } from '@/service/material';
 import { getItems } from '@/service/item';
 import { normalizeImagePath } from '@/lib/norm';
 import { Badge } from '@/components/ui/badge';
+import Image from 'next/image';
 
 interface ProformaInvoiceFormValues {
   customerId: string;
@@ -65,6 +66,7 @@ interface IItem {
       name: string;
       color: string;
       size: string;
+      imageUrl?: string;
     }
   }[];
 }
@@ -105,6 +107,9 @@ export default function DesignProformaInvoiceForm({
   const [materialStock, setMaterialStock] = useState<Map<string, { available: number; isOutOfStock: boolean }>>(new Map());
   const [isLoadingStock, setIsLoadingStock] = useState(false);
   
+  // Add state for portal mounting
+  const [isMounted, setIsMounted] = useState(false);
+  
   // Ensure we have initialData for update
   if (!initialData) {
     throw new Error('This form is only for updating existing proforma invoices. No initial data provided.');
@@ -112,6 +117,11 @@ export default function DesignProformaInvoiceForm({
   
   // Store original material quantities
   const [originalMaterialQuantities, setOriginalMaterialQuantities] = useState<Map<string, number>>(new Map());
+  
+  // Mount effect for portal
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   const defaultValues = useMemo<ProformaInvoiceFormValues>(
     () => ({
@@ -312,45 +322,51 @@ export default function DesignProformaInvoiceForm({
     [customers]
   );
 
-const materialOptions: SelectOption[] = useMemo(
-  () => [
-    { value: '', label: 'Select a material' },
-    ...materials.map((material) => {
-      const details: string[] = [];
+  // Custom option renderer for materials with image
+  const materialOptionRenderer = (material: any) => {
+    const details: string[] = [];
+    
+    if (material.color?.trim()) {
+      details.push(material.color);
+    }
+    
+    if (material.size?.trim()) {
+      details.push(material.size);
+    }
+    
+    // Material type
+    if (material.plainMDF) {
+      details.push('Plain MDF');
+    } else if (material.laminatedMDF) {
+      details.push('Laminated MDF');
+    } else if (material.wood) {
+      details.push('Wood');
+    } else if (material.metal) {
+      details.push('Metal');
+    } else if (material.accessory) {
+      details.push('Accessory');
+    } else if (material.other) {
+      details.push('Other');
+    }
+    
+    const label = details.length
+      ? `${material.name} (${details.join(' - ')})`
+      : material.name;
+    
+    return {
+      value: material.id,
+      label: label,
+      imageUrl: material.imageUrl
+    };
+  };
 
-      if (material.color?.trim()) {
-        details.push(material.color);
-      }
-
-      if (material.size?.trim()) {
-        details.push(material.size);
-      }
-
-      // Material type
-      if (material.plainMDF) {
-        details.push('Plain MDF');
-      } else if (material.laminatedMDF) {
-        details.push('Laminated MDF');
-      } else if (material.wood) {
-        details.push('Wood');
-      } else if (material.metal) {
-        details.push('Metal');
-      } else if (material.accessory) {
-        details.push('Accessory');
-      } else if (material.other) {
-        details.push('Other');
-      }
-
-      return {
-        value: material.id,
-        label: details.length
-          ? `${material.name} (${details.join(' - ')})`
-          : material.name,
-      };
-    }),
-  ],
-  [materials]
-);
+  const materialOptions: SelectOption[] = useMemo(
+    () => [
+      { value: '', label: 'Select a material' },
+      ...materials.map((material) => materialOptionRenderer(material))
+    ],
+    [materials]
+  );
 
   const refreshMaterials = async () => {
     try {
@@ -409,7 +425,7 @@ const materialOptions: SelectOption[] = useMemo(
     const item = currentItems[itemIndex];
     
     if (item) {
-       const updatedMaterials: ExtendedMaterial[] = [
+      const updatedMaterials: ExtendedMaterial[] = [
         ...(item.materials as ExtendedMaterial[] || []),
         {
           id: '',
@@ -417,8 +433,7 @@ const materialOptions: SelectOption[] = useMemo(
           materialId: '',
           quantity: 1,
           note: '',
-        materialIssues: [] // Add this - required by ExtendedMaterial
-          
+          materialIssues: []
         }
       ];
       
@@ -504,73 +519,68 @@ const materialOptions: SelectOption[] = useMemo(
     }
   };
 
-const onSubmit = async (data: ProformaInvoiceFormValues) => {
-  try {
-    setIsLoading(true);
+  const onSubmit = async (data: ProformaInvoiceFormValues) => {
+    try {
+      setIsLoading(true);
 
-    // Collect all material updates
-    const materialUpdates: MaterialUpdate[] = [];
-    
-   
-    data.items.forEach((item, itemIndex) => {
+      // Collect all material updates
+      const materialUpdates: MaterialUpdate[] = [];
       
-      if (item.materials && item.materials.length > 0) {
-        item.materials.forEach((material, materialIndex) => {
-          const originalQty = originalMaterialQuantities.get(material.id) || 0;
-     
-          // Only include materials that have changes
-          if (material.id && originalQty > 0) {
-            // Existing material - check if additional quantity is provided
-            const additionalQty = (material as ExtendedMaterial).additionalQuantity || 0;
+      data.items.forEach((item, itemIndex) => {
+        if (item.materials && item.materials.length > 0) {
+          item.materials.forEach((material, materialIndex) => {
+            const originalQty = originalMaterialQuantities.get(material.id) || 0;
             
-            
-            if (additionalQty > 0) {
+            // Only include materials that have changes
+            if (material.id && originalQty > 0) {
+              // Existing material - check if additional quantity is provided
+              const additionalQty = (material as ExtendedMaterial).additionalQuantity || 0;
+              
+              if (additionalQty > 0) {
+                const update = {
+                  materialId: material.materialId,
+                  additionalQuantity: additionalQty,
+                  note: material.note || null
+                };
+                materialUpdates.push(update);
+              }
+            } else if (!material.id && material.quantity > 0) {
+              // New material - quantity is the actual quantity to add
               const update = {
                 materialId: material.materialId,
-                additionalQuantity: additionalQty,
+                additionalQuantity: material.quantity,
                 note: material.note || null
               };
               materialUpdates.push(update);
             }
-          } else if (!material.id && material.quantity > 0) {
-            // New material - quantity is the actual quantity to add
-            const update = {
-              materialId: material.materialId,
-              additionalQuantity: material.quantity,
-              note: material.note || null
-            };
-            materialUpdates.push(update);
-          }
-        });
+          });
+        }
+      });
+
+      if (materialUpdates.length === 0) {
+        toast.info('No material updates to apply');
+        setIsLoading(false);
+        return;
       }
-    });
 
-
-    if (materialUpdates.length === 0) {
-      toast.info('No material updates to apply');
+      const response = await updateProformaInvoiceAdditionalQuantity(initialData.id, materialUpdates);
+      
+      toast.success('Materials updated successfully');
+      
+      router.back(); // Navigate back to the previous page
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error in onSubmit:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      toast.error(error?.message || 'Error updating materials');
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    
-    const response = await updateProformaInvoiceAdditionalQuantity(initialData.id, materialUpdates);
-    
-    toast.success('Materials updated successfully');
-    
-router.back(); // Navigate back to the previous page
-    router.refresh();
-  } catch (error: any) {
-    console.error('Error in onSubmit:', error);
-    console.error('Error details:', {
-      message: error?.message,
-      response: error?.response?.data,
-      status: error?.response?.status
-    });
-    toast.error(error?.message || 'Error updating materials');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const [isDark, setIsDark] = useState(false);
 
@@ -589,6 +599,7 @@ router.back(); // Navigate back to the previous page
     return () => observer.disconnect();
   }, []);
 
+  // Enhanced dark styles with portal support
   const darkStyles = {
     control: (base: any) => ({
       ...base,
@@ -599,12 +610,14 @@ router.back(); // Navigate back to the previous page
     menu: (base: any) => ({
       ...base,
       backgroundColor: '#1f2937',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      zIndex: 9999,
     }),
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isFocused ? '#374151' : '#1f2937',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      zIndex: 9999,
     }),
     singleValue: (base: any) => ({
       ...base,
@@ -617,7 +630,41 @@ router.back(); // Navigate back to the previous page
     placeholder: (base: any) => ({
       ...base,
       color: '#9ca3af'
-    })
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+    }),
+  };
+
+  // Create base select styles that will be merged with dark/light styles
+  const getSelectStyles = (customStyles = {}) => {
+    const baseStyles = {
+      menuPortal: (base: any) => ({
+        ...base,
+        zIndex: 9999,
+      }),
+      menu: (base: any) => ({
+        ...base,
+        zIndex: 9999,
+        position: 'absolute',
+        // Ensure menu doesn't get clipped
+        overflow: 'visible',
+      }),
+      option: (base: any) => ({
+        ...base,
+        zIndex: 9999,
+      }),
+      container: (base: any) => ({
+        ...base,
+        position: 'relative',
+        zIndex: 50,
+      }),
+    };
+    
+    return isDark 
+      ? { ...baseStyles, ...darkStyles, ...customStyles }
+      : { ...baseStyles, ...customStyles };
   };
 
   // Helper function to get display quantity for a material
@@ -631,8 +678,68 @@ router.back(); // Navigate back to the previous page
     return material.quantity || 0;
   };
 
+  // Custom Select Option Component with Image
+  const CustomSelectOption = (props: any) => {
+    const { data, innerRef, innerProps, isFocused } = props;
+    const material = materials.find(m => m.id === data.value);
+    const imageUrl = material?.imageUrl ? normalizeImagePath(material.imageUrl) : null;
+    
+    return (
+      <div
+        ref={innerRef}
+        {...innerProps}
+        className={`flex items-center gap-3 p-2 cursor-pointer ${
+          isFocused ? 'bg-gray-100 dark:bg-gray-700' : ''
+        }`}
+      >
+        {imageUrl ? (
+          <div className="relative h-10 w-10 shrink-0 rounded overflow-hidden border border-gray-200 dark:border-gray-600">
+            <Image
+              src={imageUrl}
+              alt={material?.name || 'Material'}
+              fill
+              className="object-cover"
+              sizes="40px"
+            />
+          </div>
+        ) : (
+          <div className="h-10 w-10 shrink-0 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+            <ImageIcon className="h-5 w-5 text-gray-400" />
+          </div>
+        )}
+        <span className="flex-1 text-sm">{data.label}</span>
+      </div>
+    );
+  };
+
+  // Custom Single Value Component with Image
+  const CustomSingleValue = (props: any) => {
+    const { data } = props;
+    const material = materials.find(m => m.id === data.value);
+    const imageUrl = material?.imageUrl ? normalizeImagePath(material.imageUrl) : null;
+    
+    return (
+      <div className="flex items-center gap-2">
+        {imageUrl ? (
+          <div className="relative h-6 w-6 shrink-0 rounded overflow-hidden border border-gray-200 dark:border-gray-600">
+            <Image
+              src={imageUrl}
+              alt={material?.name || 'Material'}
+              fill
+              className="object-cover"
+              sizes="24px"
+            />
+          </div>
+        ) : (
+          <ImageIcon className="h-4 w-4 text-gray-400 shrink-0 " />
+        )}
+        <span>{data.label}</span>
+      </div>
+    );
+  };
+
   return (
-    <Card className="mx-auto w-full">
+    <Card className="mx-auto w-full overflow-visible">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{pageTitle}</CardTitle>
@@ -651,9 +758,9 @@ router.back(); // Navigate back to the previous page
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-visible">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 overflow-visible">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               <FormField
                 name="customerId"
@@ -668,8 +775,13 @@ router.back(); // Navigate back to the previous page
                         onChange={(option) => field.onChange(option?.value)}
                         placeholder="Select customer"
                         isSearchable
-                        styles={isDark ? darkStyles : {}}
+                        styles={getSelectStyles()}
                         isDisabled={true} // Read-only
+                        menuPortalTarget={isMounted ? document.body : undefined}
+                        menuPosition="fixed"
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                        maxMenuHeight={300}
                       />
                     </FormControl>
                     <FormMessage />
@@ -699,7 +811,7 @@ router.back(); // Navigate back to the previous page
               />
             </div>
 
-            <div className="border-t pt-6">
+            <div className="border-t pt-6 overflow-visible">
               <div className="mb-4 flex items-center justify-between">
                 <CardTitle className="text-lg">Items</CardTitle>
                 <Button
@@ -715,36 +827,36 @@ router.back(); // Navigate back to the previous page
                 </Button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 overflow-visible">
                 {itemFields.map((field, itemIndex) => {
                   const currentMaterials = form.watch(`items.${itemIndex}.materials`) || [];
                   
                   return (
                     <div
                       key={field.id}
-                      className="space-y-4 rounded-lg border p-4"
+                      className="space-y-4 rounded-lg border p-4 overflow-visible"
                     >
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
                         <div className="md:col-span-5">
-                         <FormField
-                          control={form.control}
-                          name={`items.${itemIndex}.description`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Description</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder="Item description"
-                                  {...field}
-                                  rows={2}
-                                  readOnly={true} // Read-only
-                                  className="bg-gray-50 dark:bg-gray-900"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.description`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Description</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Item description"
+                                    {...field}
+                                    rows={2}
+                                    readOnly={true} // Read-only
+                                    className="bg-gray-50 dark:bg-gray-900"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
 
                         <div className="md:col-span-1">
@@ -773,27 +885,27 @@ router.back(); // Navigate back to the previous page
                             )}
                           />
                         </div>
-                      </div>
 
-                      <div className="md:col-span-2">
-                        <FormField
-                          control={form.control}
-                          name={`items.${itemIndex}.size`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Size</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="e.g., Large, 10x10"
-                                  {...field}
-                                  readOnly={true} // Read-only
-                                  className="bg-gray-50 dark:bg-gray-900"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        <div className="md:col-span-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.size`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Size</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="e.g., Large, 10x10"
+                                    {...field}
+                                    readOnly={true} // Read-only
+                                    className="bg-gray-50 dark:bg-gray-900"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       </div>
 
                       <div>
@@ -818,7 +930,7 @@ router.back(); // Navigate back to the previous page
                         />
                       </div>
 
-                      <div className="mt-4 border-t pt-4">
+                      <div className="mt-4 border-t pt-4 overflow-visible">
                         <div className="mb-3 flex items-center justify-between">
                           <CardTitle className="text-md flex items-center gap-2">
                             <Package className="h-4 w-4" />
@@ -835,7 +947,6 @@ router.back(); // Navigate back to the previous page
                             )}
                           </CardTitle>
                           <div className="flex items-center gap-2">
-                            {/* <MaterialModal /> */}
                             <Button
                               type="button"
                               variant="outline"
@@ -843,6 +954,7 @@ router.back(); // Navigate back to the previous page
                               onClick={refreshMaterials}
                               className="flex items-center gap-2"
                             >
+                              <RefreshCw className="h-4 w-4" />
                               Refresh Materials
                             </Button>
                             <Button
@@ -859,7 +971,7 @@ router.back(); // Navigate back to the previous page
                         </div>
 
                         {currentMaterials.length > 0 ? (
-                          <div className="space-y-3">
+                          <div className="space-y-3 overflow-visible">
                             {currentMaterials.map((material, materialIndex) => {
                               const stockInfo = material.materialId ? materialStock.get(material.materialId) : null;
                               const originalQty = originalMaterialQuantities.get(material.id) || 0;
@@ -869,17 +981,57 @@ router.back(); // Navigate back to the previous page
                               const isQuantityExceeded = stockInfo && additionalQty > stockInfo.available && stockInfo.available > 0;
                               const isOutOfStock = stockInfo && stockInfo.isOutOfStock;
                               
+                              // Get material image
+                              const selectedMaterial = materials.find(m => m.id === material.materialId);
+                              const materialImageUrl = selectedMaterial?.imageUrl ? normalizeImagePath(selectedMaterial.imageUrl) : null;
+                              
                               return (
-                                <div key={materialIndex} className={`grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 ${isExisting ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}>
-                                  <div className="md:col-span-5">
+                                <div key={materialIndex} className={`grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 overflow-visible ${isExisting ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}>
+                                  {/* Material Image Column */}
+                                  <div className="md:col-span-1 flex items-center justify-center">
+                                    {materialImageUrl ? (
+                                      <div className="relative h-16 w-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0 ">
+                                        <Image
+                                          src={materialImageUrl}
+                                          alt={selectedMaterial?.name || 'Material'}
+                                          fill
+                                          className="object-cover"
+                                          sizes="64px"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="h-16 w-16 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 shrink-0 ">
+                                        <ImageIcon className="h-8 w-8 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Material Selection Column */}
+                                  <div className="md:col-span-4 overflow-visible">
                                     <FormLabel>Material</FormLabel>
                                     <Select
                                       options={materialOptions}
                                       value={materialOptions.find(option => option.value === material.materialId)}
                                       onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
                                       placeholder="Select material"
-                                      styles={isDark ? darkStyles : {}}
-                                      isDisabled={isExisting || undefined} // Disable material selection for existing materials
+                                      styles={getSelectStyles({
+                                        option: (base: any, state: any) => ({
+                                          ...base,
+                                          backgroundColor: state.isFocused ? '#374151' : '#1f2937',
+                                          color: '#f9fafb',
+                                          padding: '4px 8px'
+                                        })
+                                      })}
+                                      isDisabled={isExisting || undefined}
+                                      components={{
+                                        Option: CustomSelectOption,
+                                        SingleValue: CustomSingleValue
+                                      }}
+                                      menuPortalTarget={isMounted ? document.body : undefined}
+                                      menuPosition="fixed"
+                                      className="react-select-container"
+                                      classNamePrefix="react-select"
+                                      maxMenuHeight={300}
                                     />
                                     {isExisting && (
                                       <p className="text-xs text-blue-600 mt-1">
@@ -945,7 +1097,7 @@ router.back(); // Navigate back to the previous page
                                       size="sm"
                                       onClick={() => removeMaterialFromItem(itemIndex, materialIndex)}
                                       className="w-full"
-                                      disabled={isExisting} // Disable removal for existing materials
+                                      disabled={isExisting}
                                     >
                                       <Trash2 className="h-4 w-4" />
                                       {isExisting ? 'Cannot Remove' : 'Remove'}
@@ -967,8 +1119,6 @@ router.back(); // Navigate back to the previous page
                           </div>
                         )}
                       </div>
-
-                  
                     </div>
                   );
                 })}

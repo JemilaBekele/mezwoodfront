@@ -471,3 +471,28 @@
 .branded-splash--success .branded-splash__orbit--3 {
   border-top-color: var(--bsplash-success-orbit-e);
 }
+/* Add this to a global CSS file or component-level styles */
+.react-select-container {
+  position: relative;
+  z-index: 50;
+}
+
+.react-select__menu {
+  z-index: 9999 !important;
+  position: absolute !important;
+}
+
+/* Fix for parent containers with overflow issues */
+.overflow-fix {
+  overflow: visible !important;
+}
+
+/* For the card content that might be clipping */
+.no-clip {
+  overflow: visible !important;
+}
+
+/* Ensure dropdown menu appears above everything */
+.dropdown-portal {
+  z-index: 9999;
+}

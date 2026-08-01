@@ -1,5 +1,3 @@
-// components/DeliveryDateComparisonReport.tsx
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -21,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AlertTriangle, Calendar, CheckCircle, RefreshCw, Clock } from 'lucide-react';
+import { AlertTriangle, Calendar, CheckCircle, RefreshCw, Clock, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDeliveryDateComparisonReport } from '@/service/dashboard';
@@ -136,12 +134,119 @@ const DeliveryDateComparisonReport: React.FC = () => {
     }
   };
 
+  // ==================== COLOR CODING LOGIC ====================
+  
+  /**
+   * Determine status based on stage date vs project/requested date
+   * 
+   * @param stageDate - The stage delivery date
+   * @param projectDate - The project planned delivery date
+   * @param requestedDate - The customer requested delivery date
+   * @returns { status: 'in-time' | 'delayed' | 'warning', color: string, label: string }
+   */
+  const getDateComparisonStatus = (
+    stageDate: string | null | undefined,
+    projectDate: string | null | undefined,
+    requestedDate: string | null | undefined
+  ) => {
+    // Default status
+    const defaultStatus = {
+      status: 'unknown' as const,
+      color: 'bg-gray-100 text-gray-600',
+      label: 'Unknown',
+      badgeVariant: 'secondary' as const,
+    };
+
+    // If any required date is missing
+    if (!stageDate || !projectDate) {
+      return defaultStatus;
+    }
+
+    try {
+      const stage = new Date(stageDate);
+      const project = new Date(projectDate);
+      
+      if (isNaN(stage.getTime()) || isNaN(project.getTime())) {
+        return defaultStatus;
+      }
+
+      // Compare stage date vs project planned date
+      // Green: Stage date <= Project date (in time)
+      if (stage <= project) {
+        // Check if requested date is earlier than project date (Yellow warning)
+        if (requestedDate) {
+          const requested = new Date(requestedDate);
+          if (!isNaN(requested.getTime()) && requested < project) {
+            // Yellow: Requested date < Project date (customer wants it earlier)
+            return {
+              status: 'warning' as const,
+              color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+              label: '⚠️ Warning - Customer wants earlier',
+              badgeVariant: 'secondary' as const, // Changed from 'warning' to 'secondary'
+            };
+          }
+        }
+        // Green: In time
+        return {
+          status: 'in-time' as const,
+          color: 'bg-green-100 text-green-800 border-green-300',
+          label: '✅ In Time',
+          badgeVariant: 'default' as const,
+        };
+      } else {
+        // Red: Stage date > Project date (delayed)
+        return {
+          status: 'delayed' as const,
+          color: 'bg-red-100 text-red-800 border-red-300',
+          label: '❌ Delayed',
+          badgeVariant: 'destructive' as const,
+        };
+      }
+    } catch (error) {
+      return defaultStatus;
+    }
+  };
+
+  /**
+   * Get status badge for comparison display
+   */
+  const getStatusBadge = (status: 'in-time' | 'delayed' | 'warning' | 'unknown') => {
+    switch (status) {
+      case 'in-time':
+        return <Badge className="bg-green-500 hover:bg-green-600 text-white">In Time</Badge>;
+      case 'delayed':
+        return <Badge className="bg-red-500 hover:bg-red-600 text-white">Delayed</Badge>;
+      case 'warning':
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Warning</Badge>;
+      default:
+        return <Badge variant="secondary">Unknown</Badge>;
+    }
+  };
+
+  /**
+   * Get color class for status indicator dot
+   */
+  const getStatusDotColor = (status: 'in-time' | 'delayed' | 'warning' | 'unknown') => {
+    switch (status) {
+      case 'in-time':
+        return 'bg-green-500';
+      case 'delayed':
+        return 'bg-red-500';
+      case 'warning':
+        return 'bg-yellow-500';
+      default:
+        return 'bg-gray-400';
+    }
+  };
+
+  // ==================== END COLOR CODING LOGIC ====================
+
   const getComparisonBadgeColor = (type: string) => {
     switch (type) {
       case 'project_stage_mismatch':
         return 'destructive';
       case 'requested_stage_mismatch':
-        return 'warning';
+        return 'secondary'; // Changed from 'warning' to 'secondary'
       case 'requested_project_mismatch':
         return 'secondary';
       default:
@@ -176,7 +281,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
       }
       // If Project is earlier -> Warning (yellow) - Project is ahead of stage
       if (lower.includes('project')) {
-        return 'warning';
+        return 'secondary'; // Changed from 'warning' to 'secondary'
       }
     }
     
@@ -188,7 +293,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
       }
       // If Requested is earlier than stage -> Warning (yellow) - Customer wants it earlier
       if (lower.includes('requested')) {
-        return 'warning';
+        return 'secondary'; // Changed from 'warning' to 'secondary'
       }
     }
     
@@ -196,11 +301,11 @@ const DeliveryDateComparisonReport: React.FC = () => {
     if (comparisonType === 'requested_project_mismatch') {
       // If Project is earlier than requested -> Info (blue) - Project is ahead of customer request
       if (lower.includes('project')) {
-        return 'info';
+        return 'default';
       }
       // If Requested is earlier than project -> Warning (yellow) - Customer wants it earlier
       if (lower.includes('requested')) {
-        return 'warning';
+        return 'secondary'; // Changed from 'warning' to 'secondary'
       }
     }
     
@@ -264,6 +369,34 @@ const DeliveryDateComparisonReport: React.FC = () => {
   const mismatchedProjects = report.mismatchedProjects || [];
   const requestedDeliveryMismatchProjects = report.requestedDeliveryMismatchProjects || [];
 
+  // Calculate counts for summary cards
+  const inTimeCount = mismatchedProjects.filter(p => {
+    const status = getDateComparisonStatus(
+      p.dates?.stageDeliveryDate,
+      p.dates?.projectFinalDelivery,
+      p.dates?.requestedDelivery
+    );
+    return status.status === 'in-time';
+  }).length;
+
+  const delayedCount = mismatchedProjects.filter(p => {
+    const status = getDateComparisonStatus(
+      p.dates?.stageDeliveryDate,
+      p.dates?.projectFinalDelivery,
+      p.dates?.requestedDelivery
+    );
+    return status.status === 'delayed';
+  }).length;
+
+  const warningCount = mismatchedProjects.filter(p => {
+    const status = getDateComparisonStatus(
+      p.dates?.stageDeliveryDate,
+      p.dates?.projectFinalDelivery,
+      p.dates?.requestedDelivery
+    );
+    return status.status === 'warning';
+  }).length;
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -283,41 +416,62 @@ const DeliveryDateComparisonReport: React.FC = () => {
         </Button>
       </div>
 
-      {/* Color Legend */}
-      {/* <Card className="border-0 bg-muted/50">
+      {/* Status Legend */}
+      <Card className="border-0 bg-muted/50">
         <CardContent className="py-3">
           <div className="flex flex-wrap items-center gap-4 text-xs">
-            <span className="font-medium">Legend:</span>
-            <div className="flex items-center gap-1">
-              <Badge variant="secondary" className="text-xs">Stage Earlier</Badge>
-              <span className="text-muted-foreground">Stage is ahead (needs attention)</span>
+            <span className="font-medium">Status Legend:</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
+                <span className="text-muted-foreground">In Time (Stage &lt;= Planned)</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Badge variant="destructive" className="text-xs">Project/Requested Earlier</Badge>
-              <span className="text-muted-foreground">Project/Requested is ahead</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
+                <span className="text-muted-foreground">Delayed (Stage &gt; Planned)</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Badge variant="destructive" className="text-xs">Project Ahead of Request</Badge>
-              <span className="text-muted-foreground">Project delivery is earlier than requested</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-full bg-yellow-500" />
+                <span className="text-muted-foreground">Warning (Requested &lt; Planned)</span>
+              </div>
             </div>
           </div>
         </CardContent>
-      </Card> */}
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-green-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-green-600">
+              <CheckCircle className="inline h-4 w-4 mr-1" />
+              In Time
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {inTimeCount}
+            </div>
+            <p className="text-xs text-muted-foreground">Projects on schedule</p>
+          </CardContent>
+        </Card>
+
         <Card className="border-red-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-red-600">
               <AlertTriangle className="inline h-4 w-4 mr-1" />
-              Date Mismatches
+              Delayed
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {summary.projectsWithMismatch || 0}
+              {delayedCount}
             </div>
-            <p className="text-xs text-muted-foreground">Projects with mismatched dates</p>
+            <p className="text-xs text-muted-foreground">Projects behind schedule</p>
           </CardContent>
         </Card>
 
@@ -325,34 +479,19 @@ const DeliveryDateComparisonReport: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-yellow-600">
               <Clock className="inline h-4 w-4 mr-1" />
-              Requested Date Issues
+              Warning
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              {summary.projectsWithRequestedDeliveryMismatch || 0}
+              {warningCount}
             </div>
-            <p className="text-xs text-muted-foreground">Customer requested date mismatches</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-600">
-              <CheckCircle className="inline h-4 w-4 mr-1" />
-              Total Mismatches
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {summary.totalMismatches || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">Total comparison mismatches found</p>
+            <p className="text-xs text-muted-foreground">Customer wants it earlier</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Mismatched Projects Table */}
+      {/* Mismatched Projects Table with New Status Column */}
       {mismatchedProjects.length > 0 && (
         <Card>
           <CardHeader>
@@ -374,6 +513,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
                     <TableHead>Project Date</TableHead>
                     <TableHead>Stage Date</TableHead>
                     <TableHead>Requested Date</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Mismatch Type</TableHead>
                     <TableHead>Difference</TableHead>
                     <TableHead>Earlier</TableHead>
@@ -382,8 +522,15 @@ const DeliveryDateComparisonReport: React.FC = () => {
                 <TableBody>
                   {mismatchedProjects.map((project: MismatchedProject) => {
                     const comparisons = getComparisons(project);
+                    // Get status for this project
+                    const status = getDateComparisonStatus(
+                      project.dates?.stageDeliveryDate,
+                      project.dates?.projectFinalDelivery,
+                      project.dates?.requestedDelivery
+                    );
+                    
                     return (
-                      <TableRow key={project.projectId}>
+                      <TableRow key={project.projectId} className={status.color}>
                         <TableCell className="font-medium">{project.customerName || ''}</TableCell>
                         <TableCell>{project.piNumber || ''}</TableCell>
                         <TableCell>
@@ -394,6 +541,12 @@ const DeliveryDateComparisonReport: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           {formatDate(project.dates?.requestedDelivery)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block w-2 h-2 rounded-full ${getStatusDotColor(status.status)}`} />
+                            {getStatusBadge(status.status)}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -480,39 +633,57 @@ const DeliveryDateComparisonReport: React.FC = () => {
                     <TableHead>PI Number</TableHead>
                     <TableHead>Requested Date</TableHead>
                     <TableHead>Stage Date</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Difference</TableHead>
                     <TableHead>Earlier</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {requestedDeliveryMismatchProjects.map((project: RequestedDeliveryMismatchProject) => (
-                    <TableRow key={project.projectId}>
-                      <TableCell className="font-medium">{project.customerName || ''}</TableCell>
-                      <TableCell>{project.piNumber || ''}</TableCell>
-                      <TableCell>
-                        {formatDate(project.dates?.requestedDelivery)}
-                      </TableCell>
-                      <TableCell>
-                        {formatDate(project.dates?.stageDeliveryDate)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="destructive" className="text-xs">
-                          {project.comparison?.requestedVsStage?.differenceInDays || 0} days
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={getEarlierBadgeColor(
-                            project.comparison?.requestedVsStage?.whichIsEarlier || '',
-                            'requested_stage_mismatch'
-                          ) as any}
-                          className="text-xs"
-                        >
-                          {project.comparison?.requestedVsStage?.whichIsEarlier || ''}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {requestedDeliveryMismatchProjects.map((project: RequestedDeliveryMismatchProject) => {
+                    const status = getDateComparisonStatus(
+                      project.dates?.stageDeliveryDate,
+                      project.dates?.projectFinalDelivery,
+                      project.dates?.requestedDelivery
+                    );
+                    
+                    return (
+                      <TableRow key={project.projectId} className={status.color}>
+                        <TableCell className="font-medium">{project.customerName || ''}</TableCell>
+                        <TableCell>{project.piNumber || ''}</TableCell>
+                        <TableCell>
+                          {formatDate(project.dates?.requestedDelivery)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(project.dates?.stageDeliveryDate)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block w-2 h-2 rounded-full ${getStatusDotColor(status.status)}`} />
+                            {getStatusBadge(status.status)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={status.status === 'delayed' ? 'destructive' : status.status === 'warning' ? 'secondary' : 'outline'}
+                            className="text-xs"
+                          >
+                            {project.comparison?.requestedVsStage?.differenceInDays || 0} days
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={getEarlierBadgeColor(
+                              project.comparison?.requestedVsStage?.whichIsEarlier || '',
+                              'requested_stage_mismatch'
+                            ) as any}
+                            className="text-xs"
+                          >
+                            {project.comparison?.requestedVsStage?.whichIsEarlier || ''}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -39,6 +39,8 @@ import {
   ImageIcon,
   Eye,
   Download,
+  XCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, IProjectStageWorkLog, StageStatus } from '@/models/Projects';
 import { getProjectId } from '@/service/Project';
@@ -258,8 +260,152 @@ export const stageConfigs = {
     bgLight: "bg-indigo-100 dark:bg-indigo-900/40",
     remainingTextColor: "text-indigo-600 dark:text-indigo-400",
   },
-};
 
+  // =========================
+  // COMPLETED
+  // =========================
+  [ProjectStatus.COMPLETED]: {
+    label: "Completed",
+    icon: CheckCircle2,
+    color: "green",
+    borderColor: "border-green-200 dark:border-green-800",
+    headerBg: "bg-green-50 dark:bg-green-950/40",
+    headerBorder: "border-green-100 dark:border-green-900",
+    titleColor: "text-green-900 dark:text-green-100",
+    iconColor: "text-green-600 dark:text-green-400",
+    badgeColor: "text-green-700 dark:text-green-300",
+    badgeBorder: "border-green-500 dark:border-green-700",
+    bgLight: "bg-green-100 dark:bg-green-900/40",
+    remainingTextColor: "text-green-600 dark:text-green-400",
+  },
+
+  // =========================
+  // CANCELLED
+  // =========================
+  [ProjectStatus.CANCELLED]: {
+    label: "Cancelled",
+    icon: XCircle,
+    color: "gray",
+    borderColor: "border-gray-200 dark:border-gray-800",
+    headerBg: "bg-gray-50 dark:bg-gray-950/40",
+    headerBorder: "border-gray-100 dark:border-gray-900",
+    titleColor: "text-gray-900 dark:text-gray-100",
+    iconColor: "text-gray-600 dark:text-gray-400",
+    badgeColor: "text-gray-700 dark:text-gray-300",
+    badgeBorder: "border-gray-500 dark:border-gray-700",
+    bgLight: "bg-gray-100 dark:bg-gray-900/40",
+    remainingTextColor: "text-gray-600 dark:text-gray-400",
+  },
+};
+  // Status badge configuration
+export  const getStatusConfig = (status: ProjectStatus) => {
+    const config: Record<ProjectStatus, {
+      label: string;
+      variant: BadgeVariant;
+      icon: any;
+      color: string;
+    }> = {
+      [ProjectStatus.INVOICE]: {
+        label: 'Invoice',
+        variant: 'secondary',
+        icon: FileText,
+        color: 'text-gray-500',
+      },
+
+      [ProjectStatus.DESIGN]: {
+        label: 'Design',
+        variant: 'default',
+        icon: Settings,
+        color: 'text-blue-500',
+      },
+
+      [ProjectStatus.PURCHASING]: {
+        label: 'Purchasing',
+        variant: 'outline',
+        icon: Package,
+        color: 'text-purple-500',
+      },
+
+      [ProjectStatus.METAL_WORKS]: {
+        label: 'Metal Works',
+        variant: 'outline',
+        icon: Wrench,
+        color: 'text-zinc-500',
+      },
+
+      [ProjectStatus.CNC]: {
+        label: 'CNC',
+        variant: 'outline',
+        icon: Wrench,
+        color: 'text-zinc-500',
+      },
+
+      [ProjectStatus.CUTTING]: {
+        label: 'Cutting',
+        variant: 'default',
+        icon: Scissors,
+        color: 'text-amber-500',
+      },
+
+      [ProjectStatus.EDGE_BANDING]: {
+        label: 'Edge Banding',
+        variant: 'outline',
+        icon: Layers,
+        color: 'text-teal-500',
+      },
+
+      [ProjectStatus.ASSEMBLY]: {
+        label: 'Assembly',
+        variant: 'outline',
+        icon: Hammer,
+        color: 'text-orange-500',
+      },
+
+      [ProjectStatus.PAINTING]: {
+        label: 'Painting',
+        variant: 'default',
+        icon: Paintbrush,
+        color: 'text-indigo-500',
+      },
+
+      [ProjectStatus.FINISHING]: {
+        label: 'Finishing',
+        variant: 'default',
+        icon: Award,
+        color: 'text-yellow-500',
+      },
+
+      [ProjectStatus.DELIVERY]: {
+        label: 'Delivery',
+        variant: 'outline',
+        icon: Truck,
+        color: 'text-green-500',
+      },
+
+      [ProjectStatus.INSTALLATION]: {
+        label: 'Installation',
+        variant: 'default',
+        icon: Home,
+        color: 'text-emerald-500',
+      },
+
+      [ProjectStatus.COMPLETED]: {
+        label: 'Completed',
+        variant: 'default',
+        icon: CheckCircle2,
+        color: 'text-green-600',
+      },
+
+      [ProjectStatus.CANCELLED]: {
+        label: 'Cancelled',
+        variant: 'secondary',
+        icon: XCircle,
+        color: 'text-red-500',
+      },
+    };
+
+    return config[status];
+  };
 const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType }) => {
   const [project, setProject] = useState<IProject | null>(null);
   const [proformaInvoice, setProformaInvoice] = useState<IProformaInvoice | null>(null);
@@ -277,6 +423,10 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
   const [deletingWorkLog, setDeletingWorkLog] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedWorkLog, setSelectedWorkLog] = useState<IProjectStageWorkLog | null>(null);
+  
+  // New state for complete all confirmation dialog
+  const [completeAllDialogOpen, setCompleteAllDialogOpen] = useState(false);
+  const [completeAllStage, setCompleteAllStage] = useState<IProjectStage | null>(null);
 
   const stageConfig = stageConfigs[stageType];
   const currentStageLabel = stageConfig.label;
@@ -469,9 +619,75 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
     }
   };
 
-  // Handle delete work log
+  // Handle complete all remaining units with confirmation
+  const handleCompleteAll = async (stage: IProjectStage) => {
+    const plannedUnits = stage.workUnits || stage.capacityDays || 0;
+    const currentActualUnits = stage.actualWorkUnits || 0;
+    const remainingUnits = plannedUnits - currentActualUnits;
+
+    // Check if stage is already completed (with tolerance)
+    if (remainingUnits <= 0.000001) {
+      toast.error('Stage is already completed.');
+      return;
+    }
+
+    // Show confirmation dialog
+    setCompleteAllStage(stage);
+    setCompleteAllDialogOpen(true);
+  };
+
+  // Execute the complete all action after confirmation
+  const confirmCompleteAll = async () => {
+    if (!completeAllStage) return;
+
+    const stage = completeAllStage;
+    const plannedUnits = stage.workUnits || stage.capacityDays || 0;
+    const currentActualUnits = stage.actualWorkUnits || 0;
+    const remainingUnits = plannedUnits - currentActualUnits;
+
+    // Check if stage is already completed (with tolerance)
+    if (remainingUnits <= 0.000001) {
+      toast.error('Stage is already completed.');
+      setCompleteAllDialogOpen(false);
+      setCompleteAllStage(null);
+      return;
+    }
+
+    setAddingWorkLog(stage.id);
+    try {
+      // Create work log with remaining units
+      await createProjectStageWorkLog({
+        projectStageId: stage.id,
+        doneUnits: remainingUnits,
+        note: `[Auto-complete] Completed remaining ${remainingUnits.toFixed(4)} units (${((remainingUnits / plannedUnits) * 100).toFixed(2)}%)`,
+      });
+
+      toast.success(`Successfully completed all remaining units! (${remainingUnits.toFixed(4)} units)`);
+      
+      // Refresh project data
+      await fetchProjectData();
+    } catch (error: any) {
+      console.error('Error completing all units:', error);
+      toast.error(error.response?.data?.message || 'Failed to complete all units');
+    } finally {
+      setAddingWorkLog(null);
+      setCompleteAllDialogOpen(false);
+      setCompleteAllStage(null);
+    }
+  };
+
+  // Handle delete work log with completion check
   const handleDeleteWorkLog = async () => {
     if (!selectedWorkLog) return;
+
+    // Check if the stage is already completed
+    const stage = project?.stages?.find(s => s.id === selectedWorkLog.projectStageId);
+    if (stage && isStageCompleted(stage)) {
+      toast.error('Cannot delete work log from a completed stage. Please uncomplete the stage first.');
+      setDeleteDialogOpen(false);
+      setSelectedWorkLog(null);
+      return;
+    }
 
     setDeletingWorkLog(selectedWorkLog.id);
     try {
@@ -546,89 +762,7 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
     }
   };
 
-  // Status badge configuration
-  const getStatusConfig = (status: ProjectStatus) => {
-    const config: Record<ProjectStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
-      color: string;
-    }> = {
-      [ProjectStatus.INVOICE]: {
-        label: 'Invoice',
-        variant: 'secondary',
-        icon: FileText,
-        color: 'text-gray-500',
-      },
-      [ProjectStatus.DESIGN]: {
-        label: 'Design',
-        variant: 'default',
-        icon: Settings,
-        color: 'text-blue-500',
-      },
-      [ProjectStatus.PURCHASING]: {
-        label: 'Purchasing',
-        variant: 'outline',
-        icon: Package,
-        color: 'text-purple-500',
-      },
-      [ProjectStatus.CUTTING]: {
-        label: 'Cutting',
-        variant: 'default',
-        icon: Scissors,
-        color: 'text-amber-500',
-      },
-      [ProjectStatus.EDGE_BANDING]: {
-        label: 'Edge Banding',
-        variant: 'outline',
-        icon: Layers,
-        color: 'text-teal-500',
-      },
-      [ProjectStatus.PAINTING]: {
-        label: 'Painting',
-        variant: 'default',
-        icon: Paintbrush,
-        color: 'text-indigo-500',
-      },
-      [ProjectStatus.ASSEMBLY]: {
-        label: 'Assembly',
-        variant: 'outline',
-        icon: Hammer,
-        color: 'text-orange-500',
-      },
-      [ProjectStatus.FINISHING]: {
-        label: 'Finishing',
-        variant: 'default',
-        icon: Award,
-        color: 'text-yellow-500',
-      },
-      [ProjectStatus.DELIVERY]: {
-        label: 'Delivery',
-        variant: 'outline',
-        icon: Truck,
-        color: 'text-green-500',
-      },
-      [ProjectStatus.INSTALLATION]: {
-        label: 'Installation',
-        variant: 'default',
-        icon: Home,
-        color: 'text-emerald-500',
-      }, 
-      [ProjectStatus.METAL_WORKS]: {
-        label: 'Metal Works',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-      [ProjectStatus.CNC]: {
-        label: 'CNC',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-    };
-    return config[status];
-  };
+ 
 
   // Difficulty badge configuration
   const getDifficultyConfig = (difficulty: DifficultyLevel) => {
@@ -871,7 +1005,7 @@ const formatDescription = (text: string, limit = 80) => {
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Time taken</p>
+                                  <p className="text-xs text-muted-foreground">Time Needed</p>
                                   <p className="font-medium text-sm md:text-base">{formatMinutes(stage.timeTaken)}</p>
                                 </div>
                               </div>
@@ -965,17 +1099,20 @@ const formatDescription = (text: string, limit = 80) => {
                                           </p>
                                         )}
                                       </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedWorkLog(log);
-                                          setDeleteDialogOpen(true);
-                                        }}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 self-start"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
+                                      {/* Only show delete button if stage is NOT completed */}
+                                      {!completed && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedWorkLog(log);
+                                            setDeleteDialogOpen(true);
+                                          }}
+                                          className="text-red-600 hover:text-red-700 hover:bg-red-50 self-start"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -992,37 +1129,19 @@ const formatDescription = (text: string, limit = 80) => {
                               Add Work Log
                             </h4>
                             <div className="space-y-3">
-                              {/* Complete All Units Checkbox */}
+                              {/* Complete All Units Button - Now triggers confirmation dialog */}
                               {remainingUnits > 0.000001 && (
-                                <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                                  <input
-                                    type="checkbox"
-                                    id={`complete-all-${stage.id}`}
-                                    onChange={async (e) => {
-                                      if (e.target.checked) {
-                                        // Set the done units to remaining units (convert number to string)
-                                        handleWorkLogInputChange(stage.id, 'inputType', 'units');
-                                        handleWorkLogInputChange(stage.id, 'doneUnits', remainingUnits.toString());
-                                        
-                                        // Wait a moment for state to update, then submit
-                                        setTimeout(async () => {
-                                          await handleAddWorkLog(stage.id, stage);
-                                          // Uncheck the checkbox after submission
-                                          e.target.checked = false;
-                                        }, 100);
-                                      }
-                                    }}
-                                    className="h-4 w-4 text-green-600 rounded border-green-300 focus:ring-green-500"
-                                  />
-                                  <label 
-                                    htmlFor={`complete-all-${stage.id}`}
-                                    className="text-sm font-medium text-green-700 cursor-pointer flex items-center gap-2"
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                    Complete All Remaining Units ({remainingUnits.toFixed(4)} units / {remainingPercentage.toFixed(2)}%)
-                                  </label>
-                                </div>
+                                <Button
+                                  onClick={() => handleCompleteAll(stage)}
+                                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                  disabled={addingWorkLog === stage.id}
+                                >
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Complete All Remaining Units ({remainingUnits.toFixed(4)} units / {remainingPercentage.toFixed(2)}%)
+                                </Button>
                               )}
+
+                              <Separator className="my-2" />
 
                               {/* Input Type Toggle */}
                               <div>
@@ -1599,6 +1718,15 @@ const formatDescription = (text: string, limit = 80) => {
                 <p className="text-sm md:text-base">{project.updatedBy.name}</p>
               </div>
             )}
+                  {project.designBy && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Designer</p>
+                  <p>{project.designBy.name}</p>
+                  {project.designBy.email && (
+                    <p className="text-xs text-muted-foreground">{project.designBy.email}</p>
+                  )}
+                </div>
+              )}
           </div>
         </CardContent>
       </Card>
@@ -1638,9 +1766,54 @@ const formatDescription = (text: string, limit = 80) => {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Complete All Confirmation Dialog */}
+    <AlertDialog open={completeAllDialogOpen} onOpenChange={setCompleteAllDialogOpen}>
+      <AlertDialogContent className="max-w-[95vw] sm:max-w-lg">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Complete All Remaining Units</AlertDialogTitle>
+          <AlertDialogDescription>
+            {completeAllStage && (
+              <div className="space-y-3">
+                <p>Are you sure you want to complete all remaining units for this stage?</p>
+                <div className="mt-2 p-3 bg-muted rounded-md">
+                  <p className="text-sm font-medium">Stage: {stageConfig.label}</p>
+                  <p className="text-sm mt-1">
+                    Remaining Units: {(() => {
+                      const plannedUnits = completeAllStage.workUnits || completeAllStage.capacityDays || 0;
+                      const actualUnits = completeAllStage.actualWorkUnits || 0;
+                      return (plannedUnits - actualUnits).toFixed(4);
+                    })()}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    This will mark all remaining work as completed. This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0">
+          <AlertDialogCancel className="w-full sm:w-auto">No, Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={confirmCompleteAll}
+            className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+            disabled={addingWorkLog !== null}
+          >
+            {addingWorkLog ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Completing...
+              </>
+            ) : (
+              'Yes, Complete All'
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 );
 };
 
 export default UnifiedProjectDetailPage;
-

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/format';
 import { toast } from 'sonner';
+import Image from 'next/image';
 import {
   Package,
   Calendar,
@@ -20,6 +21,8 @@ import {
   X,
   Store,
   Building2,
+  Ruler,
+  Image as ImageIcon,
 } from 'lucide-react';
 import {
   Table,
@@ -39,6 +42,7 @@ import {
 import { getMaterialById } from '@/service/material';
 import { MaterialDetail } from '@/models/materialDetail';
 import Link from 'next/link';
+import { normalizeImagePath } from '@/lib/norm';
 
 type MaterialViewProps = {
   id?: string;
@@ -311,6 +315,9 @@ const MaterialDetailPage: React.FC<MaterialViewProps> = ({ id }) => {
     return filters.join(' • ');
   };
 
+  // Get normalized image URL
+  const imageUrl = material.imageUrl ? normalizeImagePath(material.imageUrl) : null;
+
   return (
     <div className='container mx-auto space-y-6 p-4 md:p-8'>
       {/* Header with actions */}
@@ -354,27 +361,7 @@ const MaterialDetailPage: React.FC<MaterialViewProps> = ({ id }) => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center justify-between'>
-              <div>
-                <p className='text-sm font-medium text-muted-foreground'>Available</p>
-                <p className='text-2xl font-bold text-green-600'>
-                  {material.stockSummary.availableStock}
-                </p>
-                <div className='mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden'>
-                  <div 
-                    className='h-full bg-green-600 rounded-full' 
-                    style={{ width: `${stockPercentage}%` }}
-                  />
-                </div>
-              </div>
-              <div className='rounded-full bg-green-100 p-3 dark:bg-green-950/20'>
-                <CheckCircle className='h-5 w-5 text-green-600' />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Inventory by Type Summary */}
         <Card>
@@ -492,79 +479,162 @@ const MaterialDetailPage: React.FC<MaterialViewProps> = ({ id }) => {
 
       {/* All Content Sections */}
       <div className='space-y-6'>
-        {/* Overview Section */}
+        {/* Overview Section with Image and Size */}
         <Card>
           <CardHeader>
             <CardTitle className='text-lg font-semibold'>Material Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-              <div className='space-y-3'>
-                <div className='flex items-center gap-2'>
-                  <Package className='h-4 w-4 text-muted-foreground' />
-                  <div>
-                    <p className='text-sm font-medium'>Name</p>
-                    <p className='text-sm text-muted-foreground'>{material.name}</p>
-                  </div>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Layers className='h-4 w-4 text-muted-foreground' />
-                  <div>
-                    <p className='text-sm font-medium'>Category</p>
-                    <p className='text-sm text-muted-foreground'>
-                      {material.materialType?.name || ''}
-                    </p>
-                  </div>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <FileText className='h-4 w-4 text-muted-foreground' />
-                  <div>
-                    <p className='text-sm font-medium'>Unit of Measure</p>
-                    <p className='text-sm text-muted-foreground'>
-                      {material.unitOfMeasure?.name || ''}
-                      {material.unitOfMeasure?.symbol && ` (${material.unitOfMeasure.symbol})`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className='space-y-3'>
-                <div className='flex items-center gap-2'>
-                  <Calendar className='h-4 w-4 text-muted-foreground' />
-                  <div>
-                    <p className='text-sm font-medium'>Created At</p>
-                    <p className='text-sm text-muted-foreground'>
-                      {formatDate(material.createdAt)}
-                    </p>
-                  </div>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <RefreshCw className='h-4 w-4 text-muted-foreground' />
-                  <div>
-                    <p className='text-sm font-medium'>Last Updated</p>
-                    <p className='text-sm text-muted-foreground'>
-                      {formatDate(material.updatedAt)}
-                    </p>
-                  </div>
+            <div className='grid grid-cols-1 gap-6 md:grid-cols-3'>
+              {/* Image Section */}
+              <div className='md:col-span-1'>
+                <div className='relative aspect-square w-full overflow-hidden rounded-lg border bg-gray-50 dark:bg-gray-900'>
+                  {imageUrl ? (
+                    <Image
+                      src={imageUrl}
+                      alt={material.name || 'Material image'}
+                      fill
+                      className='object-contain p-2'
+                      sizes='(max-width: 768px) 100vw, 33vw'
+                      onError={(e) => {
+                        // Fallback if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        // Show fallback icon
+                        const parent = target.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('div');
+                          fallback.className = 'flex h-full w-full items-center justify-center';
+                          fallback.innerHTML = `
+                            <div class="flex flex-col items-center gap-2 text-muted-foreground">
+                              <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span class="text-sm">No image</span>
+                            </div>
+                          `;
+                          parent.appendChild(fallback);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className='flex h-full w-full flex-col items-center justify-center text-muted-foreground'>
+                      <ImageIcon className='h-12 w-12' />
+                      <span className='mt-2 text-sm'>No image available</span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Material Types Badges */}
-            <div className='mt-4'>
-              <p className='mb-2 text-sm font-medium'>Material Types</p>
-              <div className='flex flex-wrap gap-2'>
-                {material.plainMDF && (
-                  <Badge variant='outline' className='bg-primary/5'>Plain MDF</Badge>
-                )}
-                {material.laminatedMDF && (
-                  <Badge variant='outline' className='bg-primary/5'>Laminated MDF</Badge>
-                )}
-                {material.wood && (
-                  <Badge variant='outline' className='bg-primary/5'>Wood</Badge>
-                )}
-                {material.metal && (
-                  <Badge variant='outline' className='bg-primary/5'>Metal</Badge>
-                )}
+              {/* Material Details */}
+              <div className='md:col-span-2 space-y-4'>
+                <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                  <div className='space-y-3'>
+                    <div className='flex items-center gap-2'>
+                      <Package className='h-4 w-4 text-muted-foreground' />
+                      <div>
+                        <p className='text-sm font-medium'>Name</p>
+                        <p className='text-sm text-muted-foreground'>{material.name}</p>
+                      </div>
+                    </div>
+                    
+                    <div className='flex items-center gap-2'>
+                      <Ruler className='h-4 w-4 text-muted-foreground' />
+                      <div>
+                        <p className='text-sm font-medium'>Size</p>
+                        <p className='text-sm text-muted-foreground'>
+                          {material.size || 'Not specified'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className='flex items-center gap-2'>
+                      <Layers className='h-4 w-4 text-muted-foreground' />
+                      <div>
+                        <p className='text-sm font-medium'>Category</p>
+                        <p className='text-sm text-muted-foreground'>
+                          {material.materialType?.name || 'Not specified'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className='space-y-3'>
+                    <div className='flex items-center gap-2'>
+                      <FileText className='h-4 w-4 text-muted-foreground' />
+                      <div>
+                        <p className='text-sm font-medium'>Unit of Measure</p>
+                        <p className='text-sm text-muted-foreground'>
+                          {material.unitOfMeasure?.name || 'Not specified'}
+                          {material.unitOfMeasure?.symbol && ` (${material.unitOfMeasure.symbol})`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className='flex items-center gap-2'>
+                      <Calendar className='h-4 w-4 text-muted-foreground' />
+                      <div>
+                        <p className='text-sm font-medium'>Created At</p>
+                        <p className='text-sm text-muted-foreground'>
+                          {formatDate(material.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className='flex items-center gap-2'>
+                      <RefreshCw className='h-4 w-4 text-muted-foreground' />
+                      <div>
+                        <p className='text-sm font-medium'>Last Updated</p>
+                        <p className='text-sm text-muted-foreground'>
+                          {formatDate(material.updatedAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Color if available */}
+                    {material.color && (
+                      <div className='flex items-center gap-2'>
+                        <div 
+                          className='h-4 w-4 rounded-full border' 
+                          style={{ backgroundColor: material.color }}
+                        />
+                        <div>
+                          <p className='text-sm font-medium'>Color</p>
+                          <p className='text-sm text-muted-foreground'>{material.color}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Material Types Badges */}
+                <div className='pt-2 border-t'>
+                  <p className='mb-2 text-sm font-medium'>Material Types</p>
+                  <div className='flex flex-wrap gap-2'>
+                    {material.plainMDF && (
+                      <Badge variant='outline' className='bg-primary/5'>Plain MDF</Badge>
+                    )}
+                    {material.laminatedMDF && (
+                      <Badge variant='outline' className='bg-primary/5'>Laminated MDF</Badge>
+                    )}
+                    {material.wood && (
+                      <Badge variant='outline' className='bg-primary/5'>Wood</Badge>
+                    )}
+                    {material.metal && (
+                      <Badge variant='outline' className='bg-primary/5'>Metal</Badge>
+                    )}
+                    {material.accessory && (
+                      <Badge variant='outline' className='bg-primary/5'>Accessory</Badge>
+                    )}
+                    {material.other && (
+                      <Badge variant='outline' className='bg-primary/5'>Other</Badge>
+                    )}
+                    {!material.plainMDF && !material.laminatedMDF && !material.wood && 
+                     !material.metal && !material.accessory && !material.other && (
+                      <span className='text-sm text-muted-foreground'>No types specified</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -686,93 +756,6 @@ const MaterialDetailPage: React.FC<MaterialViewProps> = ({ id }) => {
             </Table>
           </CardContent>
         </Card>
-
-        {/* Inventory by Location Section */}
-        {/* <Card>
-          <CardHeader>
-            <CardTitle className='text-lg font-semibold'>
-              Current Inventory by Location
-              {isFilterActive && (
-                <span className='text-sm font-normal text-muted-foreground ml-2'>
-                  (Filtered)
-                </span>
-              )}
-            </CardTitle>
-            {!isFilterActive && (
-              <p className='text-sm text-muted-foreground mt-1'>
-                Showing all inventory across stores and showrooms
-              </p>
-            )}
-          </CardHeader>
-          <CardContent>
-            {filteredInventory.length > 0 ? (
-              <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
-                {filteredInventory.map((stock) => {
-                  const locationInfo = getInventoryLocationInfo(stock);
-                  return (
-                    <div key={stock.id} className='flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow'>
-                      <div className='flex-1'>
-                        <div className='flex items-center gap-2 mb-2'>
-                          {locationInfo?.icon}
-                          <p className='font-semibold'>
-                            {locationInfo?.name || 'Unknown Location'}
-                          </p>
-                          {locationInfo?.isMain && (
-                            <Badge variant='secondary' className='text-xs'>
-                              Main
-                            </Badge>
-                          )}
-                        </div>
-                        <div className='space-y-1'>
-                          <p className='text-sm text-muted-foreground'>
-                            Status: 
-                            <Badge 
-                              variant='outline' 
-                              className={`ml-2 text-xs ${
-                                stock.status === 'Available' 
-                                  ? 'bg-green-50 text-green-700 border-green-200' 
-                                  : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                              }`}
-                            >
-                              {stock.status}
-                            </Badge>
-                          </p>
-                          <p className='text-sm text-muted-foreground'>
-                            Type: <span className='capitalize'>{locationInfo?.type || 'unknown'}</span>
-                          </p>
-                        </div>
-                      </div>
-                      <div className='text-right'>
-                        <p className='text-2xl font-bold text-primary'>{stock.quantity}</p>
-                        <p className='text-xs text-muted-foreground'>
-                          {material.unitOfMeasure?.symbol || 'units'}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className='text-center py-12'>
-                <Package className='h-12 w-12 text-muted-foreground mx-auto mb-3' />
-                <p className='text-muted-foreground'>
-                  {isFilterActive 
-                    ? `No inventory found for the selected filters: ${getFilterDescription()}`
-                    : 'No inventory records found'}
-                </p>
-                {isFilterActive && (
-                  <Button 
-                    variant='link' 
-                    onClick={resetFilters}
-                    className='mt-2'
-                  >
-                    Clear filters to see all locations
-                  </Button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card> */}
       </div>
     </div>
   );

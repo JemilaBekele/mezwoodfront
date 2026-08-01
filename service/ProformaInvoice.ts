@@ -200,7 +200,7 @@ export const createProformaInvoice = async (
 
 /* =========================
    UPDATE
-========================= */
+========================= */ 
 export const updateProformaInvoice = async (
   id: string,
   data: any,
@@ -217,7 +217,22 @@ export const updateProformaInvoice = async (
     throw error;
   }
 };
-
+export const updateProformaInvoiceseco = async (
+  id: string,
+  data: any,
+  
+) => {
+  try {
+    
+    const response = await axiosInstance.put(
+      `/proforma-invoices/secondupdate/${id}`,
+      data
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
 /* =========================
    DELETE
 ========================= */

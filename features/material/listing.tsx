@@ -147,6 +147,9 @@ export const MaterialCard = ({ material, onSelectMaterial }: MaterialCardProps) 
             {material.color && (
               <p className="text-xs text-gray-500 dark:text-gray-400">Color: {material.color}</p>
             )}
+             {material.size && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">Size: {material.size}</p>
+            )}
             {material.unitOfMeasure && (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 UOM: {material.unitOfMeasure.name} ({material.unitOfMeasure.symbol})
@@ -283,7 +286,6 @@ export default function MaterialListingPage({ initialMaterials }: MaterialListin
           getMaterials(),
           getMaterialCategories()
         ]);
-        
         
         setMaterials(materialsData || []);
         setCategories(categoriesData || []);

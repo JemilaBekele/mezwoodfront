@@ -20,6 +20,8 @@ export enum ProjectStatus {
   FINISHING = 'FINISHING',
   DELIVERY = 'DELIVERY',
   INSTALLATION = 'INSTALLATION',
+    COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
 }
 export enum DesignStatus {
     DESIGN_FINISHED = 'DESIGN_FINISHED',

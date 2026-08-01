@@ -13,23 +13,21 @@ import {
   FileText,
   Loader2,
   TrendingUp,
-  Settings,
-  Truck,
-  Home,
-  Hammer,
-  Paintbrush,
-  Scissors,
+
   CalendarDays,
   User,
-  Award,
+ 
   BarChart3,
   Layers,
   Package,
-  Wrench,
+
   Box,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
+  Eye,
+  X,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage } from '@/models/Projects';
 import { getProjectId } from '@/service/Project';
@@ -69,9 +67,36 @@ import { getAllEmploy } from '@/service/employee';
 import { Input } from '@/components/ui/input';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
+import { normalizeImagePath } from '@/lib/norm';
+import Image from 'next/image';
+import { getStatusConfig } from '../../unifay';
 
-// Helper function for image URLs
+// Skeleton Loader Component
+const SkeletonCard = ({ className = '' }: { className?: string }) => (
+  <div className={`animate-pulse ${className}`}>
+    <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+    <div className="space-y-3">
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+    </div>
+  </div>
+);
 
+const SkeletonTable = () => (
+  <div className="animate-pulse">
+    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+    {[...Array(5)].map((_, i) => (
+      <div key={i} className="flex gap-4 mb-3">
+        <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="flex-1 h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="w-20 h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="w-20 h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="w-16 h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      </div>
+    ))}
+  </div>
+);
 
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 
@@ -114,6 +139,7 @@ interface PurchaseNeededItem {
   shortfall: number;
   unit: string;
   itemDescription: string;
+  imageUrl?: string;
 }
 
 const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
@@ -134,6 +160,10 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [isCheckingStock, setIsCheckingStock] = useState(false);
   const [users, setUsers] = useState<UserData[]>([]);
   
+  // State for image preview modal
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  
   // New state for partial issuance
   const [givenQuantity, setGivenQuantity] = useState<number>(0);
   const [additionalQuantity, setAdditionalQuantity] = useState<number>(0);
@@ -142,6 +172,18 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   // State for purchase needed items
   const [purchaseNeededItems, setPurchaseNeededItems] = useState<PurchaseNeededItem[]>([]);
   const [loadingPurchaseNeeded, setLoadingPurchaseNeeded] = useState(false);
+
+  // Function to handle image preview
+  const handleImageClick = (imageUrl: string, name: string) => {
+    setPreviewImage({ url: imageUrl, name });
+    setIsPreviewOpen(true);
+  };
+
+  // Function to close image preview
+  const closePreview = () => {
+    setIsPreviewOpen(false);
+    setPreviewImage(null);
+  };
 
   // Fetch users for givenTo dropdown
   useEffect(() => {
@@ -191,7 +233,8 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             availableStock: availableStock,
             shortfall: shortfall,
             unit: 'units',
-            itemDescription: material.note || ''
+            itemDescription: material.note || '',
+            imageUrl: material.material?.imageUrl || '',
           });
         }
       } catch (error) {
@@ -484,89 +527,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     );
   };
 
-  // Status badge configuration
-  const getStatusConfig = (status: ProjectStatus) => {
-    const config: Record<ProjectStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
-      color: string;
-    }> = {
-      [ProjectStatus.INVOICE]: {
-        label: 'Invoice',
-        variant: 'secondary',
-        icon: FileText,
-        color: 'text-gray-500',
-      },
-      [ProjectStatus.DESIGN]: {
-        label: 'Design',
-        variant: 'default',
-        icon: Settings,
-        color: 'text-blue-500',
-      },
-      [ProjectStatus.PURCHASING]: {
-        label: 'Purchasing',
-        variant: 'outline',
-        icon: Package,
-        color: 'text-purple-500',
-      },
-      [ProjectStatus.CUTTING]: {
-        label: 'Cutting',
-        variant: 'default',
-        icon: Scissors,
-        color: 'text-amber-500',
-      },
-      [ProjectStatus.EDGE_BANDING]: {
-        label: 'Edge Banding',
-        variant: 'outline',
-        icon: Layers,
-        color: 'text-teal-500',
-      },
-      [ProjectStatus.PAINTING]: {
-        label: 'Painting',
-        variant: 'default',
-        icon: Paintbrush,
-        color: 'text-indigo-500',
-      },
-      [ProjectStatus.ASSEMBLY]: {
-        label: 'Assembly',
-        variant: 'outline',
-        icon: Hammer,
-        color: 'text-orange-500',
-      },
-      [ProjectStatus.FINISHING]: {
-        label: 'Finishing',
-        variant: 'default',
-        icon: Award,
-        color: 'text-yellow-500',
-      },
-      [ProjectStatus.DELIVERY]: {
-        label: 'Delivery',
-        variant: 'outline',
-        icon: Truck,
-        color: 'text-green-500',
-      },
-      [ProjectStatus.INSTALLATION]: {
-        label: 'Installation',
-        variant: 'default',
-        icon: Home,
-        color: 'text-emerald-500',
-      }, 
-      [ProjectStatus.METAL_WORKS]: {
-        label: 'Metal Works',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-      [ProjectStatus.CNC]: {
-        label: 'CNC',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-    };
-    return config[status];
-  };
+ 
 
   // Difficulty badge configuration
   const getDifficultyConfig = (difficulty: DifficultyLevel) => {
@@ -609,11 +570,18 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const totalShortfall = purchaseNeededItems.reduce((sum, item) => sum + item.shortfall, 0);
   const hasItemsToPurchase = purchaseNeededItems.length > 0;
 
+  // Show loading state with skeleton
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="mr-2 h-8 w-8 animate-spin" />
-        <p>Loading purchasing project details...</p>
+      <div className="space-y-6 p-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <SkeletonCard className="h-64" />
+        <SkeletonCard className="h-96" />
+        <SkeletonTable />
       </div>
     );
   }
@@ -628,86 +596,113 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
   return (
     <div className="space-y-6">
-      {/* ========== SECTION 1: ITEMS NEED TO PURCHASE - SIMPLE LIST ========== */}
-    {/* ========== SECTION 1: ITEMS NEED TO PURCHASE - ONLY SHOW IF ITEMS EXIST ========== */}
-{hasItemsToPurchase && (
-  <Card className="border-2 border-red-200 shadow-lg dark:border-red-800">
-    <CardHeader className="bg-red-50 border-b border-red-200 dark:bg-red-950 dark:border-red-800">
-      <CardTitle className="flex items-center gap-2 text-2xl font-bold text-red-700 dark:text-red-400">
-        <ShoppingCart className="h-6 w-6" />
-        ITEMS NEED TO PURCHASE
-        <Badge variant="destructive" className="ml-2">
-          {purchaseNeededItems.length} item(s)
-        </Badge>
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="pt-6">
-      {loadingPurchaseNeeded ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-          <p>Checking stock levels...</p>
-        </div>
-      ) : (
-        <>
-          {/* Summary Banner */}
-          <div className="mb-6 rounded-lg bg-yellow-50 p-4 border-l-4 border-yellow-500 dark:bg-yellow-950 dark:border-yellow-600">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              <span className="font-semibold text-yellow-800 dark:text-yellow-300">
-                Need to purchase {purchaseNeededItems.length} item(s) - Total Quantity: {totalShortfall} units
-              </span>
-            </div>
-          </div>
+      {/* ========== SECTION 1: ITEMS NEED TO PURCHASE - ONLY SHOW IF ITEMS EXIST ========== */}
+      {hasItemsToPurchase && (
+        <Card className="border-2 border-red-200 shadow-lg dark:border-red-800">
+          <CardHeader className="bg-red-50 border-b border-red-200 dark:bg-red-950 dark:border-red-800">
+            <CardTitle className="flex items-center gap-2 text-2xl font-bold text-red-700 dark:text-red-400">
+              <ShoppingCart className="h-6 w-6" />
+              ITEMS NEED TO PURCHASE
+              <Badge variant="destructive" className="ml-2">
+                {purchaseNeededItems.length} item(s)
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 overflow-visible">
+            {loadingPurchaseNeeded ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                <p>Checking stock levels...</p>
+              </div>
+            ) : (
+              <>
+                {/* Summary Banner */}
+                <div className="mb-6 rounded-lg bg-yellow-50 p-4 border-l-4 border-yellow-500 dark:bg-yellow-950 dark:border-yellow-600">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    <span className="font-semibold text-yellow-800 dark:text-yellow-300">
+                      Need to purchase {purchaseNeededItems.length} item(s) - Total Quantity: {totalShortfall} units
+                    </span>
+                  </div>
+                </div>
 
-          {/* Simple Purchase List Table */}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-100 dark:bg-gray-800">
-                  <TableHead className="font-bold">Material Name</TableHead>
-                  <TableHead className="font-bold">Color</TableHead>
-                  <TableHead className="font-bold">Size</TableHead>
-                  <TableHead className="font-bold text-right">Required</TableHead>
-                  <TableHead className="font-bold text-right">Issued</TableHead>
-                  <TableHead className="font-bold text-right">Remaining</TableHead>
-                  <TableHead className="font-bold text-right">Stock Available</TableHead>
-                  <TableHead className="font-bold text-right">TO BUY</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {purchaseNeededItems.map((item, index) => (
-                  <TableRow key={index} className="hover:bg-red-50 dark:hover:bg-red-950/50">
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-red-500 dark:text-red-400" />
-                        {item.materialName}
-                      </div>
-                    </TableCell>
-                    <TableCell>{item.color}</TableCell>
-                    <TableCell>{item.size}</TableCell>
-                    <TableCell className="text-right">{item.requiredQuantity}</TableCell>
-                    <TableCell className="text-right">{item.alreadyIssued}</TableCell>
-                    <TableCell className="text-right text-orange-600 dark:text-orange-400 font-medium">
-                      {item.remainingNeeded}
-                    </TableCell>
-                    <TableCell className="text-right text-blue-600 dark:text-blue-400">
-                      {item.availableStock}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="destructive" className="text-base px-3 py-1">
-                        {item.shortfall}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
+                {/* Simple Purchase List Table with Images */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-100 dark:bg-gray-800">
+                        <TableHead className="font-bold">Image</TableHead>
+                        <TableHead className="font-bold">Material Name</TableHead>
+                        <TableHead className="font-bold">Color</TableHead>
+                        <TableHead className="font-bold">Size</TableHead>
+                        <TableHead className="font-bold text-right">Required</TableHead>
+                        <TableHead className="font-bold text-right">Issued</TableHead>
+                        <TableHead className="font-bold text-right">Remaining</TableHead>
+                        <TableHead className="font-bold text-right">Stock Available</TableHead>
+                        <TableHead className="font-bold text-right">TO BUY</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {purchaseNeededItems.map((item, index) => {
+                        const imageUrl = item.imageUrl ? normalizeImagePath(item.imageUrl) : null;
+                        
+                        return (
+                          <TableRow key={index} className="hover:bg-red-50 dark:hover:bg-red-950/50">
+                            <TableCell>
+                              {imageUrl ? (
+                                <div 
+                                  className="relative h-12 w-12 rounded overflow-hidden border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity hover:shadow-lg shrink-0"
+                                  onClick={() => handleImageClick(imageUrl, item.materialName)}
+                                >
+                                  <Image
+                                    src={imageUrl}
+                                    alt={item.materialName}
+                                    fill
+                                    className="object-cover"
+                                    sizes="48px"
+                                  />
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                                    <Eye className="h-4 w-4 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                  <ImageIcon className="h-6 w-6 text-gray-400" />
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4 text-red-500 dark:text-red-400" />
+                                {item.materialName}
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.color}</TableCell>
+                            <TableCell>{item.size}</TableCell>
+                            <TableCell className="text-right">{item.requiredQuantity}</TableCell>
+                            <TableCell className="text-right">{item.alreadyIssued}</TableCell>
+                            <TableCell className="text-right text-orange-600 dark:text-orange-400 font-medium">
+                              {item.remainingNeeded}
+                            </TableCell>
+                            <TableCell className="text-right text-blue-600 dark:text-blue-400">
+                              {item.availableStock}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="destructive" className="text-base px-3 py-1">
+                                {item.shortfall}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       )}
-    </CardContent>
-  </Card>
-)}
 
       {/* Project Overview Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -943,14 +938,12 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                             <TableHead>Quantity</TableHead>
                             <TableHead>Materials</TableHead>
                             <TableHead>Description</TableHead>
-
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {proformaInvoice.items.map((item) => (
                             <TableRow key={item.id}>
-                                                         <TableCell>{item.item?.name || ''}</TableCell>
-
+                              <TableCell>{item.item?.name || ''}</TableCell>
                               <TableCell>{item.size || ''}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>
@@ -963,7 +956,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                   'No materials'
                                 )}
                               </TableCell>
-                                 <TableCell>
+                              <TableCell>
                                 <div className="space-y-1">
                                   <p className="font-medium">{item.description}</p>
                                   {item.additionalDescription && (
@@ -986,150 +979,174 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   )}
                 </TabsContent>
 
-               <TabsContent value="materials" className="space-y-4 mt-4">
-  {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
-    <div className="space-y-4">
-      {proformaInvoice.items.map((item) => {
-        if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
-        
-        return (
-          <div key={item.id} className="border rounded-lg overflow-hidden">
-            <div className="bg-muted/30 p-3 border-b">
+                <TabsContent value="materials" className="space-y-4 mt-4">
+                  {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
+                    <div className="space-y-4">
+                      {proformaInvoice.items.map((item) => {
+                        if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+                        
+                        return (
+                          <div key={item.id} className="border rounded-lg overflow-hidden">
+                            <div className="bg-muted/30 p-3 border-b">
                               <h4 className="font-semibold">{item.item?.name || ''}</h4>
-              {item.size && <p className="text-sm text-muted-foreground">Size: {item.size}</p>}
-            </div>
-            <div className="p-3 overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Material Name</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Required Qty</TableHead>
-                    <TableHead>Additional Qty</TableHead>
-                    <TableHead>Issued Qty</TableHead>
-                    <TableHead>Remaining</TableHead>
-                    <TableHead>Available Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Issue History</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {item.proformaItemMaterials.map((material) => {
-                    const stockInfo = materialStockInfo[material.id];
-                    const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
-                    const givenQuantity = material.givenquantity || 0;
-                    const remainingNeeded = totalRequired - givenQuantity;
-                    
-                    return (
-                      <TableRow key={material.id}>
-                        <TableCell>
-                          <p className="font-medium">{material.material?.name || ''}</p>
-                        </TableCell>
-                        <TableCell>{material.material?.color || ''}</TableCell>
-                        <TableCell>{material.material?.size || ''}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{material.quantity} units</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{material?.additionalQuantity || 0} units</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {givenQuantity > 0 ? (
-                            <span className="text-sm font-medium text-green-600">
-                              {givenQuantity} units
-                            </span>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`text-sm font-medium ${remainingNeeded > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                            {remainingNeeded} units
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {getStockDisplay(material)}
-                        </TableCell>
-                        <TableCell>
-                          {getMaterialStatusBadge(material.status)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-2 min-w-50">
-                            {material.materialIssues && material.materialIssues.length > 0 ? (
-                              material.materialIssues.map((issue, idx) => (
-                                <div key={issue.id} className="text-xs border-b pb-1 last:border-0">
-                                  <div className="flex items-center gap-1">
-                                    <User className="h-3 w-3 text-blue-500" />
-                                    <span className="font-medium">{issue.issuedBy?.name || 'Unknown'}</span>
-                                    <span className="text-muted-foreground">→</span>
-                                    <span className="font-medium">{issue.givenTo?.name || ''}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center mt-1">
-                                    <Badge variant="outline" className="text-xs">
-                                      {issue.quantity} units
-                                    </Badge>
-                                    <span className="text-muted-foreground">
-                                      {new Date(issue.issuedAt).toLocaleDateString()}
-                                    </span>
-                                  </div>
-                                  {issue.note && (
-                                    <p className="text-muted-foreground mt-1 truncate max-w-50">
-                                      {issue.note}
-                                    </p>
-                                  )}
-                                </div>
-                              ))
-                            ) : (
-                              <span className="text-xs text-muted-foreground">No issues recorded</span>
-                            )}
+                              {item.size && <p className="text-sm text-muted-foreground">Size: {item.size}</p>}
+                            </div>
+                            <div className="p-3 overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Image</TableHead>
+                                    <TableHead>Material Name</TableHead>
+                                    <TableHead>Color</TableHead>
+                                    <TableHead>Size</TableHead>
+                                    <TableHead>Required Qty</TableHead>
+                                    <TableHead>Additional Qty</TableHead>
+                                    <TableHead>Issued Qty</TableHead>
+                                    <TableHead>Remaining</TableHead>
+                                    <TableHead>Available Stock</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Issue History</TableHead>
+                                    <TableHead>Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {item.proformaItemMaterials.map((material) => {
+                                    const stockInfo = materialStockInfo[material.id];
+                                    const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
+                                    const givenQuantity = material.givenquantity || 0;
+                                    const remainingNeeded = totalRequired - givenQuantity;
+                                    const imageUrl = material.material?.imageUrl ? normalizeImagePath(material.material.imageUrl) : null;
+                                    
+                                    return (
+                                      <TableRow key={material.id}>
+                                        <TableCell>
+                                          {imageUrl ? (
+                                            <div 
+                                              className="relative h-12 w-12 rounded overflow-hidden border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity hover:shadow-lg shrink-0"
+                                              onClick={() => handleImageClick(imageUrl, material.material?.name || 'Material')}
+                                            >
+                                              <Image
+                                                src={imageUrl}
+                                                alt={material.material?.name || 'Material'}
+                                                fill
+                                                className="object-cover"
+                                                sizes="48px"
+                                              />
+                                              <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                                                <Eye className="h-4 w-4 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                                            </div>
+                                          )}
+                                        </TableCell>
+                                        <TableCell>
+                                          <p className="font-medium">{material.material?.name || ''}</p>
+                                        </TableCell>
+                                        <TableCell>{material.material?.color || ''}</TableCell>
+                                        <TableCell>{material.material?.size || ''}</TableCell>
+                                        <TableCell>
+                                          <Badge variant="outline">{material.quantity} units</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge variant="outline">{material?.additionalQuantity || 0} units</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                          {givenQuantity > 0 ? (
+                                            <span className="text-sm font-medium text-green-600">
+                                              {givenQuantity} units
+                                            </span>
+                                          ) : (
+                                            '-'
+                                          )}
+                                        </TableCell>
+                                        <TableCell>
+                                          <span className={`text-sm font-medium ${remainingNeeded > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                            {remainingNeeded} units
+                                          </span>
+                                        </TableCell>
+                                        <TableCell>
+                                          {getStockDisplay(material)}
+                                        </TableCell>
+                                        <TableCell>
+                                          {getMaterialStatusBadge(material.status)}
+                                        </TableCell>
+                                        <TableCell>
+                                          <div className="space-y-2 min-w-50">
+                                            {material.materialIssues && material.materialIssues.length > 0 ? (
+                                              material.materialIssues.map((issue, idx) => (
+                                                <div key={issue.id} className="text-xs border-b pb-1 last:border-0">
+                                                  <div className="flex items-center gap-1">
+                                                    <User className="h-3 w-3 text-blue-500" />
+                                                    <span className="font-medium">{issue.issuedBy?.name || 'Unknown'}</span>
+                                                    <span className="text-muted-foreground">→</span>
+                                                    <span className="font-medium">{issue.givenTo?.name || ''}</span>
+                                                  </div>
+                                                  <div className="flex justify-between items-center mt-1">
+                                                    <Badge variant="outline" className="text-xs">
+                                                      {issue.quantity} units
+                                                    </Badge>
+                                                    <span className="text-muted-foreground">
+                                                      {new Date(issue.issuedAt).toLocaleDateString()}
+                                                    </span>
+                                                  </div>
+                                                  {issue.note && (
+                                                    <p className="text-muted-foreground mt-1 truncate max-w-50">
+                                                      {issue.note}
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              ))
+                                            ) : (
+                                              <span className="text-xs text-muted-foreground">No issues recorded</span>
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell>
+                                          <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ISSUE_STOCK_MATERIALS.name}>
+                                            <div className="flex gap-2">
+                                              {(
+                                                material.status === MaterialIssueStatus.PENDING ||
+                                                material.status === MaterialIssueStatus.PARTIALLY ||
+                                                (
+                                                  material.status === MaterialIssueStatus.ISSUED &&
+                                                  (material.givenquantity || 0) < 
+                                                  ((material.quantity || 0) + (material.additionalQuantity || 0))
+                                                )
+                                              ) && (
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() => handleIssueMaterialClick(material)}
+                                                  className="gap-1"
+                                                >
+                                                  <CheckCircle className="h-3 w-3" />
+                                                  {material.status === MaterialIssueStatus.PARTIALLY || material.status === MaterialIssueStatus.ISSUED
+                                                    ? 'Issue More'
+                                                    : 'Issue'}
+                                                </Button>
+                                              )}
+                                            </div>
+                                          </PermissionGuard>
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                                  <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ISSUE_STOCK_MATERIALS.name}>
-
-                          <div className="flex gap-2">
-                            {(
-                              material.status === MaterialIssueStatus.PENDING ||
-                              material.status === MaterialIssueStatus.PARTIALLY ||
-                              (
-                                material.status === MaterialIssueStatus.ISSUED &&
-                                (material.givenquantity || 0) < 
-                                ((material.quantity || 0) + (material.additionalQuantity || 0))
-                              )
-                            ) && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleIssueMaterialClick(material)}
-                                className="gap-1"
-                              >
-                                <CheckCircle className="h-3 w-3" />
-                                {material.status === MaterialIssueStatus.PARTIALLY || material.status === MaterialIssueStatus.ISSUED
-                                  ? 'Issue More'
-                                  : 'Issue'}
-                              </Button>
-                            )}
-                          </div>
-                          </PermissionGuard>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  ) : (
-    <div className="text-center py-8">
-      <Box className="mx-auto h-12 w-12 text-muted-foreground/50" />
-      <p className="mt-4 text-muted-foreground">No materials found</p>
-    </div>
-  )}
-</TabsContent>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Box className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                      <p className="mt-4 text-muted-foreground">No materials found</p>
+                    </div>
+                  )}
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
@@ -1233,6 +1250,31 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             <div className="space-y-2">
               <Label>Material Details</Label>
               <div className="bg-muted/30 p-3 rounded-lg space-y-1">
+                {/* Show material image in dialog */}
+                {selectedMaterial?.material?.imageUrl && (
+                  <div className="flex justify-center mb-2">
+                    <div 
+                      className="relative h-20 w-20 rounded overflow-hidden border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        const imageUrl = normalizeImagePath(selectedMaterial.material?.imageUrl);
+                        if (imageUrl) {
+                          handleImageClick(imageUrl, selectedMaterial.material?.name || 'Material');
+                        }
+                      }}
+                    >
+                      <Image
+                        src={normalizeImagePath(selectedMaterial.material.imageUrl)!}
+                        alt={selectedMaterial.material?.name || 'Material'}
+                        fill
+                        className="object-cover"
+                        sizes="80px"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                        <Eye className="h-5 w-5 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <p className="text-sm">
                   <span className="font-medium">Material:</span> {selectedMaterial?.material?.name}
                 </p>
@@ -1390,6 +1432,42 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
               Confirm Issue
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Modal */}
+      <Dialog open={isPreviewOpen} onOpenChange={closePreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden bg-transparent border-none shadow-2xl">
+          <DialogHeader className="absolute top-4 right-4 z-10">
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 text-white border-none"
+              onClick={closePreview}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 bg-black/90 rounded-lg">
+            {previewImage && (
+              <>
+                <div className="relative w-full max-h-[70vh] flex items-center justify-center">
+                  <img
+                    src={previewImage.url}
+                    alt={previewImage.name}
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-image.png';
+                    }}
+                  />
+                </div>
+                <div className="mt-4 text-center text-white">
+                  <p className="text-sm font-medium">{previewImage.name}</p>
+                  <p className="text-xs text-gray-400">Click outside or press ESC to close</p>
+                </div>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -46,6 +46,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
+import { getStatusConfig } from '../Stages/unifay';
 // Define the variant type to match your Badge component
 type BadgeVariant = "link" | "secondary" | "default" | "outline" | "ghost" | "destructive" | null | undefined;
 
@@ -128,89 +129,7 @@ const ProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     fetchProjectData();
   }, [fetchProjectData, id]);
 
-  // Status badge configuration - with proper typing
-  const getStatusConfig = (status: ProjectStatus) => {
-    const config: Record<ProjectStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
-      color: string;
-    }> = {
-      [ProjectStatus.INVOICE]: {
-        label: 'Invoice',
-        variant: 'secondary',
-        icon: FileText,
-        color: 'text-gray-500',
-      },
-      [ProjectStatus.DESIGN]: {
-        label: 'Design',
-        variant: 'default',
-        icon: Settings,
-        color: 'text-blue-500',
-      },
-      [ProjectStatus.PURCHASING]: {
-        label: 'Purchasing',
-        variant: 'outline',
-        icon: Package,
-        color: 'text-purple-500',
-      },
-      [ProjectStatus.CUTTING]: {
-        label: 'Cutting',
-        variant: 'default',
-        icon: Scissors,
-        color: 'text-amber-500',
-      },
-      [ProjectStatus.EDGE_BANDING]: {
-        label: 'Edge Banding',
-        variant: 'outline',
-        icon: Layers,
-        color: 'text-teal-500',
-      },
-      [ProjectStatus.PAINTING]: {
-        label: 'Painting',
-        variant: 'default',
-        icon: Paintbrush,
-        color: 'text-indigo-500',
-      },
-      [ProjectStatus.ASSEMBLY]: {
-        label: 'Assembly',
-        variant: 'outline',
-        icon: Hammer,
-        color: 'text-orange-500',
-      },
-      [ProjectStatus.FINISHING]: {
-        label: 'Finishing',
-        variant: 'default',
-        icon: Award,
-        color: 'text-yellow-500',
-      },
-      [ProjectStatus.DELIVERY]: {
-        label: 'Delivery',
-        variant: 'outline',
-        icon: Truck,
-        color: 'text-green-500',
-      },
-      [ProjectStatus.INSTALLATION]: {
-        label: 'Installation',
-        variant: 'default',
-        icon: Home,
-        color: 'text-emerald-500',
-      }, 
-      [ProjectStatus.METAL_WORKS]: {
-        label: 'Metal Works',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-      [ProjectStatus.CNC]: {
-        label: 'CNC',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-    };
-    return config[status];
-  };
+
 
   // Stage status badge configuration
   const getStageStatusConfig = (status: StageStatus) => {
@@ -573,6 +492,8 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
               { label: 'Updated By', person: project.updatedBy },
               { label: 'Prepared By', person: project.invoice?.preparedBy },
               { label: 'Approved By', person: project.invoice?.approvedBy },
+              { label: 'Design By', person: project.designBy },
+
             ].filter(item => item.person).map((item) => (
               <div key={item.label} className="flex items-center gap-2.5">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-bold uppercase">

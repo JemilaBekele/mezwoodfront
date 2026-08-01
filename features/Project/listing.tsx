@@ -22,10 +22,9 @@ import {
   CheckCircle,
   Signal,
   BarChart3,
-  LayoutGrid,
-  HardDrive,
-  TrendingUp,
+
   CheckCheck,
+  XCircle,
 } from "lucide-react";
 import { DataTable } from "@/components/ui/table/newdatatable";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
@@ -106,6 +105,17 @@ const PROJECT_STATUS_CONFIG: Record<ProjectStatus, { label: string; icon: React.
   FINISHING: { label: "Finishing", icon: CheckCircle, color: "green" },
   DELIVERY: { label: "Delivery", icon: Package, color: "purple" },
   INSTALLATION: { label: "Installation", icon: Layers, color: "yellow" },
+    COMPLETED: {
+    label: "Completed",
+    icon: CheckCircle,
+    color: "emerald",
+  },
+
+  CANCELLED: {
+    label: "Cancelled",
+    icon: XCircle,
+    color: "red",
+  },
 };
 
 const DESIGN_STATUS_CONFIG: Record<

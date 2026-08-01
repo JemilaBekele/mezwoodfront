@@ -61,6 +61,7 @@ import {
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { normalizeImagePath } from '@/lib/norm';
+import { getStatusConfig, stageConfigs } from '../unifay';
 
 // Helper function for image URLs
 
@@ -71,190 +72,7 @@ type ProjectDetailProps = {
   id?: string;
 };
 
-// Stage configuration for all stages
-const stageConfigs: Record<ProjectStatus, {
-  label: string;
-  icon: any;
-  color: string;
-  borderColor: string;
-  headerBg: string;
-  headerBorder: string;
-  titleColor: string;
-  iconColor: string;
-  badgeColor: string;
-  badgeBorder: string;
-  bgLight: string;
-  remainingTextColor: string;
-}> = {
-  [ProjectStatus.INVOICE]: {
-    label: "Invoice",
-    icon: FileText,
-    color: "blue",
-    borderColor: "border-blue-200 dark:border-blue-800",
-    headerBg: "bg-blue-50 dark:bg-blue-950/40",
-    headerBorder: "border-blue-100 dark:border-blue-900",
-    titleColor: "text-blue-900 dark:text-blue-100",
-    iconColor: "text-blue-600 dark:text-blue-400",
-    badgeColor: "text-blue-700 dark:text-blue-300",
-    badgeBorder: "border-blue-500 dark:border-blue-700",
-    bgLight: "bg-blue-100 dark:bg-blue-900/40",
-    remainingTextColor: "text-blue-600 dark:text-blue-400",
-  },
-  [ProjectStatus.DESIGN]: {
-    label: "Design",
-    icon: PenTool,
-    color: "purple",
-    borderColor: "border-purple-200 dark:border-purple-800",
-    headerBg: "bg-purple-50 dark:bg-purple-950/40",
-    headerBorder: "border-purple-100 dark:border-purple-900",
-    titleColor: "text-purple-900 dark:text-purple-100",
-    iconColor: "text-purple-600 dark:text-purple-400",
-    badgeColor: "text-purple-700 dark:text-purple-300",
-    badgeBorder: "border-purple-500 dark:border-purple-700",
-    bgLight: "bg-purple-100 dark:bg-purple-900/40",
-    remainingTextColor: "text-purple-600 dark:text-purple-400",
-  },
-  [ProjectStatus.PURCHASING]: {
-    label: "Purchasing",
-    icon: ShoppingCart,
-    color: "amber",
-    borderColor: "border-amber-200 dark:border-amber-800",
-    headerBg: "bg-amber-50 dark:bg-amber-950/40",
-    headerBorder: "border-amber-100 dark:border-amber-900",
-    titleColor: "text-amber-900 dark:text-amber-100",
-    iconColor: "text-amber-600 dark:text-amber-400",
-    badgeColor: "text-amber-700 dark:text-amber-300",
-    badgeBorder: "border-amber-500 dark:border-amber-700",
-    bgLight: "bg-amber-100 dark:bg-amber-900/40",
-    remainingTextColor: "text-amber-600 dark:text-amber-400",
-  },
-  [ProjectStatus.CUTTING]: {
-    label: "Cutting",
-    icon: Scissors,
-    color: "red",
-    borderColor: "border-red-200 dark:border-red-800",
-    headerBg: "bg-red-50 dark:bg-red-950/40",
-    headerBorder: "border-red-100 dark:border-red-900",
-    titleColor: "text-red-900 dark:text-red-100",
-    iconColor: "text-red-600 dark:text-red-400",
-    badgeColor: "text-red-700 dark:text-red-300",
-    badgeBorder: "border-red-500 dark:border-red-700",
-    bgLight: "bg-red-100 dark:bg-red-900/40",
-    remainingTextColor: "text-red-600 dark:text-red-400",
-  },
-  [ProjectStatus.EDGE_BANDING]: {
-    label: "Edge Banding",
-    icon: Layers,
-    color: "teal",
-    borderColor: "border-teal-200 dark:border-teal-800",
-    headerBg: "bg-teal-50 dark:bg-teal-950/40",
-    headerBorder: "border-teal-100 dark:border-teal-900",
-    titleColor: "text-teal-900 dark:text-teal-100",
-    iconColor: "text-teal-600 dark:text-teal-400",
-    badgeColor: "text-teal-700 dark:text-teal-300",
-    badgeBorder: "border-teal-500 dark:border-teal-700",
-    bgLight: "bg-teal-100 dark:bg-teal-900/40",
-    remainingTextColor: "text-teal-600 dark:text-teal-400",
-  },
-  [ProjectStatus.ASSEMBLY]: {
-    label: "Assembly",
-    icon: Hammer,
-    color: "orange",
-    borderColor: "border-orange-200 dark:border-orange-800",
-    headerBg: "bg-orange-50 dark:bg-orange-950/40",
-    headerBorder: "border-orange-100 dark:border-orange-900",
-    titleColor: "text-orange-900 dark:text-orange-100",
-    iconColor: "text-orange-600 dark:text-orange-400",
-    badgeColor: "text-orange-700 dark:text-orange-300",
-    badgeBorder: "border-orange-500 dark:border-orange-700",
-    bgLight: "bg-orange-100 dark:bg-orange-900/40",
-    remainingTextColor: "text-orange-600 dark:text-orange-400",
-  },
-  [ProjectStatus.PAINTING]: {
-    label: "Painting",
-    icon: Paintbrush,
-    color: "pink",
-    borderColor: "border-pink-200 dark:border-pink-800",
-    headerBg: "bg-pink-50 dark:bg-pink-950/40",
-    headerBorder: "border-pink-100 dark:border-pink-900",
-    titleColor: "text-pink-900 dark:text-pink-100",
-    iconColor: "text-pink-600 dark:text-pink-400",
-    badgeColor: "text-pink-700 dark:text-pink-300",
-    badgeBorder: "border-pink-500 dark:border-pink-700",
-    bgLight: "bg-pink-100 dark:bg-pink-900/40",
-    remainingTextColor: "text-pink-600 dark:text-pink-400",
-  },
-  [ProjectStatus.FINISHING]: {
-    label: "Finishing",
-    icon: Sparkles,
-    color: "emerald",
-    borderColor: "border-emerald-200 dark:border-emerald-800",
-    headerBg: "bg-emerald-50 dark:bg-emerald-950/40",
-    headerBorder: "border-emerald-100 dark:border-emerald-900",
-    titleColor: "text-emerald-900 dark:text-emerald-100",
-    iconColor: "text-emerald-600 dark:text-emerald-400",
-    badgeColor: "text-emerald-700 dark:text-emerald-300",
-    badgeBorder: "border-emerald-500 dark:border-emerald-700",
-    bgLight: "bg-emerald-100 dark:bg-emerald-900/40",
-    remainingTextColor: "text-emerald-600 dark:text-emerald-400",
-  },
-  [ProjectStatus.DELIVERY]: {
-    label: "Delivery",
-    icon: Truck,
-    color: "sky",
-    borderColor: "border-sky-200 dark:border-sky-800",
-    headerBg: "bg-sky-50 dark:bg-sky-950/40",
-    headerBorder: "border-sky-100 dark:border-sky-900",
-    titleColor: "text-sky-900 dark:text-sky-100",
-    iconColor: "text-sky-600 dark:text-sky-400",
-    badgeColor: "text-sky-700 dark:text-sky-300",
-    badgeBorder: "border-sky-500 dark:border-sky-700",
-    bgLight: "bg-sky-100 dark:bg-sky-900/40",
-    remainingTextColor: "text-sky-600 dark:text-sky-400",
-  },
-  [ProjectStatus.INSTALLATION]: {
-    label: "Installation",
-    icon: Drill,
-    color: "indigo",
-    borderColor: "border-indigo-200 dark:border-indigo-800",
-    headerBg: "bg-indigo-50 dark:bg-indigo-950/40",
-    headerBorder: "border-indigo-100 dark:border-indigo-900",
-    titleColor: "text-indigo-900 dark:text-indigo-100",
-    iconColor: "text-indigo-600 dark:text-indigo-400",
-    badgeColor: "text-indigo-700 dark:text-indigo-300",
-    badgeBorder: "border-indigo-500 dark:border-indigo-700",
-    bgLight: "bg-indigo-100 dark:bg-indigo-900/40",
-    remainingTextColor: "text-indigo-600 dark:text-indigo-400",
-  },
-  [ProjectStatus.METAL_WORKS]: {
-    label: "Metal Works",
-    icon: Cog,
-    color: "slate",
-    borderColor: "border-slate-200 dark:border-slate-800",
-    headerBg: "bg-slate-50 dark:bg-slate-950/40",
-    headerBorder: "border-slate-100 dark:border-slate-900",
-    titleColor: "text-slate-900 dark:text-slate-100",
-    iconColor: "text-slate-600 dark:text-slate-400",
-    badgeColor: "text-slate-700 dark:text-slate-300",
-    badgeBorder: "border-slate-500 dark:border-slate-700",
-    bgLight: "bg-slate-100 dark:bg-slate-900/40",
-    remainingTextColor: "text-slate-600 dark:text-slate-400",
-  },
-  [ProjectStatus.CNC]: {
-    label: "CNC",
-    icon: Cog,
-    color: "zinc",
-    borderColor: "border-zinc-200 dark:border-zinc-800",
-    headerBg: "bg-zinc-50 dark:bg-zinc-950/40",
-    headerBorder: "border-zinc-100 dark:border-zinc-900",
-    titleColor: "text-zinc-900 dark:text-zinc-100",
-    iconColor: "text-zinc-600 dark:text-zinc-400",
-    badgeColor: "text-zinc-700 dark:text-zinc-300",
-    badgeBorder: "border-zinc-500 dark:border-zinc-700",
-    bgLight: "bg-zinc-100 dark:bg-zinc-900/40",
-    remainingTextColor: "text-zinc-600 dark:text-zinc-400",
-  },
-};
+
 
 const AdminProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [project, setProject] = useState<IProject | null>(null);
@@ -323,12 +141,12 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
       description: 'Design phase completed but awaiting final approval or stock check',
     },
     [DesignStatus.FINISHED]: {
-      label: 'Finished',
-      variant: 'default',
-      icon: CheckCircle,
-      color: 'text-green-600',
-      description: 'Project fully completed',
-    },
+       label: 'Proceed to Production',
+       variant: 'default',
+       icon: CheckCircle,
+       color: 'text-green-600',
+       description: 'Project fully completed',
+     },
   };
 
   return status ? config[status] : null;
@@ -364,89 +182,7 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
     fetchProjectData();
   }, [fetchProjectData]);
 
-  // Status badge configuration
-  const getStatusConfig = (status: ProjectStatus) => {
-    const config: Record<ProjectStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
-      color: string;
-    }> = {
-      [ProjectStatus.INVOICE]: {
-        label: 'Invoice',
-        variant: 'secondary',
-        icon: FileText,
-        color: 'text-gray-500',
-      },
-      [ProjectStatus.DESIGN]: {
-        label: 'Design',
-        variant: 'default',
-        icon: Settings,
-        color: 'text-blue-500',
-      },
-      [ProjectStatus.PURCHASING]: {
-        label: 'Purchasing',
-        variant: 'outline',
-        icon: Package,
-        color: 'text-purple-500',
-      },
-      [ProjectStatus.CUTTING]: {
-        label: 'Cutting',
-        variant: 'default',
-        icon: Scissors,
-        color: 'text-amber-500',
-      },
-      [ProjectStatus.EDGE_BANDING]: {
-        label: 'Edge Banding',
-        variant: 'outline',
-        icon: Layers,
-        color: 'text-teal-500',
-      },
-      [ProjectStatus.PAINTING]: {
-        label: 'Painting',
-        variant: 'default',
-        icon: Paintbrush,
-        color: 'text-indigo-500',
-      },
-      [ProjectStatus.ASSEMBLY]: {
-        label: 'Assembly',
-        variant: 'outline',
-        icon: Hammer,
-        color: 'text-orange-500',
-      },
-      [ProjectStatus.FINISHING]: {
-        label: 'Finishing',
-        variant: 'default',
-        icon: Award,
-        color: 'text-yellow-500',
-      },
-      [ProjectStatus.DELIVERY]: {
-        label: 'Delivery',
-        variant: 'outline',
-        icon: Truck,
-        color: 'text-green-500',
-      },
-      [ProjectStatus.INSTALLATION]: {
-        label: 'Installation',
-        variant: 'default',
-        icon: Home,
-        color: 'text-emerald-500',
-      }, 
-      [ProjectStatus.METAL_WORKS]: {
-        label: 'Metal Works',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-      [ProjectStatus.CNC]: {
-        label: 'CNC',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-    };
-    return config[status];
-  };
+ 
 
   // Difficulty badge configuration
   const getDifficultyConfig = (difficulty: DifficultyLevel) => {

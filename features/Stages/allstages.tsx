@@ -29,6 +29,7 @@ import {
   BarChart3,
   AlertCircle,
   CheckCheck,
+  XCircle,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DesignStatus, DifficultyLevel } from '@/models/Projects';
 import { useMemo, useCallback, useState } from 'react';
@@ -99,21 +100,98 @@ function StatusPill({
 }
 
 // ─── Status Configs ──────────────────────────────────────────────
-const PROJECT_STATUS_CONFIG: Record<ProjectStatus, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
-  INVOICE: { label: "Invoice", icon: FileText, color: "amber" },
-  DESIGN: { label: "Design", icon: Ruler, color: "blue" },
-  PURCHASING: { label: "Purchasing", icon: Package, color: "violet" },
-  METAL_WORKS: { label: "Metal Works", icon: Gauge, color: "gray" },
-  CNC: { label: "CNC", icon: Activity, color: "cyan" },
-  CUTTING: { label: "Cutting", icon: Grid, color: "orange" },
-  EDGE_BANDING: { label: "Edge Banding", icon: Layers, color: "teal" },
-  ASSEMBLY: { label: "Assembly", icon: Layers, color: "indigo" },
-  PAINTING: { label: "Painting", icon: Palette, color: "pink" },
-  FINISHING: { label: "Finishing", icon: CheckCircle, color: "green" },
-  DELIVERY: { label: "Delivery", icon: Package, color: "purple" },
-  INSTALLATION: { label: "Installation", icon: Layers, color: "yellow" },
-};
+const PROJECT_STATUS_CONFIG: Record<
+  ProjectStatus,
+  {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }
+> = {
+  INVOICE: {
+    label: "Invoice",
+    icon: FileText,
+    color: "amber",
+  },
 
+  DESIGN: {
+    label: "Design",
+    icon: Ruler,
+    color: "blue",
+  },
+
+  PURCHASING: {
+    label: "Purchasing",
+    icon: Package,
+    color: "violet",
+  },
+
+  METAL_WORKS: {
+    label: "Metal Works",
+    icon: Gauge,
+    color: "gray",
+  },
+
+  CNC: {
+    label: "CNC",
+    icon: Activity,
+    color: "cyan",
+  },
+
+  CUTTING: {
+    label: "Cutting",
+    icon: Grid,
+    color: "orange",
+  },
+
+  EDGE_BANDING: {
+    label: "Edge Banding",
+    icon: Layers,
+    color: "teal",
+  },
+
+  ASSEMBLY: {
+    label: "Assembly",
+    icon: Layers,
+    color: "indigo",
+  },
+
+  PAINTING: {
+    label: "Painting",
+    icon: Palette,
+    color: "pink",
+  },
+
+  FINISHING: {
+    label: "Finishing",
+    icon: CheckCircle,
+    color: "green",
+  },
+
+  DELIVERY: {
+    label: "Delivery",
+    icon: Package,
+    color: "purple",
+  },
+
+  INSTALLATION: {
+    label: "Installation",
+    icon: Layers,
+    color: "yellow",
+  },
+
+  COMPLETED: {
+    label: "Completed",
+    icon: CheckCircle,
+    color: "emerald",
+  },
+
+  CANCELLED: {
+    label: "Cancelled",
+    icon: XCircle,
+    color: "red",
+  },
+};
 const DESIGN_STATUS_CONFIG: Record<DesignStatus, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   INITIATED: { label: "Initiated", icon: PenTool, color: "amber" },
   MODELING: { label: "Modeling", icon: BarChart3, color: "blue" },

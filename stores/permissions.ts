@@ -341,6 +341,7 @@ export const PERMISSIONS = {
     DELETE: {
       name: 'DELETE_MATERIAL',
     },
+  
   },
   MATERIAL_CATEGORY: {
     CREATE: {

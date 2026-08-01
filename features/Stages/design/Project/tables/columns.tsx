@@ -7,6 +7,7 @@ import { CalendarDays, User, FileText, Layers, CheckCircle, PenTool } from 'luci
 import { IProject, ProjectStatus, DifficultyLevel, DesignStatus } from '@/models/Projects';
 import { ProjectCellAction } from './cell-action';
 import { useRouter } from 'next/navigation';
+import { getDesignStatusConfig } from '../design';
 
 export const projectColumns= (
   reload?: () => Promise<void>
@@ -72,23 +73,30 @@ export const projectColumns= (
       NEW DESIGN STATUS COLUMN
   =============================== */
 
-  {
-    accessorKey: 'designStatus',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Design Status' />
-    ),
-    cell: ({ cell }) => {
-      const status = cell.getValue<DesignStatus>();
+{
+  accessorKey: 'designStatus',
+  header: ({ column }) => (
+    <DataTableColumnHeader column={column} title='Design Status' />
+  ),
+  cell: ({ cell }) => {
+    const status = cell.getValue<DesignStatus>();
+    const config = getDesignStatusConfig(status);
 
-      return (
-        <div className='flex items-center gap-2 capitalize'>
-          <PenTool className='h-4 w-4 text-muted-foreground' />
-          {status?.replace(/_/g, ' ') || '-'}
-        </div>
-      );
-    },
-    enableColumnFilter: true
+    if (!status || !config) {
+      return <span>-</span>;
+    }
+
+    const Icon = config.icon;
+
+    return (
+      <div className='flex items-center gap-2'>
+        <Icon className={`h-4 w-4 ${config.color}`} />
+        <span>{config.label}</span>
+      </div>
+    );
   },
+  enableColumnFilter: true
+},
 
   /* ===============================
       DESIGN FINISHED DATE

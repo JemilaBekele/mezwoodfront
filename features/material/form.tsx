@@ -12,12 +12,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Upload, X, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, X, AlertCircle, Loader2, Plus, Check, RotateCw } from 'lucide-react';
 
 import { IMaterial } from '@/models/material';
 import { IMaterialCategory } from '@/models/materialCategory';
 import { IUnitOfMeasure } from '@/models/UnitOfMeasure';
 import { createMaterial, updateMaterial } from '@/service/material';
+import { createMaterialCategory, getMaterialCategories } from '@/service/materialcatagory';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
 
 import { normalizeImagePath } from '@/lib/norm';
 
@@ -51,15 +54,24 @@ const materialTypeOptions = [
 export default function MaterialForm({
   initialData,
   pageTitle,
-  categories,
+  categories: initialCategories,
   unitsOfMeasure,
   isEdit,
 }: MaterialFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshingCategories, setIsRefreshingCategories] = useState(false);
   
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const formContainerRef = useRef<HTMLFormElement>(null);
+
+  // Local state for categories to allow refreshing
+  const [categories, setCategories] = useState<IMaterialCategory[]>(initialCategories);
+
+  // Update categories when prop changes
+  useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
 
   // Form fields
   const [name, setName] = useState(initialData?.name || '');
@@ -87,6 +99,11 @@ export default function MaterialForm({
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
+
+  // Category creation states
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   // Validation functions
   const validateName = (value: string): string | undefined => {
@@ -164,7 +181,6 @@ export default function MaterialForm({
 
     setErrors(newErrors);
     
-    // Mark all fields as touched
     setTouched({
       name: true,
       materialTypeId: true,
@@ -179,21 +195,18 @@ export default function MaterialForm({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       if (!validTypes.includes(file.type)) {
         toast.error('Please upload a valid image file (JPEG, PNG, WebP, or GIF)');
         return;
       }
       
-      // Validate file size (max 5MB)
       const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         toast.error('Image size should be less than 5MB');
         return;
       }
 
-      // Clean up old preview
       if (imagePreview && imagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(imagePreview);
       }
@@ -201,20 +214,7 @@ export default function MaterialForm({
       setImageFile(file);
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
-      setImageUrl(''); // Clear URL when file is selected
-    }
-  };
-
-  const handleImageUrlChange = (url: string) => {
-    setImageUrl(url);
-    // Normalize the URL for preview
-    const normalizedUrl = normalizeImagePath(url);
-    setImagePreview(normalizedUrl || url);
-    setImageFile(null); // Clear file when URL is provided
-    
-    // Clean up blob URL if exists
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview);
+      setImageUrl('');
     }
   };
 
@@ -231,13 +231,61 @@ export default function MaterialForm({
     setTouched(prev => ({ ...prev, [field]: true }));
   };
 
+  // Refresh categories function
+  const refreshCategories = async () => {
+    setIsRefreshingCategories(true);
+    try {
+      // Fetch categories from API
+      const fetchedCategories = await getMaterialCategories();
+      setCategories(fetchedCategories);
+      toast.success('Categories refreshed successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to refresh categories');
+    } finally {
+      setIsRefreshingCategories(false);
+    }
+  };
+
+  // Handle category creation with refresh
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    setIsCreatingCategory(true);
+    try {
+      const result = await createMaterialCategory({ name: newCategoryName.trim() });
+      
+      toast.success('Category created successfully');
+      
+      // Close the form and reset
+      setShowCategoryForm(false);
+      setNewCategoryName('');
+      
+      // Set the new category as selected
+      if (result?.id) {
+        setMaterialTypeId(result.id);
+      }
+      
+      // Refresh categories list
+      await refreshCategories();
+      
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create category');
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
     if (!validateForm()) return;
 
     setIsLoading(true);
     try {
-      // Prepare the base data object
       const baseData: Partial<IMaterial> = {
         name,
         color,
@@ -254,7 +302,6 @@ export default function MaterialForm({
 
       let response;
       
-      // If there's an image file, use FormData
       if (imageFile) {
         const formData = new FormData();
         formData.append('name', name);
@@ -272,17 +319,17 @@ export default function MaterialForm({
         
         if (isEdit && initialData?.id) {
           response = await updateMaterial(initialData.id, formData);
-
-             router.push('/dashboard/Material'); // Navigate to materials list page
-      router.refresh();
+          toast.success('Material updated successfully');
+          router.push('/dashboard/Material');
+          router.refresh();
         } else {
           response = await createMaterial(formData);
-            // Now response is accessible here
-            router.push(`/dashboard/Material/initial?id=${response?.material?.id}`);
-                  router.refresh();
+          toast.success('Material created successfully');
+          
+                    router.push('/dashboard/Material');
+
         }
       } else {
-        // Use regular object for URL or no image
         const payload = { ...baseData };
         if (imageUrl) {
           payload.imageUrl = imageUrl;
@@ -290,17 +337,16 @@ export default function MaterialForm({
         
         if (isEdit && initialData?.id) {
           response = await updateMaterial(initialData.id, payload);
-          router.push('/dashboard/Material'); // Navigate to materials list page
+          toast.success('Material updated successfully');
+          router.push('/dashboard/Material');
           router.refresh();
         } else {
           response = await createMaterial(payload);
-          // console.log(response.material);
-          router.push(`/dashboard/Material/initial?id=${response?.material?.id}`);
-          router.refresh();
-        }
+          toast.success('Material created successfully');
+          
+           router.push('/dashboard/Material');
+          router.refresh();   }
       }
-
-      toast.success(isEdit ? 'Material updated successfully' : 'Material created successfully');
    
     } catch (error: any) {
       toast.error(error.message || 'Failed to save material');
@@ -309,21 +355,14 @@ export default function MaterialForm({
     }
   };
 
-  // Handle checkbox change for material types
-// Replace the existing handleMaterialTypeChange function with this:
+  // Handle keydown to prevent Enter from submitting form unexpectedly
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      // Prevent form submission on Enter key in input fields
+      e.preventDefault();
+    }
+  };
 
-const handleMaterialTypeChange = (type: string, checked: boolean) => {
-  // If unchecking the current item, don't allow it (optional - keeps at least one selected)
-  if (!checked) return;
-  
-  // Set all to false first, then set the selected one to true
-  setPlainMDF(type === 'plainMDF');
-  setLaminatedMDF(type === 'laminatedMDF');
-  setWood(type === 'wood');
-  setMetal(type === 'metal');
-  setAccessory(type === 'accessory');
-  setOther(type === 'other');
-};
   const handleGoBack = () => {
     router.back();
   };
@@ -331,20 +370,20 @@ const handleMaterialTypeChange = (type: string, checked: boolean) => {
   const safeImageSrc = imagePreview || (imageUrl ? normalizeImagePath(imageUrl) : null);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-8" onClick={(e) => e.stopPropagation()}>
       <div className="container mx-auto px-4">
-        {/* Header with back button */}
-      
-       <h1 className="text-2xl font-bold text-gray-900">
-            {pageTitle}
-          </h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {pageTitle}
+        </h1>
 
-        {/* Form Card */}
-        <Card className="mx-auto w-full ">
-          
+        <Card className="mx-auto w-full">
           <CardContent className="p-4 sm:p-6">
-            
-            <form onSubmit={handleSubmit} className="space-y-6" ref={formContainerRef}>
+            <form 
+              onSubmit={handleSubmit} 
+              className="space-y-6" 
+              ref={formContainerRef}
+              onKeyDown={handleKeyDown}
+            >
               {/* Basic Information Section */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
@@ -375,35 +414,126 @@ const handleMaterialTypeChange = (type: string, checked: boolean) => {
 
                   {/* Material Category */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Material Category <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      value={materialTypeId}
-                      onValueChange={(value) => {
-                        setMaterialTypeId(value);
-                        handleBlur('materialTypeId');
-                      }}
-                    >
-                      <SelectTrigger 
-                        className={errors.materialTypeId && touched.materialTypeId ? 'border-red-500' : ''}
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">
+                        Material Category <span className="text-red-500">*</span>
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          refreshCategories();
+                        }}
+                        disabled={isRefreshingCategories}
+                        className="h-6 px-2 text-xs"
+                        title="Refresh categories"
                       >
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.length === 0 ? (
-                          <SelectItem value="none" disabled>
-                            No categories available
-                          </SelectItem>
+                        {isRefreshingCategories ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         ) : (
-                          categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))
+                          <RotateCw className="h-3 w-3 mr-1" />
                         )}
-                      </SelectContent>
-                    </Select>
+                        Refresh
+                      </Button>
+                    </div>
+                    
+                    {!showCategoryForm ? (
+                      <div className="flex gap-2">
+                        <Select
+                          value={materialTypeId}
+                          onValueChange={(value) => {
+                            setMaterialTypeId(value);
+                            handleBlur('materialTypeId');
+                          }}
+                        >
+                          <SelectTrigger 
+                            className={errors.materialTypeId && touched.materialTypeId ? 'border-red-500' : ''}
+                          >
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.length === 0 ? (
+                              <SelectItem value="none" disabled>
+                                No categories available
+                              </SelectItem>
+                            ) : (
+                              categories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCategoryForm(true);
+                          }}
+                          className="flex-shrink-0"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter new category name"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCreateCategory();
+                            }
+                            if (e.key === 'Escape') {
+                              setShowCategoryForm(false);
+                              setNewCategoryName('');
+                            }
+                          }}
+                          autoFocus
+                          className="flex-1"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCreateCategory();
+                          }}
+                          disabled={isCreatingCategory}
+                          className="flex-shrink-0"
+                        >
+                          {isCreatingCategory ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCategoryForm(false);
+                            setNewCategoryName('');
+                          }}
+                          className="flex-shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                    
                     {errors.materialTypeId && touched.materialTypeId && (
                       <p className="text-sm text-red-500 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
@@ -490,46 +620,45 @@ const handleMaterialTypeChange = (type: string, checked: boolean) => {
               </div>
 
               {/* Material Type Flags Section */}
-<div className="space-y-4">
-  <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
-    Material Classification
-  </h3>
-  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-    {materialTypeOptions.map((option) => (
-      <div key={option.id} className="flex items-center space-x-2">
-        <input
-          type="radio"
-          id={option.id}
-          name="materialType"
-          checked={
-            option.id === 'plainMDF' ? plainMDF :
-            option.id === 'laminatedMDF' ? laminatedMDF :
-            option.id === 'wood' ? wood :
-            option.id === 'metal' ? metal :
-            option.id === 'accessory' ? accessory :
-            other
-          }
-          onChange={() => {
-            // Set the selected type to true, others to false
-            setPlainMDF(option.id === 'plainMDF');
-            setLaminatedMDF(option.id === 'laminatedMDF');
-            setWood(option.id === 'wood');
-            setMetal(option.id === 'metal');
-            setAccessory(option.id === 'accessory');
-            setOther(option.id === 'other');
-          }}
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-        />
-        <Label htmlFor={option.id} className="text-sm cursor-pointer">
-          {option.label}
-        </Label>
-      </div>
-    ))}
-  </div>
-  <p className="text-xs text-gray-500">
-    Select one material classification type
-  </p>
-</div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                  Material Classification
+                </h3>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {materialTypeOptions.map((option) => (
+                    <div key={option.id} className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id={option.id}
+                        name="materialType"
+                        checked={
+                          option.id === 'plainMDF' ? plainMDF :
+                          option.id === 'laminatedMDF' ? laminatedMDF :
+                          option.id === 'wood' ? wood :
+                          option.id === 'metal' ? metal :
+                          option.id === 'accessory' ? accessory :
+                          other
+                        }
+                        onChange={() => {
+                          setPlainMDF(option.id === 'plainMDF');
+                          setLaminatedMDF(option.id === 'laminatedMDF');
+                          setWood(option.id === 'wood');
+                          setMetal(option.id === 'metal');
+                          setAccessory(option.id === 'accessory');
+                          setOther(option.id === 'other');
+                        }}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                      />
+                      <Label htmlFor={option.id} className="text-sm cursor-pointer">
+                        {option.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Select one material classification type
+                </p>
+              </div>
 
               {/* Image Section */}
               <div className="space-y-4">
@@ -565,8 +694,6 @@ const handleMaterialTypeChange = (type: string, checked: boolean) => {
                   )}
 
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-               
-
                     <div>
                       <input
                         type="file"
@@ -612,6 +739,12 @@ const handleMaterialTypeChange = (type: string, checked: boolean) => {
                     type="submit" 
                     disabled={isLoading}
                     className="w-full sm:w-auto"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
                   >
                     {isLoading ? (
                       <>

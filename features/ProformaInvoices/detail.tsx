@@ -1333,6 +1333,8 @@ const formatCurrency = (amount: number | undefined | null) => {
                                 <TableHead>Color</TableHead>
                                 <TableHead>Size</TableHead>
                                 <TableHead>Quantity</TableHead>
+                                                                                  <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
+                                
                                 <TableHead>Note</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -1353,6 +1355,9 @@ const formatCurrency = (amount: number | undefined | null) => {
                                   <TableCell>
                                     <Badge variant="outline">{material.quantity} units</Badge>
                                   </TableCell>
+                                    <TableCell className="text-sm">
+                                                                                      <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0}</Badge>
+                                                                                    </TableCell>
                                   <TableCell>
                                     {material.note ? (
                                       <div className="max-w-xs">

@@ -64,6 +64,7 @@ import { getMaterialStockById } from '@/service/StockCorrection';
 import { normalizeImagePath } from '@/lib/norm';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
+import { getStatusConfig } from '../../unifay';
 
 
 
@@ -90,25 +91,7 @@ interface MaterialStockCheck {
   itemDescription: string;
   isAvailable: boolean;
 }
-
-const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
-  const [project, setProject] = useState<IProject | null>(null);
-  const [proformaInvoice, setProformaInvoice] = useState<IProformaInvoice | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [materialStockChecks, setMaterialStockChecks] = useState<MaterialStockCheck[]>([]);
-  const [isCheckingStock, setIsCheckingStock] = useState(false);
-  const [allMaterialsAvailable, setAllMaterialsAvailable] = useState(false);
-  const router = useRouter();
-
-  // Filter stages to only show DESIGN stage
-  const getDesignStages = (stages?: IProjectStage[]) => {
-    if (!stages) return [];
-    return stages.filter(stage => stage.stage === ProjectStatus.DESIGN);
-  };
-
-  // Get design status configuration - NOW INCLUDING INITIATED
-const getDesignStatusConfig = (status?: DesignStatus) => {
+export const getDesignStatusConfig = (status?: DesignStatus) => {
   const config: Record<
     DesignStatus,
     {
@@ -162,7 +145,7 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
       description: 'Design phase completed but awaiting final approval or stock check',
     },
     [DesignStatus.FINISHED]: {
-      label: 'Finished',
+      label: 'Proceed to Production',
       variant: 'default',
       icon: CheckCircle,
       color: 'text-green-600',
@@ -172,6 +155,24 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
 
   return status ? config[status] : null;
 };
+const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
+  const [project, setProject] = useState<IProject | null>(null);
+  const [proformaInvoice, setProformaInvoice] = useState<IProformaInvoice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [materialStockChecks, setMaterialStockChecks] = useState<MaterialStockCheck[]>([]);
+  const [isCheckingStock, setIsCheckingStock] = useState(false);
+  const [allMaterialsAvailable, setAllMaterialsAvailable] = useState(false);
+  const router = useRouter();
+
+  // Filter stages to only show DESIGN stage
+  const getDesignStages = (stages?: IProjectStage[]) => {
+    if (!stages) return [];
+    return stages.filter(stage => stage.stage === ProjectStatus.DESIGN);
+  };
+
+  // Get design status configuration - NOW INCLUDING INITIATED
+
 
   // Check material stock availability
   const checkMaterialStock = useCallback(async () => {
@@ -280,9 +281,14 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
       }
     }
 
-    const confirmChange = window.confirm(
-      `Are you sure you want to change stage to "${stage.replace('_', ' ')}"?`
-    );
+  const stageLabel =
+  stage === DesignStatus.FINISHED
+    ? 'Proceed to Production'
+    : getDesignStatusConfig(stage)?.label || stage.replace('_', ' ');
+
+const confirmChange = window.confirm(
+  `Are you sure you want to change stage to "${stageLabel}"?`
+);
 
     if (!confirmChange) return;
 
@@ -348,88 +354,7 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
   }, [checkMaterialStock, proformaInvoice]);
 
   // Status badge configuration - simplified for design team
-  const getStatusConfig = (status: ProjectStatus) => {
-    const config: Record<ProjectStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
-      color: string;
-    }> = {
-      [ProjectStatus.INVOICE]: {
-        label: 'Invoice',
-        variant: 'secondary',
-        icon: FileText,
-        color: 'text-gray-500',
-      },
-      [ProjectStatus.DESIGN]: {
-        label: 'Design',
-        variant: 'default',
-        icon: Settings,
-        color: 'text-blue-500',
-      },
-      [ProjectStatus.PURCHASING]: {
-        label: 'Purchasing',
-        variant: 'outline',
-        icon: Package,
-        color: 'text-purple-500',
-      },
-      [ProjectStatus.CUTTING]: {
-        label: 'Cutting',
-        variant: 'default',
-        icon: Scissors,
-        color: 'text-amber-500',
-      },
-      [ProjectStatus.EDGE_BANDING]: {
-        label: 'Edge Banding',
-        variant: 'outline',
-        icon: Layers,
-        color: 'text-teal-500',
-      },
-      [ProjectStatus.PAINTING]: {
-        label: 'Painting',
-        variant: 'default',
-        icon: Paintbrush,
-        color: 'text-indigo-500',
-      },
-      [ProjectStatus.ASSEMBLY]: {
-        label: 'Assembly',
-        variant: 'outline',
-        icon: Hammer,
-        color: 'text-orange-500',
-      },
-      [ProjectStatus.FINISHING]: {
-        label: 'Finishing',
-        variant: 'default',
-        icon: Award,
-        color: 'text-yellow-500',
-      },
-      [ProjectStatus.DELIVERY]: {
-        label: 'Delivery',
-        variant: 'outline',
-        icon: Truck,
-        color: 'text-green-500',
-      },
-      [ProjectStatus.INSTALLATION]: {
-        label: 'Installation',
-        variant: 'default',
-        icon: Home,
-        color: 'text-emerald-500',
-      }, 
-      [ProjectStatus.METAL_WORKS]: {
-        label: 'Metal Works',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-      [ProjectStatus.CNC]: {
-        label: 'CNC',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-    };
-    return config[status];
-  };
+ 
 
   // Difficulty badge configuration
   const getDifficultyConfig = (difficulty: DifficultyLevel) => {
@@ -782,8 +707,8 @@ return (
                     ) : (
                       <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                     )}
-                    Finish Design
-                  </Button>
+proceed to production                  
+</Button>
                 </>
               )}
             </div>

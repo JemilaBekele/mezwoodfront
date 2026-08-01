@@ -58,6 +58,7 @@ import {
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { normalizeImagePath } from '@/lib/norm';
+import { getStatusConfig } from '../../unifay';
 
 // Helper function for image URLs
 
@@ -137,12 +138,12 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
       description: 'Design phase completed but awaiting final approval or stock check',
     },
     [DesignStatus.FINISHED]: {
-      label: 'Finished',
-      variant: 'default',
-      icon: CheckCircle,
-      color: 'text-green-600',
-      description: 'Project fully completed',
-    },
+       label: 'Proceed to Production',
+       variant: 'default',
+       icon: CheckCircle,
+       color: 'text-green-600',
+       description: 'Project fully completed',
+     },
   };
 
   return status ? config[status] : null;
@@ -257,89 +258,7 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
     }
   }, [project, loading, autoFinishTriggered, updatingDesign, fetchProjectData]);
 
-  // Status badge configuration
-  const getStatusConfig = (status: ProjectStatus) => {
-    const config: Record<ProjectStatus, { 
-      label: string; 
-      variant: BadgeVariant; 
-      icon: any; 
-      color: string;
-    }> = {
-      [ProjectStatus.INVOICE]: {
-        label: 'Invoice',
-        variant: 'secondary',
-        icon: FileText,
-        color: 'text-gray-500',
-      },
-      [ProjectStatus.DESIGN]: {
-        label: 'Design',
-        variant: 'default',
-        icon: Settings,
-        color: 'text-blue-500',
-      },
-      [ProjectStatus.PURCHASING]: {
-        label: 'Purchasing',
-        variant: 'outline',
-        icon: Package,
-        color: 'text-purple-500',
-      },
-      [ProjectStatus.CUTTING]: {
-        label: 'Cutting',
-        variant: 'default',
-        icon: Scissors,
-        color: 'text-amber-500',
-      },
-      [ProjectStatus.EDGE_BANDING]: {
-        label: 'Edge Banding',
-        variant: 'outline',
-        icon: Layers,
-        color: 'text-teal-500',
-      },
-      [ProjectStatus.PAINTING]: {
-        label: 'Painting',
-        variant: 'default',
-        icon: Paintbrush,
-        color: 'text-indigo-500',
-      },
-      [ProjectStatus.ASSEMBLY]: {
-        label: 'Assembly',
-        variant: 'outline',
-        icon: Hammer,
-        color: 'text-orange-500',
-      },
-      [ProjectStatus.FINISHING]: {
-        label: 'Finishing',
-        variant: 'default',
-        icon: Award,
-        color: 'text-yellow-500',
-      },
-      [ProjectStatus.DELIVERY]: {
-        label: 'Delivery',
-        variant: 'outline',
-        icon: Truck,
-        color: 'text-green-500',
-      },
-      [ProjectStatus.INSTALLATION]: {
-        label: 'Installation',
-        variant: 'default',
-        icon: Home,
-        color: 'text-emerald-500',
-      }, 
-      [ProjectStatus.METAL_WORKS]: {
-        label: 'Metal Works',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-      [ProjectStatus.CNC]: {
-        label: 'CNC',
-        variant: 'outline',
-        icon: Wrench,
-        color: 'text-zinc-500',
-      },
-    };
-    return config[status];
-  };
+
 
   // Difficulty badge configuration
   const getDifficultyConfig = (difficulty: DifficultyLevel) => {

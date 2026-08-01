@@ -13,20 +13,27 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { updateProformaInvoice } from '@/service/ProformaInvoice';
+import { updateProformaInvoiceseco } from '@/service/ProformaInvoice';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IProformaInvoice, IProformaInvoiceItem, IProformaItemMaterial } from '@/models/ProformaInvoice';
 import { Textarea } from '@/components/ui/textarea';
 import Select from 'react-select';
-import { Plus, Trash2,  Image as ImageIcon, Package, Eye, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Image as ImageIcon, Package, Eye, RefreshCw, AlertTriangle, X } from 'lucide-react';
 import { getCustomer } from '@/service/customer';
 import { getMaterials, getMaterialStockById } from '@/service/material';
 import { getItems } from '@/service/item';
 import { normalizeImagePath } from '@/lib/norm';
 import { Badge } from '@/components/ui/badge';
 import MaterialModal from '@/features/material/modal';
+import Image from 'next/image';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface ProformaInvoiceFormValues {
   customerId: string;
@@ -66,6 +73,7 @@ interface IItem {
       name: string;
       color: string;
       size: string;
+      imageUrl?: string;
     }
   }[];
 }
@@ -95,14 +103,26 @@ export default function DesignProformaInvoiceForm({
   const [itemImages, setItemImages] = useState<Map<number, ImageFileWithPreview[]>>(new Map());
   const [isFetchingItems, setIsFetchingItems] = useState(false);
   
+  // State for image preview modal
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  
   // State for stock information
   const [materialStock, setMaterialStock] = useState<Map<string, { available: number; isOutOfStock: boolean }>>(new Map());
   const [isLoadingStock, setIsLoadingStock] = useState(false);
+  
+  // Add state for portal mounting
+  const [isMounted, setIsMounted] = useState(false);
   
   // Ensure we have initialData for update
   if (!initialData) {
     throw new Error('This form is only for updating existing proforma invoices. No initial data provided.');
   }
+  
+  // Mount effect for portal
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   const defaultValues = useMemo<ProformaInvoiceFormValues>(
     () => ({
@@ -153,6 +173,18 @@ export default function DesignProformaInvoiceForm({
     control: form.control,
     name: 'items'
   });
+
+  // Function to handle image preview
+  const handleImageClick = (imageUrl: string, materialName: string) => {
+    setPreviewImage({ url: imageUrl, name: materialName });
+    setIsPreviewOpen(true);
+  };
+
+  // Function to close image preview
+  const closePreview = () => {
+    setIsPreviewOpen(false);
+    setPreviewImage(null);
+  };
 
   // Function to check material stock
   const checkMaterialStock = useCallback(
@@ -286,45 +318,49 @@ export default function DesignProformaInvoiceForm({
     [customers]
   );
 
-const materialOptions: SelectOption[] = useMemo(
-  () => [
-    { value: '', label: 'Select a material' },
-    ...materials.map((material) => {
-      const details: string[] = [];
+  // Custom option renderer for materials with image
+  const materialOptionRenderer = (material: any) => {
+    const details: string[] = [];
 
-      if (material.color?.trim()) {
-        details.push(material.color);
-      }
+    if (material.color?.trim()) {
+      details.push(material.color);
+    }
 
-      if (material.size?.trim()) {
-        details.push(material.size);
-      }
+    if (material.size?.trim()) {
+      details.push(material.size);
+    }
 
-      // Material type
-      if (material.plainMDF) {
-        details.push('Plain MDF');
-      } else if (material.laminatedMDF) {
-        details.push('Laminated MDF');
-      } else if (material.wood) {
-        details.push('Wood');
-      } else if (material.metal) {
-        details.push('Metal');
-      } else if (material.accessory) {
-        details.push('Accessory');
-      } else if (material.other) {
-        details.push('Other');
-      }
+    // Material type
+    if (material.plainMDF) {
+      details.push('Plain MDF');
+    } else if (material.laminatedMDF) {
+      details.push('Laminated MDF');
+    } else if (material.wood) {
+      details.push('Wood');
+    } else if (material.metal) {
+      details.push('Metal');
+    } else if (material.accessory) {
+      details.push('Accessory');
+    } else if (material.other) {
+      details.push('Other');
+    }
 
-      return {
-        value: material.id,
-        label: details.length
-          ? `${material.name} (${details.join(' - ')})`
-          : material.name,
-      };
-    }),
-  ],
-  [materials]
-);
+    return {
+      value: material.id,
+      label: details.length
+        ? `${material.name} (${details.join(' - ')})`
+        : material.name,
+      imageUrl: material.imageUrl
+    };
+  };
+
+  const materialOptions: SelectOption[] = useMemo(
+    () => [
+      { value: '', label: 'Select a material' },
+      ...materials.map((material) => materialOptionRenderer(material))
+    ],
+    [materials]
+  );
 
   const refreshMaterials = async () => {
     try {
@@ -336,7 +372,77 @@ const materialOptions: SelectOption[] = useMemo(
     }
   };
 
+  // Custom Select Option Component with Image
+  const CustomSelectOption = (props: any) => {
+    const { data, innerRef, innerProps, isFocused } = props;
+    const material = materials.find(m => m.id === data.value);
+    const imageUrl = material?.imageUrl ? normalizeImagePath(material.imageUrl) : null;
+    
+    return (
+      <div
+        ref={innerRef}
+        {...innerProps}
+        className={`flex items-center gap-3 p-2 cursor-pointer ${
+          isFocused ? 'bg-gray-100 dark:bg-gray-700' : ''
+        }`}
+      >
+        {imageUrl ? (
+          <div 
+            className="relative h-10 w-10 shrink-0 rounded overflow-hidden border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleImageClick(imageUrl, material?.name || 'Material');
+            }}
+          >
+            <Image
+              src={imageUrl}
+              alt={material?.name || 'Material'}
+              fill
+              className="object-cover"
+              sizes="40px"
+            />
+          </div>
+        ) : (
+          <div className="h-10 w-10 shrink-0  rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+            <ImageIcon className="h-5 w-5 text-gray-400" />
+          </div>
+        )}
+        <span className="flex-1 text-sm">{data.label}</span>
+      </div>
+    );
+  };
 
+  // Custom Single Value Component with Image
+  const CustomSingleValue = (props: any) => {
+    const { data } = props;
+    const material = materials.find(m => m.id === data.value);
+    const imageUrl = material?.imageUrl ? normalizeImagePath(material.imageUrl) : null;
+    
+    return (
+      <div className="flex items-center gap-2">
+        {imageUrl ? (
+          <div 
+            className="relative h-6 w-6 shrink-0  rounded overflow-hidden border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleImageClick(imageUrl, material?.name || 'Material');
+            }}
+          >
+            <Image
+              src={imageUrl}
+              alt={material?.name || 'Material'}
+              fill
+              className="object-cover"
+              sizes="24px"
+            />
+          </div>
+        ) : (
+          <ImageIcon className="h-4 w-4 text-gray-400 shrink-0 " />
+        )}
+        <span>{data.label}</span>
+      </div>
+    );
+  };
 
   const calculateItemAmount = (index: number) => {
     const quantity = form.getValues(`items.${index}.quantity`);
@@ -364,8 +470,6 @@ const materialOptions: SelectOption[] = useMemo(
       form.setValue('vatPercent', 15);
     }
   };
-
-
 
   const addItem = () => {
     appendItem({
@@ -395,8 +499,7 @@ const materialOptions: SelectOption[] = useMemo(
           materialId: '',
           quantity: 1,
           note: '',
-        materialIssues: [] // Add this - required by ExtendedMaterial
-          
+          materialIssues: [] // Add this - required by ExtendedMaterial
         }
       ];
       
@@ -458,40 +561,7 @@ const materialOptions: SelectOption[] = useMemo(
     }
   };
 
-
   const onSubmit = async (data: ProformaInvoiceFormValues) => {
-    // Check for any quantity warnings before submitting
-    // let hasWarnings = false;
-    
-    // data.items.forEach(item => {
-    //   if (item.materials) {
-    //     item.materials.forEach(material => {
-    //       if (material.materialId) {
-    //         const stockInfo = materialStock.get(material.materialId);
-    //         if (stockInfo && material.quantity > stockInfo.available && stockInfo.available > 0) {
-    //           hasWarnings = true;
-    //           const materialName = materials.find(m => m.id === material.materialId)?.name || 'Material';
-    //           toast.warning(`${materialName}: Quantity (${material.quantity}) exceeds available stock (${stockInfo.available})`, {
-    //             duration: 5000,
-    //           });
-    //         } else if (stockInfo && stockInfo.isOutOfStock) {
-    //           hasWarnings = true;
-    //           const materialName = materials.find(m => m.id === material.materialId)?.name || 'Material';
-    //           toast.warning(`${materialName} is out of stock!`, {
-    //             duration: 5000,
-    //           });
-    //         }
-    //       }
-    //     });
-    //   }
-    // });
-    
-    // if (hasWarnings) {
-    //   toast.warning('Some materials have stock issues. You can still proceed with the update.', {
-    //     duration: 5000,
-    //   });
-    // }
-    
     try {
       setIsLoading(true);
 
@@ -560,12 +630,12 @@ const materialOptions: SelectOption[] = useMemo(
         formData.append('attachments', file);
       });
 
-     // Only update operation
-await updateProformaInvoice(initialData.id, formData);
+      // Only update operation
+      await updateProformaInvoiceseco(initialData.id, formData);
 
-toast.success('Proforma Invoice updated successfully');
+      toast.success('Proforma Invoice updated successfully');
 
-router.push(`/dashboard/Stage/Design/mydesign`);
+      router.push(`/dashboard/Stage/Design/mydesign`);
       router.refresh();
     } catch (error: any) {
       toast.error(error?.message || 'Error updating proforma invoice');
@@ -591,6 +661,7 @@ router.push(`/dashboard/Stage/Design/mydesign`);
     return () => observer.disconnect();
   }, []);
 
+  // Enhanced dark styles with portal support
   const darkStyles = {
     control: (base: any) => ({
       ...base,
@@ -601,12 +672,14 @@ router.push(`/dashboard/Stage/Design/mydesign`);
     menu: (base: any) => ({
       ...base,
       backgroundColor: '#1f2937',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      zIndex: 9999,
     }),
     option: (base: any, state: any) => ({
       ...base,
       backgroundColor: state.isFocused ? '#374151' : '#1f2937',
-      color: '#f9fafb'
+      color: '#f9fafb',
+      zIndex: 9999,
     }),
     singleValue: (base: any) => ({
       ...base,
@@ -619,12 +692,45 @@ router.push(`/dashboard/Stage/Design/mydesign`);
     placeholder: (base: any) => ({
       ...base,
       color: '#9ca3af'
-    })
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+    }),
   };
 
+  // Create base select styles that will be merged with dark/light styles
+  const getSelectStyles = (customStyles = {}) => {
+    const baseStyles = {
+      menuPortal: (base: any) => ({
+        ...base,
+        zIndex: 9999,
+      }),
+      menu: (base: any) => ({
+        ...base,
+        zIndex: 9999,
+        position: 'absolute',
+        // Ensure menu doesn't get clipped
+        overflow: 'visible',
+      }),
+      option: (base: any) => ({
+        ...base,
+        zIndex: 9999,
+      }),
+      container: (base: any) => ({
+        ...base,
+        position: 'relative',
+        zIndex: 50,
+      }),
+    };
+    
+    return isDark 
+      ? { ...baseStyles, ...darkStyles, ...customStyles }
+      : { ...baseStyles, ...customStyles };
+  };
 
   return (
-    <Card className="mx-auto w-full">
+    <Card className="mx-auto w-full overflow-visible">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{pageTitle}</CardTitle>
@@ -643,9 +749,9 @@ router.push(`/dashboard/Stage/Design/mydesign`);
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-visible">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 overflow-visible">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               <FormField
                 name="customerId"
@@ -660,15 +766,19 @@ router.push(`/dashboard/Stage/Design/mydesign`);
                         onChange={(option) => field.onChange(option?.value)}
                         placeholder="Select customer"
                         isSearchable
-                        styles={isDark ? darkStyles : {}}
+                        styles={getSelectStyles()}
                         isDisabled={true} // Read-only
+                        menuPortalTarget={isMounted ? document.body : undefined}
+                        menuPosition="fixed"
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                        maxMenuHeight={300}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
 
               <FormField
                 name="amountDate"
@@ -692,7 +802,7 @@ router.push(`/dashboard/Stage/Design/mydesign`);
               />
             </div>
 
-            <div className="border-t pt-6">
+            <div className="border-t pt-6 overflow-visible">
               <div className="mb-4 flex items-center justify-between">
                 <CardTitle className="text-lg">Items</CardTitle>
                 <Button
@@ -708,36 +818,36 @@ router.push(`/dashboard/Stage/Design/mydesign`);
                 </Button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 overflow-visible">
                 {itemFields.map((field, itemIndex) => {
                   const currentMaterials = form.watch(`items.${itemIndex}.materials`) || [];
                   
                   return (
                     <div
                       key={field.id}
-                      className="space-y-4 rounded-lg border p-4"
+                      className="space-y-4 rounded-lg border p-4 overflow-visible"
                     >
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
                         <div className="md:col-span-5">
-                         <FormField
-                          control={form.control}
-                          name={`items.${itemIndex}.description`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Description</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder="Item description"
-                                  {...field}
-                                  rows={2}
-                                  readOnly={true} // Read-only
-                                  className="bg-gray-50 dark:bg-gray-900"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.description`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Description</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Item description"
+                                    {...field}
+                                    rows={2}
+                                    readOnly={true} // Read-only
+                                    className="bg-gray-50 dark:bg-gray-900"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
 
                         <div className="md:col-span-1">
@@ -767,31 +877,26 @@ router.push(`/dashboard/Stage/Design/mydesign`);
                           />
                         </div>
 
-
-                      
-                      </div>
-
-                     
-
-                      <div className="md:col-span-2">
-                        <FormField
-                          control={form.control}
-                          name={`items.${itemIndex}.size`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Size</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="e.g., Large, 10x10"
-                                  {...field}
-                                  readOnly={true} // Read-only
-                                  className="bg-gray-50 dark:bg-gray-900"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        <div className="md:col-span-2">
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.size`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Size</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="e.g., Large, 10x10"
+                                    {...field}
+                                    readOnly={true} // Read-only
+                                    className="bg-gray-50 dark:bg-gray-900"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       </div>
 
                       <div>
@@ -816,7 +921,7 @@ router.push(`/dashboard/Stage/Design/mydesign`);
                         />
                       </div>
 
-                      <div className="mt-4 border-t pt-4">
+                      <div className="mt-4 border-t pt-4 overflow-visible">
                         <div className="mb-3 flex items-center justify-between">
                           <CardTitle className="text-md flex items-center gap-2">
                             <Package className="h-4 w-4" />
@@ -856,83 +961,131 @@ router.push(`/dashboard/Stage/Design/mydesign`);
                         </div>
 
                         {currentMaterials.length > 0 ? (
-                          <div className="space-y-3">
+                          <div className="space-y-3 overflow-visible">
                             {currentMaterials.map((material, materialIndex) => {
                               const stockInfo = material.materialId ? materialStock.get(material.materialId) : null;
                               const isQuantityExceeded = stockInfo && material.quantity > stockInfo.available && stockInfo.available > 0;
                               const isOutOfStock = stockInfo && stockInfo.isOutOfStock;
                               
+                              // Get material image
+                              const selectedMaterial = materials.find(m => m.id === material.materialId);
+                              const materialImageUrl = selectedMaterial?.imageUrl ? normalizeImagePath(selectedMaterial.imageUrl) : null;
+                              
                               return (
-                              <div key={materialIndex} className={`grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 `}>
-                                <div className="md:col-span-5">
-                                  <FormLabel>Material</FormLabel>
-                                  <Select
-                                    options={materialOptions}
-                                    value={materialOptions.find(option => option.value === material.materialId)}
-                                    onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
-                                    placeholder="Select material"
-                                    styles={isDark ? darkStyles : {}}
-                                    isDisabled={false} // Editable
-                                  />
-                               
-                                  {/* Stock information display */}
-                                  {material.materialId && (
-                                    stockInfo ? (
-                                      <div className="flex items-center gap-1 mt-1">
-                                        {isQuantityExceeded && (
-                                          <AlertTriangle className="h-3 w-3 text-yellow-600" />
-                                        )}
-                                        {isOutOfStock && (
-                                          <AlertTriangle className="h-3 w-3 text-red-600" />
-                                        )}
-                                        <p className={`text-xs ${isQuantityExceeded ? 'text-yellow-600 font-medium' : isOutOfStock ? 'text-red-600' : 'text-green-600'}`}>
-                                          {isOutOfStock ? '⚠️ Out of Stock' : 
-                                           isQuantityExceeded ? `⚠️ Exceeds stock! (${stockInfo.available} available)` : 
-                                           `${stockInfo.available} available`}
-                                        </p>
+                                <div key={materialIndex} className={`grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 overflow-visible`}>
+                                  {/* Material Image Column */}
+                                  <div className="md:col-span-1 flex items-center justify-center">
+                                    {materialImageUrl ? (
+                                      <div 
+                                        className="relative h-16 w-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0  cursor-pointer hover:opacity-80 transition-opacity hover:shadow-lg"
+                                        onClick={() => handleImageClick(materialImageUrl, selectedMaterial?.name || 'Material')}
+                                      >
+                                        <Image
+                                          src={materialImageUrl}
+                                          alt={selectedMaterial?.name || 'Material'}
+                                          fill
+                                          className="object-cover"
+                                          sizes="64px"
+                                        />
+                                        {/* Hover overlay */}
+                                        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                                          <Eye className="h-6 w-6 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                                        </div>
                                       </div>
                                     ) : (
-                                      <p className="text-xs mt-1 text-gray-400">
-                                        Checking stock...
-                                      </p>
-                                    )
-                                  )}
-                                </div>
+                                      <div className="h-16 w-16 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 shrink-0 ">
+                                        <ImageIcon className="h-8 w-8 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
 
-                                <div className="md:col-span-2">
-                                  <FormLabel>Quantity</FormLabel>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={material.quantity}
-                                    onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'quantity', parseInt(e.target.value) || 1)}
-                                    placeholder="Qty"
-                                  />
-                                </div>
+                                  {/* Material Selection Column */}
+                                  <div className="md:col-span-4 overflow-visible">
+                                    <FormLabel>Material</FormLabel>
+                                    <Select
+                                      options={materialOptions}
+                                      value={materialOptions.find(option => option.value === material.materialId)}
+                                      onChange={(option) => updateMaterialInItem(itemIndex, materialIndex, 'materialId', option?.value || '')}
+                                      placeholder="Select material"
+                                      styles={getSelectStyles({
+                                        option: (base: any, state: any) => ({
+                                          ...base,
+                                          backgroundColor: state.isFocused ? '#374151' : '#1f2937',
+                                          color: '#f9fafb',
+                                          padding: '4px 8px'
+                                        })
+                                      })}
+                                      isDisabled={false} // Editable
+                                      components={{
+                                        Option: CustomSelectOption,
+                                        SingleValue: CustomSingleValue
+                                      }}
+                                      menuPortalTarget={isMounted ? document.body : undefined}
+                                      menuPosition="fixed"
+                                      className="react-select-container"
+                                      classNamePrefix="react-select"
+                                      maxMenuHeight={300}
+                                    />
+                                   
+                                    {/* Stock information display */}
+                                    {material.materialId && (
+                                      stockInfo ? (
+                                        <div className="flex items-center gap-1 mt-1">
+                                          {isQuantityExceeded && (
+                                            <AlertTriangle className="h-3 w-3 text-yellow-600" />
+                                          )}
+                                          {isOutOfStock && (
+                                            <AlertTriangle className="h-3 w-3 text-red-600" />
+                                          )}
+                                          <p className={`text-xs ${isQuantityExceeded ? 'text-yellow-600 font-medium' : isOutOfStock ? 'text-red-600' : 'text-green-600'}`}>
+                                            {isOutOfStock ? '⚠️ Out of Stock' : 
+                                             isQuantityExceeded ? `⚠️ Exceeds stock! (${stockInfo.available} available)` : 
+                                             `${stockInfo.available} available`}
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs mt-1 text-gray-400">
+                                          Checking stock...
+                                        </p>
+                                      )
+                                    )}
+                                  </div>
 
-                                <div className="md:col-span-3">
-                                  <FormLabel>Note</FormLabel>
-                                  <Input
-                                    value={material.note || ''}
-                                    onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'note', e.target.value)}
-                                    placeholder="Optional note"
-                                    className="border-blue-200 focus-visible:ring-blue-500"
-                                  />
-                                </div>
+                                  <div className="md:col-span-2">
+                                    <FormLabel>Quantity</FormLabel>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={material.quantity}
+                                      onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                      placeholder="Qty"
+                                    />
+                                  </div>
 
-                                <div className="md:col-span-2 flex items-end">
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => removeMaterialFromItem(itemIndex, materialIndex)}
-                                    className="w-full"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <div className="md:col-span-3">
+                                    <FormLabel>Note</FormLabel>
+                                    <Input
+                                      value={material.note || ''}
+                                      onChange={(e) => updateMaterialInItem(itemIndex, materialIndex, 'note', e.target.value)}
+                                      placeholder="Optional note"
+                                      className="border-blue-200 focus-visible:ring-blue-500"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-2 flex items-end">
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => removeMaterialFromItem(itemIndex, materialIndex)}
+                                      className="w-full"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </div>
-                              </div>
-                            )})}
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="rounded-lg border border-dashed p-8 text-center">
@@ -965,7 +1118,10 @@ router.push(`/dashboard/Stage/Design/mydesign`);
                             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                               {itemImages.get(itemIndex)?.map((image, imageIndex) => (
                                 <div key={imageIndex} className="relative group">
-                                  <div className="relative aspect-square rounded-lg border overflow-hidden bg-gray-100 dark:bg-gray-800">
+                                  <div 
+                                    className="relative aspect-square rounded-lg border overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => handleImageClick(image.preview, `Item ${itemIndex + 1} Image ${imageIndex + 1}`)}
+                                  >
                                     <img
                                       src={image.preview}
                                       alt={`Item ${itemIndex + 1} image ${imageIndex + 1}`}
@@ -990,7 +1146,10 @@ router.push(`/dashboard/Stage/Design/mydesign`);
                                       variant="secondary"
                                       size="icon"
                                       className="absolute bottom-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => window.open(image.preview, '_blank')}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleImageClick(image.preview, `Item ${itemIndex + 1} Image ${imageIndex + 1}`);
+                                      }}
                                     >
                                       <Eye className="h-3 w-3" />
                                     </Button>
@@ -1014,10 +1173,6 @@ router.push(`/dashboard/Stage/Design/mydesign`);
               </div>
             </div>
 
-          
-
-        
-
             <div className="flex justify-end">
               <Button
                 type="submit"
@@ -1030,6 +1185,42 @@ router.push(`/dashboard/Stage/Design/mydesign`);
           </form>
         </Form>
       </CardContent>
+
+      {/* Image Preview Modal */}
+      <Dialog open={isPreviewOpen} onOpenChange={closePreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden bg-transparent border-none shadow-2xl">
+          <DialogHeader className="absolute top-4 right-4 z-10">
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 text-white border-none"
+              onClick={closePreview}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 bg-black/90 rounded-lg">
+            {previewImage && (
+              <>
+                <div className="relative w-full max-h-[70vh] flex items-center justify-center">
+                  <img
+                    src={previewImage.url}
+                    alt={previewImage.name}
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder-image.png';
+                    }}
+                  />
+                </div>
+                <div className="mt-4 text-center text-white">
+                  <p className="text-sm font-medium">{previewImage.name}</p>
+                  <p className="text-xs text-gray-400">Click outside or press ESC to close</p>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
