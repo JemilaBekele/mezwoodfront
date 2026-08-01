@@ -1114,50 +1114,50 @@ export default function DesignProformaInvoiceForm({
                         
                         <div className="space-y-4">
                           {/* Image Gallery - Read-only */}
-                          {(itemImages.get(itemIndex)?.length || 0) > 0 && (
-                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                              {itemImages.get(itemIndex)?.map((image, imageIndex) => (
-                                <div key={imageIndex} className="relative group">
-                                  <div 
-                                    className="relative aspect-square rounded-lg border overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => handleImageClick(image.preview, `Item ${itemIndex + 1} Image ${imageIndex + 1}`)}
-                                  >
-                                    <img
-                                      src={image.preview}
-                                      alt={`Item ${itemIndex + 1} image ${imageIndex + 1}`}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                                      }}
-                                    />
-                                    
-                                    {/* Image Info Badge */}
-                                    {image.isExisting && (
-                                      <div className="absolute top-1 left-1">
-                                        <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800">
-                                          Existing
-                                        </Badge>
-                                      </div>
-                                    )}
-                                    
-                                    {/* View Button */}
-                                    <Button
-                                      type="button"
-                                      variant="secondary"
-                                      size="icon"
-                                      className="absolute bottom-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleImageClick(image.preview, `Item ${itemIndex + 1} Image ${imageIndex + 1}`);
-                                      }}
-                                    >
-                                      <Eye className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        {(itemImages.get(itemIndex)?.length || 0) > 0 && (
+  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    {itemImages.get(itemIndex)?.map((image, imageIndex) => (
+      <div key={imageIndex} className="relative group">
+        <div 
+          className="relative aspect-square rounded-lg border overflow-hidden bg-white dark:bg-white cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => handleImageClick(image.preview, `Item ${itemIndex + 1} Image ${imageIndex + 1}`)}
+        >
+          <img
+            src={image.preview}
+            alt={`Item ${itemIndex + 1} image ${imageIndex + 1}`}
+            className="w-full h-full object-contain p-2" // Changed from object-cover to object-contain with padding
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/placeholder-image.png';
+            }}
+          />
+          
+          {/* Image Info Badge */}
+          {image.isExisting && (
+            <div className="absolute top-1 left-1">
+              <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800">
+                Existing
+              </Badge>
+            </div>
+          )}
+          
+          {/* View Button */}
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="absolute bottom-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleImageClick(image.preview, `Item ${itemIndex + 1} Image ${imageIndex + 1}`);
+            }}
+          >
+            <Eye className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
                           
                           {(!itemImages.get(itemIndex) || itemImages.get(itemIndex)?.length === 0) && (
                             <div className="text-center py-8 text-gray-500">
@@ -1199,19 +1199,19 @@ export default function DesignProformaInvoiceForm({
               <X className="h-4 w-4" />
             </Button>
           </DialogHeader>
-          <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 bg-black/90 rounded-lg">
-            {previewImage && (
-              <>
-                <div className="relative w-full max-h-[70vh] flex items-center justify-center">
-                  <img
-                    src={previewImage.url}
-                    alt={previewImage.name}
-                    className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                    }}
-                  />
-                </div>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-4 bg-black/90 rounded-lg">
+  {previewImage && (
+    <>
+      <div className="relative w-full max-h-[70vh] flex items-center justify-center bg-white"> {/* Added bg-white */}
+        <img
+          src={previewImage.url}
+          alt={previewImage.name}
+          className="max-w-full max-h-[70vh] object-contain p-2" // Added p-2 and object-contain
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/placeholder-image.png';
+          }}
+        />
+      </div>
                 <div className="mt-4 text-center text-white">
                   <p className="text-sm font-medium">{previewImage.name}</p>
                   <p className="text-xs text-gray-400">Click outside or press ESC to close</p>
