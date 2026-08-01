@@ -1122,14 +1122,16 @@ export default function DesignProformaInvoiceForm({
           className="relative aspect-square rounded-lg border overflow-hidden bg-white dark:bg-white cursor-pointer hover:opacity-90 transition-opacity"
           onClick={() => handleImageClick(image.preview, `Item ${itemIndex + 1} Image ${imageIndex + 1}`)}
         >
-          <img
-            src={image.preview}
-            alt={`Item ${itemIndex + 1} image ${imageIndex + 1}`}
-            className="w-full h-full object-contain p-2" // Changed from object-cover to object-contain with padding
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '/placeholder-image.png';
-            }}
-          />
+   <Image
+  src={image.preview || '/placeholder-image.png'}
+  alt={`Item ${itemIndex + 1} Image ${imageIndex + 1}`}
+  fill
+  className="object-contain"
+  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw"
+  onError={(event) => {
+    event.currentTarget.src = '/placeholder-image.png';
+  }}
+/>
           
           {/* Image Info Badge */}
           {image.isExisting && (
