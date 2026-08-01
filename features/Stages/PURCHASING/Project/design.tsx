@@ -650,26 +650,39 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                           <TableRow key={index} className="hover:bg-red-50 dark:hover:bg-red-950/50">
                             <TableCell>
                               {imageUrl ? (
-                                <div 
-                                  className="relative h-12 w-12 rounded overflow-hidden border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity hover:shadow-lg shrink-0"
-                                  onClick={() => handleImageClick(imageUrl, item.materialName)}
-                                >
-                                  <Image
-                                    src={imageUrl}
-                                    alt={item.materialName}
-                                    fill
-                                    className="object-cover"
-                                    sizes="48px"
-                                  />
-                                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
-                                    <Eye className="h-4 w-4 text-white opacity-0 hover:opacity-100 transition-opacity" />
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
-                                  <ImageIcon className="h-6 w-6 text-gray-400" />
-                                </div>
-                              )}
+                                            <div className="relative group">
+                                              <div className="relative h-16 w-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0">
+                                                <Image
+                                                  src={imageUrl}
+                                                  alt={ 'Material'}
+                                                  fill
+                                                  className="object-cover"
+                                                  sizes="64px"
+                                                />
+                                              </div>
+                                          
+                                              <Button
+                                                type="button"
+                                                variant="secondary"
+                                                size="icon"
+                                                className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md border-2 border-white dark:border-gray-800 p-0 z-10"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleImageClick(
+                                                    imageUrl,
+                                                    'Material'
+                                                  );
+                                                }}
+                                                title="Preview image"
+                                              >
+                                                <Eye className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                                            </div>
+                                          )}
                             </TableCell>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
