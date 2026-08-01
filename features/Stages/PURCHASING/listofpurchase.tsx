@@ -16,9 +16,7 @@ import {
   X,
   Image as ImageIcon,
   Info,
-  Palette,
-  Ruler,
-  Tag,
+
   User,
   Calendar,
   Clock,
