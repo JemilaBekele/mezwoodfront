@@ -200,6 +200,8 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
       [ProjectStatus.FINISHING]: '#EAB308',
       [ProjectStatus.DELIVERY]: '#10B981',
       [ProjectStatus.INSTALLATION]: '#047857',
+       [ProjectStatus.COMPLETED]: '#059669',
+                  [ProjectStatus.CANCELLED]: '#EF4444',
     };
     return colorMap[stage] || '#6B7280';
   }, []);
