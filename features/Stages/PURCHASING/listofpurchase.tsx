@@ -383,30 +383,27 @@ const MaterialUsageReportPage: React.FC = () => {
                     <div className="bg-muted/30 p-4 border-b flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         {/* Material Image */}
-                        {imageUrl ? (
-                          <div 
-                            className="relative h-14 w-14 rounded overflow-hidden border border-gray-200 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleImageClick(imageUrl, material.materialName);
-                            }}
-                          >
-                            <Image
-                              src={imageUrl}
-                              alt={material.materialName}
-                              fill
-                              className="object-cover"
-                              sizes="56px"
-                            />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
-                              <Eye className="h-4 w-4 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                          {imageUrl ? (
+                            <div 
+                              className="relative h-8 w-8 rounded overflow-hidden border border-gray-200 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleImageClick(imageUrl, 'material');
+                              }}
+                            >
+                              <Image
+                                src={imageUrl}
+                                alt={'material'}
+                                fill
+                                className="object-cover"
+                                sizes="32px"
+                              />
                             </div>
-                          </div>
-                        ) : (
-                          <div className="h-14 w-14 rounded bg-gray-200 flex items-center justify-center border border-gray-200 flex-shrink-0">
-                            <ImageIcon className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
+                          ) : (
+                            <div className="h-8 w-8 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
+                              <ImageIcon className="h-4 w-4 text-gray-400" />
+                            </div>
+                          )}
                         <div>
                           <h3 className="font-semibold">{material.materialName}</h3>
                           <div className="flex items-center gap-1 flex-wrap">
