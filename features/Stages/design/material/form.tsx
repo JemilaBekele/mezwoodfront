@@ -974,30 +974,45 @@ export default function DesignProformaInvoiceForm({
                               return (
                                 <div key={materialIndex} className={`grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 overflow-visible`}>
                                   {/* Material Image Column */}
-                                  <div className="md:col-span-1 flex items-center justify-center">
-                                    {materialImageUrl ? (
-                                      <div 
-                                        className="relative h-16 w-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0  cursor-pointer hover:opacity-80 transition-opacity hover:shadow-lg"
-                                        onClick={() => handleImageClick(materialImageUrl, selectedMaterial?.name || 'Material')}
-                                      >
-                                        <Image
-                                          src={materialImageUrl}
-                                          alt={selectedMaterial?.name || 'Material'}
-                                          fill
-                                          className="object-cover"
-                                          sizes="64px"
-                                        />
-                                        {/* Hover overlay */}
-                                        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
-                                          <Eye className="h-6 w-6 text-white opacity-0 hover:opacity-100 transition-opacity" />
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="h-16 w-16 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 shrink-0 ">
-                                        <ImageIcon className="h-8 w-8 text-gray-400" />
-                                      </div>
-                                    )}
-                                  </div>
+                                 <div className="md:col-span-1 flex items-center justify-center">
+  {materialImageUrl ? (
+    <div 
+      className="relative h-16 w-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0 cursor-pointer hover:opacity-80 transition-opacity hover:shadow-lg"
+      onClick={() => handleImageClick(materialImageUrl, selectedMaterial?.name || 'Material')}
+    >
+      {/* Option 1: Use regular img tag to test if it's a Next.js Image issue */}
+      <img
+        src={materialImageUrl}
+        alt={selectedMaterial?.name || 'Material'}
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = '/placeholder-image.png';
+        }}
+      />
+      
+      {/* Or Option 2: Fix Next.js Image */}
+      <Image
+        src={materialImageUrl}
+        alt={selectedMaterial?.name || 'Material'}
+        fill
+        className="object-cover"
+        sizes="64px"
+        unoptimized // Add this for external images
+        priority // Add this for above-the-fold images
+        style={{ filter: 'brightness(1)' }} // Force brightness
+      />
+      
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+        <Eye className="h-6 w-6 text-white opacity-0 hover:opacity-100 transition-opacity" />
+      </div>
+    </div>
+  ) : (
+    <div className="h-16 w-16 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 shrink-0">
+      <ImageIcon className="h-8 w-8 text-gray-400" />
+    </div>
+  )}
+</div>
 
                                   {/* Material Selection Column */}
                                   <div className="md:col-span-4 overflow-visible">
