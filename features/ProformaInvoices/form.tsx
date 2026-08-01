@@ -420,7 +420,29 @@ const getMaterialImage = useCallback(async (materialId: string) => {
       setIsFetchingItems(false);
     }
   };
-
+// Add this right after your getMaterialImage function
+const fetchMultipleMaterialImages = useCallback(async (materialIds: string[]) => {
+  if (!materialIds.length) return;
+  
+  // Only fetch images we don't have yet
+  const newIds = materialIds.filter(id => !materialImageMap.has(id));
+  if (!newIds.length) return;
+  
+  // Get images for all materials
+  newIds.forEach(materialId => {
+    const material = materials.find(m => m.id === materialId);
+    if (material?.imageUrl) {
+      const normalizedUrl = normalizeImagePath(material.imageUrl);
+      if (normalizedUrl) {
+        setMaterialImageMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(materialId, normalizedUrl);
+          return newMap;
+        });
+      }
+    }
+  });
+}, [materials, materialImageMap]);
   const refreshItems = async () => {
     await fetchItems();
     toast.success('Items refreshed');
@@ -746,20 +768,27 @@ const getMaterialImage = useCallback(async (materialId: string) => {
     }
     
     // Auto-fill materials
-    if (selectedItem.itemMaterials && selectedItem.itemMaterials.length > 0) {
-      const materialsList = selectedItem.itemMaterials.map((im: { materialId: any; quantity: any; note: any; }) => ({
-        id: '',
-        itemId: '',
-        materialId: im.materialId,
-        quantity: im.quantity,
-        note: im.note || ''
-      }));
-      
-      form.setValue(`items.${itemIndex}.materials`, materialsList);
-      toast.success(`Added ${materialsList.length} material(s) from item`);
-    } else {
-      form.setValue(`items.${itemIndex}.materials`, []);
-    }
+    // Auto-fill materials
+if (selectedItem.itemMaterials && selectedItem.itemMaterials.length > 0) {
+  // Get all material IDs
+  const materialIds = selectedItem.itemMaterials.map((im: any) => im.materialId);
+  
+  // 👇 ADD THIS LINE - Fetch all images at once
+  fetchMultipleMaterialImages(materialIds);
+  
+  const materialsList = selectedItem.itemMaterials.map((im: { materialId: any; quantity: any; note: any; }) => ({
+    id: '',
+    itemId: '',
+    materialId: im.materialId,
+    quantity: im.quantity,
+    note: im.note || ''
+  }));
+  
+  form.setValue(`items.${itemIndex}.materials`, materialsList);
+  toast.success(`Added ${materialsList.length} material(s) from item`);
+} else {
+  form.setValue(`items.${itemIndex}.materials`, []);
+}
   };
 
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1203,7 +1232,28 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
       toast.error('Failed to refresh customers');
     }
   };
-
+// Add this after your other useEffect hooks
+useEffect(() => {
+  // When materials change, fetch their images
+  const subscription = form.watch((value, { name }) => {
+    if (name?.startsWith('items.') && name?.includes('.materials')) {
+      const allItems = form.getValues('items');
+      const materialIds: string[] = [];
+      allItems?.forEach(item => {
+        item.materials?.forEach(material => {
+          if (material.materialId && !materialImageMap.has(material.materialId)) {
+            materialIds.push(material.materialId);
+          }
+        });
+      });
+      if (materialIds.length > 0) {
+        fetchMultipleMaterialImages(materialIds);
+      }
+    }
+  });
+  
+  return () => subscription.unsubscribe();
+}, [form, fetchMultipleMaterialImages, materialImageMap]);
   return (
     <>
     <div className="mx-auto w-full space-y-4">
@@ -1778,30 +1828,36 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
             </div>
 
             {/* Material Image Preview */}
-            <div className="md:col-span-2 flex items-end justify-center">
-              {materialImage ? (
-                <div 
-                  className="relative w-12 h-12 rounded-lg border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all group"
-                  onClick={() => handleMaterialImageClick(materialImage)}
-                >
-                  <img
-                    src={materialImage}
-                    alt="Material"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                    <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </div>
-              ) : (
-                <div className="w-12 h-12 rounded-lg border border-dashed bg-muted/20 flex items-center justify-center text-muted-foreground">
-                  <ImageIcon className="h-4 w-4" />
-                </div>
-              )}
-            </div>
+           {/* Material Image Preview */}
+<div className="md:col-span-2 flex items-end justify-center">
+  {material.materialId && materialImageMap.has(material.materialId) ? (
+    <div 
+      className="relative w-12 h-12 rounded-lg border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all group"
+      onClick={() => handleMaterialImageClick(materialImageMap.get(material.materialId)!)}
+    >
+      <img
+        src={materialImageMap.get(material.materialId)!}
+        alt="Material"
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = '/placeholder-image.png';
+        }}
+      />
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+        <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+    </div>
+  ) : material.materialId ? (
+    // Loading state while fetching
+    <div className="w-12 h-12 rounded-lg border border-dashed bg-muted/20 flex items-center justify-center text-muted-foreground animate-pulse">
+      <ImageIcon className="h-4 w-4" />
+    </div>
+  ) : (
+    <div className="w-12 h-12 rounded-lg border border-dashed bg-muted/20 flex items-center justify-center text-muted-foreground">
+      <ImageIcon className="h-4 w-4" />
+    </div>
+  )}
+</div>
 
             <div className="md:col-span-1 flex items-end">
               <Button
