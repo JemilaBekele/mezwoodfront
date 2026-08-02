@@ -43,6 +43,18 @@ export interface IDeliveryEstimation {
   FINISHING?: number;
   DELIVERY?: number;
 
+  // 🔹 Time-based stages — scheduled by elapsed working time rather than daily
+  // capacity. Derived server-side. The estimate used to omit these while the
+  // project scheduled both, so quotes were short by the installation phase.
+  PURCHASING?: number;
+  INSTALLATION?: number;
+
+  // The items the quote was calculated from, captured at quoting time.
+  itemsSnapshot?: { itemId: string; quantity: number }[] | null;
+
+  // Set once converted — the queryable other side of Project.deliveryEstimationcode.
+  projectId?: string | null;
+
   status: EstimationStatus;
 
   createdById?: string;

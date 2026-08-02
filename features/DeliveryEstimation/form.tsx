@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/select';
 import { DifficultyLevel } from '@/models/Projects';
 import { EstimationStatus, IDeliveryEstimation } from '@/models/delivery-estimation';
-import { calculateDeliveryEstimation, createDeliveryEstimation, updateDeliveryEstimation } from '@/service/delivery-estimation';
+import { calculateDeliveryEstimation, createDeliveryEstimation, deriveStageQuantities, updateDeliveryEstimation } from '@/service/delivery-estimation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Calendar, Users, Calculator, Save, Edit, Search, X, Plus, Package, Sliders, Settings, ArrowLeft, ChevronDown } from 'lucide-react';
@@ -189,6 +189,14 @@ export default function DeliveryEstimationForm({
   // Stage quantities state (editable)
   const [stageQuantities, setStageQuantities] = useState<StageQuantity>({ ...DEFAULT_STAGE_QUANTITIES });
   const [isManualMode, setIsManualMode] = useState(false);
+  // The two time-based stages the SCHEDULE always includes. They are derived
+  // server-side and shown read-only: the estimate used to omit them entirely
+  // while the project scheduled both, so every quote was short by the whole
+  // purchasing and installation phase.
+  const [timeBasedStages, setTimeBasedStages] = useState<{ PURCHASING: number; INSTALLATION: number }>({
+    PURCHASING: 0,
+    INSTALLATION: 0,
+  });
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -334,32 +342,46 @@ export default function DeliveryEstimationForm({
     return totals;
   }, [selectedItems]);
 
-  // Calculate stage quantities from selected items
-  const calculateStageQuantitiesFromItems = useCallback((): StageQuantity => {
-    const materialTotals = calculateMaterialTotals();
-    
-    const hasMetal = materialTotals.metal > 0;
-    const hasLaminatedMDF = materialTotals.laminatedMDF > 0;
-    
-    return {
-      DESIGN: materialTotals.total,
-      METAL_WORKS: hasMetal ? materialTotals.metal : 0,
-      CNC: 0,
-      CUTTING: materialTotals.total - materialTotals.metal,
-      EDGE_BANDING: hasLaminatedMDF ? materialTotals.laminatedMDF : 0,
-      ASSEMBLY: materialTotals.total - materialTotals.metal,
-      PAINTING: materialTotals.plainMDF + materialTotals.wood + materialTotals.metal,
-      FINISHING: materialTotals.total,
-      DELIVERY: materialTotals.total,
-    };
-  }, [calculateMaterialTotals]);
+  /**
+   * Ask the SERVER to derive stage quantities from the material mix.
+   *
+   * This used to be a local re-implementation of the engine's material rules.
+   * Keeping a second copy on the client is exactly the duplication that made
+   * quotes disagree with the projects they became, so the rule now lives only
+   * in the scheduling engine and we request the answer.
+   */
+  const calculateStageQuantitiesFromItems =
+    useCallback(async (): Promise<StageQuantity | null> => {
+      const materialTotals = calculateMaterialTotals();
+      try {
+        const result = await deriveStageQuantities({
+          materials: {
+            laminatedMDF: materialTotals.laminatedMDF,
+            plainMDF: materialTotals.plainMDF,
+            wood: materialTotals.wood,
+            metal: materialTotals.metal,
+            other: materialTotals.other,
+          },
+        });
+        setTimeBasedStages(result.timeBasedStages);
+        return result.stageQuantities as unknown as StageQuantity;
+      } catch {
+        toast.error('Could not calculate stage quantities. Please try again.');
+        return null;
+      }
+    }, [calculateMaterialTotals]);
 
   // Auto-calculate stage quantities when items change
   useEffect(() => {
-    if (!isManualMode && selectedItems.length > 0) {
-      const calculated = calculateStageQuantitiesFromItems();
-      setStageQuantities(calculated);
-    }
+    if (isManualMode || selectedItems.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const calculated = await calculateStageQuantitiesFromItems();
+      if (!cancelled && calculated) setStageQuantities(calculated);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedItems, calculateStageQuantitiesFromItems, isManualMode]);
 
   // Update stage quantity for a specific stage
@@ -508,8 +530,15 @@ export default function DeliveryEstimationForm({
         await updateDeliveryEstimation(initialData.id, submissionData);
         toast.success('Delivery estimation updated successfully');
       } else {
-        await createDeliveryEstimation(submissionData);
-        toast.success('Delivery estimation created successfully');
+        // The API now returns the created record (it used to return only the
+        // calculation, with no id or code), so the reference can be shown.
+        const created: any = await createDeliveryEstimation(submissionData);
+        const code = created?.data?.estimation?.code;
+        toast.success(
+          code
+            ? `Delivery estimation ${code} created successfully`
+            : 'Delivery estimation created successfully',
+        );
       }
 
       router.push('/dashboard/DeliveryEstimation');
@@ -571,8 +600,8 @@ const watchedCustomerName = form.watch('customerName');
   // Reset to automatic mode
   const resetToAutomaticMode = () => {
     if (selectedItems.length > 0) {
-      const calculated = calculateStageQuantitiesFromItems();
-      setStageQuantities(calculated);
+      const calculated = await calculateStageQuantitiesFromItems();
+      if (calculated) setStageQuantities(calculated);
       setIsManualMode(false);
       toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
     } else {
@@ -972,14 +1001,43 @@ const watchedCustomerName = form.watch('customerName');
                       ))}
                     </div>
 
+                    {/* Time-based stages — scheduled but not user-editable.
+                        The estimate used to omit these entirely while the project
+                        scheduled both, so every quote was short by the whole
+                        purchasing and installation phase. */}
+                    <div className="p-3 border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium mb-2">
+                        Also scheduled (derived automatically)
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(['PURCHASING', 'INSTALLATION'] as const).map((stage) => (
+                          <div key={stage} className="flex justify-between text-sm">
+                            <span className="text-gray-600">{stage}</span>
+                            <span className="font-mono font-semibold">
+                              {timeBasedStages[stage]} units
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        These run on elapsed working time rather than daily capacity, and
+                        are included in the quoted delivery date.
+                      </p>
+                    </div>
+
                     {/* Total Quantity Summary */}
                     <div className="p-4 rounded-lg">
                       <div className="flex justify-between items-center">
-                        <span className="font-semibold">Total Quantity Across All Stages:</span>
+                        <span className="font-semibold">Total project quantity:</span>
                         <span className="text-xl font-bold text-blue-600">
-                          {Object.values(stageQuantities).reduce((sum, qty) => sum + qty, 0)} units
+                          {stageQuantities.DESIGN} units
                         </span>
                       </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Every unit passes through Design, so that stage carries the
+                        project total. Summing all stages would count the same panel once
+                        per stage it visits.
+                      </p>
                     </div>
 
                     {/* Navigation Buttons */}

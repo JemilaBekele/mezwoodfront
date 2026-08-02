@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { getSchedulingSettings, updateSchedulingSettings } from '@/service/SchedulingSettings';
+import {
+  WEEKDAY_LABELS,
+  decimalToTime,
+  parseWorkingDays,
+  serializeWorkingDays,
+  timeToDecimal,
+  workingHoursOf,
+} from '@/models/SchedulingSettings';
 
 // Difficulty percentages are stored as fractions (0.4) on the backend but shown
 // to the user as whole percentages (40) — convert on load/save.
@@ -19,7 +27,17 @@ export default function SchedulingSettingsForm() {
   const [easyPercent, setEasyPercent] = useState('0');
   const [mediumPercent, setMediumPercent] = useState('40');
   const [hardPercent, setHardPercent] = useState('50');
-  const [workingHoursPerDay, setWorkingHoursPerDay] = useState('7.5');
+
+  // Working time. These used to be hardcoded on the server while this form
+  // offered a free-text "working hours / day" box — so setting it to anything
+  // other than 7.5 scheduled work past the (unchangeable) 17:00 close. The
+  // window is now the input and the hours are the derived read-out.
+  const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+  const [shiftStart, setShiftStart] = useState('08:30');
+  const [shiftEnd, setShiftEnd] = useState('17:00');
+  const [lunchStart, setLunchStart] = useState('12:30');
+  const [lunchEnd, setLunchEnd] = useState('13:30');
+  const [timezone, setTimezone] = useState('Africa/Addis_Ababa');
 
   useEffect(() => {
     (async () => {
@@ -29,7 +47,12 @@ export default function SchedulingSettingsForm() {
         setEasyPercent(String(Math.round((s.easyPercent ?? 0) * 100)));
         setMediumPercent(String(Math.round((s.mediumPercent ?? 0) * 100)));
         setHardPercent(String(Math.round((s.hardPercent ?? 0) * 100)));
-        setWorkingHoursPerDay(String(s.workingHoursPerDay ?? 7.5));
+        setWorkingDays(parseWorkingDays(s.workingDays ?? '1,2,3,4,5,6'));
+        setShiftStart(decimalToTime(s.shiftStartHour ?? 8.5));
+        setShiftEnd(decimalToTime(s.shiftEndHour ?? 17));
+        setLunchStart(decimalToTime(s.lunchStartHour ?? 12.5));
+        setLunchEnd(decimalToTime(s.lunchEndHour ?? 13.5));
+        setTimezone(s.timezone ?? 'Africa/Addis_Ababa');
       } catch (e: any) {
         toast.error(e.message || 'Failed to load scheduling settings');
       } finally {
@@ -38,23 +61,56 @@ export default function SchedulingSettingsForm() {
     })();
   }, []);
 
+  // The working hours a day actually contains, given the window. Shown live so
+  // the operator can see what the scheduler will use.
+  const derivedHours = useMemo(
+    () =>
+      workingHoursOf({
+        shiftStartHour: timeToDecimal(shiftStart),
+        shiftEndHour: timeToDecimal(shiftEnd),
+        lunchStartHour: timeToDecimal(lunchStart),
+        lunchEndHour: timeToDecimal(lunchEnd),
+      }),
+    [shiftStart, shiftEnd, lunchStart, lunchEnd],
+  );
+
+  const toggleDay = (index: number) =>
+    setWorkingDays((prev) =>
+      prev.includes(index) ? prev.filter((d) => d !== index) : [...prev, index],
+    );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const nextContingency = Number(contingencyDays);
     const nextEasy = Number(easyPercent);
     const nextMedium = Number(mediumPercent);
     const nextHard = Number(hardPercent);
-    const nextWorkingHours = Number(workingHoursPerDay);
+
     if (
       !Number.isInteger(nextContingency) ||
       nextContingency < 0 ||
-      [nextEasy, nextMedium, nextHard].some((n) => Number.isNaN(n) || n < 0) ||
-      Number.isNaN(nextWorkingHours) ||
-      nextWorkingHours <= 0
+      [nextEasy, nextMedium, nextHard].some((n) => Number.isNaN(n) || n < 0)
     ) {
-      toast.error('Enter a valid contingency, difficulty allowance, and working-hours value');
+      toast.error('Enter a valid contingency and difficulty allowance');
       return;
     }
+    if (workingDays.length === 0) {
+      toast.error('Select at least one working day');
+      return;
+    }
+    if (timeToDecimal(shiftEnd) <= timeToDecimal(shiftStart)) {
+      toast.error('Closing time must be after opening time');
+      return;
+    }
+    if (timeToDecimal(lunchEnd) < timeToDecimal(lunchStart)) {
+      toast.error('Lunch end must not be before lunch start');
+      return;
+    }
+    if (derivedHours <= 0) {
+      toast.error('The working day must contain some working time');
+      return;
+    }
+
     setSaving(true);
     try {
       await updateSchedulingSettings({
@@ -62,7 +118,12 @@ export default function SchedulingSettingsForm() {
         easyPercent: nextEasy / 100,
         mediumPercent: nextMedium / 100,
         hardPercent: nextHard / 100,
-        workingHoursPerDay: nextWorkingHours,
+        workingDays: serializeWorkingDays(workingDays),
+        shiftStartHour: timeToDecimal(shiftStart),
+        shiftEndHour: timeToDecimal(shiftEnd),
+        lunchStartHour: timeToDecimal(lunchStart),
+        lunchEndHour: timeToDecimal(lunchEnd),
+        timezone,
       });
       toast.success('Scheduling settings saved — new quotes & projects use them');
     } catch (err: any) {
@@ -105,7 +166,7 @@ export default function SchedulingSettingsForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Contingency + working hours */}
+      {/* Contingency */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="contingency">Contingency buffer</Label>
@@ -121,27 +182,87 @@ export default function SchedulingSettingsForm() {
               days
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">Fixed working-day buffer added to every project.</p>
+          <p className="text-xs text-muted-foreground">Fixed working-day buffer added after production ends.</p>
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="working-hours" className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Working hours / day
-          </Label>
-          <div className="relative">
-            <Input
-              id="working-hours"
-              inputMode="decimal"
-              value={workingHoursPerDay}
-              onChange={numericChange(setWorkingHoursPerDay, true)}
-              className="pr-16 font-mono"
-            />
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
-              hours
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground">Reference length of a full working day.</p>
+          <Label htmlFor="timezone">Business timezone</Label>
+          <Input
+            id="timezone"
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            className="font-mono"
+          />
+          <p className="text-xs text-muted-foreground">All shift times are read in this zone.</p>
         </div>
+      </div>
+
+      {/* Working time */}
+      <div className="space-y-3 rounded-lg border border-border p-4">
+        <div className="flex items-center justify-between">
+          <Label className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" /> Working time
+          </Label>
+          <span className="rounded-md bg-muted px-2 py-1 font-mono text-xs">
+            {derivedHours}h / day
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Nothing is ever scheduled outside this window. A project created after hours
+          starts at the next opening; work pauses over lunch and resumes after it.
+        </p>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Working days
+          </Label>
+          <div className="flex flex-wrap gap-1.5">
+            {WEEKDAY_LABELS.map((label, index) => {
+              const active = workingDays.includes(index);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => toggleDay(index)}
+                  aria-pressed={active}
+                  className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {label.slice(0, 3)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          {([
+            ['shift-start', 'Opens', shiftStart, setShiftStart],
+            ['shift-end', 'Closes', shiftEnd, setShiftEnd],
+            ['lunch-start', 'Lunch from', lunchStart, setLunchStart],
+            ['lunch-end', 'Lunch to', lunchEnd, setLunchEnd],
+          ] as const).map(([id, label, value, setter]) => (
+            <div key={id} className="space-y-1.5">
+              <Label htmlFor={id} className="text-xs uppercase tracking-wide text-muted-foreground">
+                {label}
+              </Label>
+              <Input
+                id={id}
+                type="time"
+                value={value}
+                onChange={(e) => setter(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Set lunch from and to the same time for no break. Working hours per day is
+          derived from this window — it is not a separate setting.
+        </p>
       </div>
 
       {/* Difficulty multipliers */}

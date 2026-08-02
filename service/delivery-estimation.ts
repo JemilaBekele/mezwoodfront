@@ -148,6 +148,36 @@ export const createDeliveryEstimation = async (
   }
 };
 // Calculate delivery estimation
+/**
+ * Derive stage quantities from selected items (or a material mix) on the SERVER.
+ *
+ * The estimation form used to compute these rules locally — a second copy of
+ * logic that lives in the scheduling engine. They agreed at the time, but that
+ * exact duplication is what previously made quotes disagree with the projects
+ * they became, so the rule now has one home and the form asks for the answer.
+ */
+export const deriveStageQuantities = async (payload: {
+  items?: { itemId: string; quantity: number }[];
+  materials?: {
+    laminatedMDF?: number;
+    plainMDF?: number;
+    wood?: number;
+    metal?: number;
+    other?: number;
+  };
+}) => {
+  const response = await axiosInstance.post<{
+    success: boolean;
+    data: {
+      materials: Record<string, number>;
+      stageQuantities: Record<string, number>;
+      timeBasedStages: { PURCHASING: number; INSTALLATION: number };
+    };
+  }>('/delivery-estimations/stage-quantities', payload);
+
+  return response.data.data;
+};
+
 export const calculateDeliveryEstimation = async (
   data:any,
 ) => {
