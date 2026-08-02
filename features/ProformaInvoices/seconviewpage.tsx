@@ -1,14 +1,14 @@
 
 import { getProformaInvoiceId } from '@/service/ProformaInvoice';
-import ProformaInvoiceForm from './form';
 import { IProformaInvoice } from '@/models/ProformaInvoice';
 import { toast } from 'sonner';
+import SecoProformaInvoiceForm from './secontupdate';
 
 type TProformaInvoiceViewPageProps = {
   invoiceId: string;
 };
 
-export default async function ProformaInvoiceViewPage({
+export default async function SecoProformaInvoiceViewPage({
   invoiceId
 }: TProformaInvoiceViewPageProps) {
   let invoice: IProformaInvoice | null = null;
@@ -27,7 +27,7 @@ export default async function ProformaInvoiceViewPage({
   }
 
   return (
-    <ProformaInvoiceForm
+    <SecoProformaInvoiceForm
       initialData={invoice}
       pageTitle={pageTitle}
     />

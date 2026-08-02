@@ -60,13 +60,14 @@ export interface IProjectLog {
   project?: IProject;
 
   note: string;
-
   createdById?: string;
   createdBy?: IEmployee;
 
   createdAt: string; // ISO date string
 }
 export interface IProject {
+  allowToDeliverWithBalance: boolean;
+
   id: string;
    designStatus?: DesignStatus;
   designFinished?: string;

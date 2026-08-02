@@ -17,7 +17,7 @@ import { Eye, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { IProformaInvoice } from '@/models/ProformaInvoice';
+import { IProformaInvoice, PIStatus } from '@/models/ProformaInvoice';
 
 interface ProformaInvoiceCellActionProps {
   data: IProformaInvoice;
@@ -77,15 +77,34 @@ export const ProformaInvoiceCellAction: React.FC<ProformaInvoiceCellActionProps>
             </DropdownMenuItem>
           </PermissionGuard>
 
-          <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.UPDATE.name}>
-            <DropdownMenuItem
-              onClick={() => router.push(`/dashboard/ProformaInvoice/${data.id}`)}
-              className='gap-2 text-sm'
-            >
-              <Pencil className='h-3.5 w-3.5 text-muted-foreground' />
-              Edit
-            </DropdownMenuItem>
-          </PermissionGuard>
+        {data.status !== PIStatus.APPROVED_CREATE_PROJECT && (
+  <PermissionGuard
+    requiredPermission={PERMISSIONS.PROFORMA_INVOICE.UPDATE.name}
+  >
+    <DropdownMenuItem
+      onClick={() => router.push(`/dashboard/ProformaInvoice/${data.id}`)}
+      className='gap-2 text-sm'
+    >
+      <Pencil className='h-3.5 w-3.5 text-muted-foreground' />
+      Edit
+    </DropdownMenuItem>
+  </PermissionGuard>
+)}
+          {data.status === PIStatus.APPROVED_CREATE_PROJECT && (
+  <PermissionGuard
+    requiredPermission={PERMISSIONS.PROFORMA_INVOICE.UPDATE.name}
+  >
+    <DropdownMenuItem
+      onClick={() =>
+        router.push(`/dashboard/ProformaInvoice/second/${data.id}`)
+      }
+      className='gap-2 text-sm'
+    >
+      <Pencil className='h-3.5 w-3.5 text-muted-foreground' />
+      Edit
+    </DropdownMenuItem>
+  </PermissionGuard>
+)}
 
           <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.DELETE.name}>
             <DropdownMenuSeparator />

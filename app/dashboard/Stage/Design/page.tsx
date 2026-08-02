@@ -8,8 +8,6 @@ import { searchParamsCache } from '@/lib/searchparams';
 import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 
-import { PermissionGuard } from '@/components/PermissionGuard';
-import { PERMISSIONS } from '@/stores/permissions';
 
 import DesignProjectListingPage from '@/features/Stages/design/Project/listing';
 

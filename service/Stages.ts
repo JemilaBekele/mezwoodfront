@@ -623,3 +623,37 @@ export const getMaterialUsageReport = async (
   }
 }
 
+export interface IStageLeftWork {
+  stage: string;
+  leftWork: number;
+}
+
+export interface StageLeftWorkResponse {
+  success: boolean;
+  data: IStageLeftWork[];
+  count: number;
+}
+
+// Get left work by stage
+export interface IStageProjectCount {
+  stage: string;
+  projectCount: number;
+}
+
+export interface StageProjectCountResponse {
+  success: boolean;
+  data: IStageProjectCount[];
+  count: number;
+}
+
+export const getStageProjectCount = async (): Promise<IStageProjectCount[]> => {
+  try {
+    const response = await axiosInstance.get<StageProjectCountResponse>(
+      '/left-work'
+    );
+
+    return response.data.data;
+  } catch (error) {
+    throw error;
+  }
+};
