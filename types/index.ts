@@ -4,6 +4,8 @@ export type NavItem = {
   title: string;
   url: string;
   icon?: keyof typeof Icons;
+      countKey?: string;
+
   disabled?: boolean;
   description?: string;
   external?: boolean;

@@ -3,7 +3,7 @@
 
 import { ColumnDef } from '@tanstack/react-table';
 import { DataTableColumnHeader } from '@/components/ui/table/data-table-column-header';
-import { CalendarDays, User, FileText, Layers, Clock, CheckCircle2, AlertCircle, Package, DollarSign, Calendar, CalendarClock } from 'lucide-react';
+import { CalendarDays, User, FileText, Layers, Clock, CheckCircle2, AlertCircle, Package, DollarSign, Calendar, CalendarClock,  } from 'lucide-react';
 import { IProject, ProjectStatus, IProjectStage, IProjectStageWorkLog } from '@/models/Projects';
 import { ProjectCellAction } from './cell-action';
 import { useRouter } from 'next/navigation';
@@ -59,7 +59,6 @@ function calculateProgress(project: IProject): number {
 }
 
 // Helper to check if project payment is fully paid (for projects only)
-// Helper to check if project payment is fully paid (for projects only)
 function isProjectFullyPaid(project: any): boolean {
   // Only check payment for projects (type is 'project')
   if (project.type === 'project') {
@@ -71,6 +70,18 @@ function isProjectFullyPaid(project: any): boolean {
   }
   // For sells, always return true (no payment restriction)
   return true;
+}
+
+// Helper to check if project should show payment restriction
+function shouldShowPaymentRestriction(project: any): boolean {
+  // Only for projects
+  if (project.type !== 'project') return false;
+  
+  // If allowToDeliverWithBalance is true, don't show payment restriction
+  if (project.allowToDeliverWithBalance) return false;
+  
+  // Check if payment is not fully paid
+  return !isProjectFullyPaid(project);
 }
 
 // Helper to get display invoice number
@@ -370,11 +381,11 @@ export const projectColumns: ColumnDef<any>[] = [
         );
       }
 
-      // Project work progress - check payment
-      const isPaid = isProjectFullyPaid(project);
+      // Project work progress - check if payment restriction should apply
+      const showRestriction = shouldShowPaymentRestriction(project);
       
-      // If project payment is not fully paid, show payment pending message
-      if (!isPaid) {
+      // If payment restriction applies, show payment pending message
+      if (showRestriction) {
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -384,6 +395,9 @@ export const projectColumns: ColumnDef<any>[] = [
             <div className="text-xs text-muted-foreground">
               {project.invoice?.amountPaid || 0} / {project.invoice?.total || 0} paid
             </div>
+         <div className="text-xs text-muted-foreground">
+  Balance left: {project.invoice?.balance || 0}
+</div>
           </div>
         );
       }
@@ -416,6 +430,7 @@ export const projectColumns: ColumnDef<any>[] = [
       );
     }
   },
+
   {
     id: 'deliveryDetails',
     header: ({ column }) => (
@@ -612,9 +627,10 @@ export const projectColumns: ColumnDef<any>[] = [
       
       // Only apply payment restriction for PROJECTS (type is 'project')
       if (project.type === 'project') {
-        const isPaid = isProjectFullyPaid(project);
-        // If project payment is not fully paid, show limited actions or disable updates
-        if (!isPaid) {
+        const showRestriction = shouldShowPaymentRestriction(project);
+        
+        // If payment restriction applies, show limited actions or disable updates
+        if (showRestriction) {
           return (
             <div className="flex items-center gap-1">
               <TooltipProvider>
@@ -635,7 +651,7 @@ export const projectColumns: ColumnDef<any>[] = [
         }
       }
       
-      // For sells or paid projects, show actions
+      // For sells or projects with no payment restriction, show actions
       return <ProjectCellAction data={project} onRefresh={meta?.onRefresh} />;
     }
   }

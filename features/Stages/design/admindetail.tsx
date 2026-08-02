@@ -14,18 +14,13 @@ import {
   Loader2,
   TrendingUp,
   Settings,
-  Truck,
-  Home,
-  Hammer,
-  Paintbrush,
+
   Scissors,
   CalendarDays,
   User,
-  Award,
   BarChart3,
   Layers,
   Package,
-  Wrench,
   PenTool,
   Ruler,
   ListChecks,
@@ -34,19 +29,18 @@ import {
   Box,
   Download,
   Image as ImageIcon,
-  Plus,
+
   History,
   FileWarning,
-  ShoppingCart,
-  Cog,
-  Sparkles,
-  Drill,
+ 
   CheckCircle,
+  ShieldCheck,
+  ShieldOff,
 } from 'lucide-react';
-import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog } from '@/models/Projects';
+import { IProject, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog } from '@/models/Projects';
 import { getProjectId } from '@/service/Project';
 import { Separator } from '@/components/ui/separator';
-import { IProformaInvoice, IProformaInvoiceItem, IProformaItemMaterial } from '@/models/ProformaInvoice';
+import { IProformaInvoice, IProformaInvoiceItem } from '@/models/ProformaInvoice';
 import { getProformaInvoiceById } from '@/service/ProformaInvoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -62,6 +56,10 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { normalizeImagePath } from '@/lib/norm';
 import { getStatusConfig, stageConfigs } from '../unifay';
+import {
+  allowDeliveryWithBalance,
+  disallowDeliveryWithBalance,
+} from '@/service/Project';
 
 // Helper function for image URLs
 
@@ -78,6 +76,7 @@ const AdminProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [project, setProject] = useState<IProject | null>(null);
   const [proformaInvoice, setProformaInvoice] = useState<IProformaInvoice | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isUpdatingDelivery, setIsUpdatingDelivery] = useState(false);
   const router = useRouter();
 
   // Get all stages (no filtering)
@@ -182,7 +181,45 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
     fetchProjectData();
   }, [fetchProjectData]);
 
- 
+  // Handle allow delivery with balance
+  const handleAllowDeliveryWithBalance = async () => {
+    if (!project) return;
+
+    setIsUpdatingDelivery(true);
+    try {
+      await allowDeliveryWithBalance(project.id);
+      const updatedProject = {
+        ...project,
+        allowToDeliverWithBalance: true,
+      } as IProject & { allowToDeliverWithBalance: boolean };
+      setProject(updatedProject);
+      toast.success('Project allowed for delivery with balance');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to allow delivery with balance');
+    } finally {
+      setIsUpdatingDelivery(false);
+    }
+  };
+
+  // Handle disallow delivery with balance
+  const handleDisallowDeliveryWithBalance = async () => {
+    if (!project) return;
+
+    setIsUpdatingDelivery(true);
+    try {
+      await disallowDeliveryWithBalance(project.id);
+      const updatedProject = {
+        ...project,
+        allowToDeliverWithBalance: false,
+      } as IProject & { allowToDeliverWithBalance: boolean };
+      setProject(updatedProject);
+      toast.success('Project disallowed for delivery with balance');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to disallow delivery with balance');
+    } finally {
+      setIsUpdatingDelivery(false);
+    }
+  };
 
   // Difficulty badge configuration
   const getDifficultyConfig = (difficulty: DifficultyLevel) => {
@@ -292,7 +329,7 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
   return (
     <div className="space-y-6">
       {/* Project Overview Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {/* Status Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -379,6 +416,69 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
                 </>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Allow Delivery with Balance Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              <span>Allow Delivery</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              {project.allowToDeliverWithBalance ? (
+                <Badge variant="secondary" className="bg-emerald-500 text-white px-3 py-1 text-sm">
+                  <ShieldCheck className="h-3 w-3 mr-1" />
+                  Allowed
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="px-3 py-1 text-sm">
+                  <ShieldOff className="h-3 w-3 mr-1" />
+                  Not Allowed
+                </Badge>
+              )}
+            </div>
+            
+            {project.allowToDeliverWithBalance ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDisallowDeliveryWithBalance}
+                disabled={isUpdatingDelivery}
+                className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:hover:bg-red-950/50"
+              >
+                {isUpdatingDelivery ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <ShieldOff className="h-4 w-4 mr-2" />
+                )}
+                Revoke Delivery Permission
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAllowDeliveryWithBalance}
+                disabled={isUpdatingDelivery}
+                className="w-full text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-900 dark:hover:bg-emerald-950/50"
+              >
+                {isUpdatingDelivery ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                )}
+                Allow Delivery with Balance
+              </Button>
+            )}
+            
+            {project.allowToDeliverWithBalance && (
+              <p className="text-xs text-muted-foreground">
+                Delivery is allowed even with pending balance
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

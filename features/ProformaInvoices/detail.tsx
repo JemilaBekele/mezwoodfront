@@ -780,21 +780,25 @@ const formatCurrency = (amount: number | undefined | null) => {
 
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
               <Select
-                value={selectedStatus}
-                onValueChange={handleStatusChange}
-                disabled={updatingStatus}
-              >
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Change status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(PIStatus).map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {getStatusConfig(status).label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+  value={selectedStatus}
+  onValueChange={handleStatusChange}
+  disabled={
+    updatingStatus ||
+    invoice.status === PIStatus.APPROVED_CREATE_PROJECT
+  }
+>
+  <SelectTrigger className="w-full sm:w-48">
+    <SelectValue placeholder="Change status" />
+  </SelectTrigger>
+
+  <SelectContent>
+    {Object.values(PIStatus).map((status) => (
+      <SelectItem key={status} value={status}>
+        {getStatusConfig(status).label}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
               
               {updatingStatus && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">

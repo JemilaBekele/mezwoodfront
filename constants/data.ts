@@ -9,6 +9,7 @@ export type Product = {
   id: number;
   category: string;
   updated_at: string;
+
 };
 
 export const navItems: NavItem[] = [
@@ -127,18 +128,34 @@ export const navItems: NavItem[] = [
       { title: 'View all Design', url: '/dashboard/Stage/Design', icon: 'penTool', shortcut: ['m', 'm'], permission: 'MANAGE_ALL_STAGES' },
       { title: 'Unassigned Design', url: '/dashboard/Stage/Design/unassigned', icon: 'userX', shortcut: ['m', 'm'], permission: 'VIEW_UNASSIGNED_DESIGN_PROJECTS' },
       { title: 'My Design', url: '/dashboard/Stage/Design/mydesign', icon: 'userCheck', shortcut: ['m', 'm'], permission: 'VIEW_DESIGN_PROJECTS_BY_DESIGNER' },
-      { title: 'Purchase', url: '/dashboard/Stage/Purchase', icon: 'shoppingCart', shortcut: ['m', 'm'], permission: 'VIEW_PURCHASING_PROJECTS' },
+      { title: 'Purchase', url: '/dashboard/Stage/Purchase', icon: 'shoppingCart', shortcut: ['m', 'm'],
+         permission: 'VIEW_PURCHASING_PROJECTS' },
       { title: 'Stock check Purchase', url: '/dashboard/Stage/Purchase/stockcheck', icon: 'search', shortcut: ['m', 'm'], permission: 'VIEW_PURCHASING_PROJECTS' },
-      { title: 'Metal Works', url: '/dashboard/Stage/metalworks', icon: 'hammer', shortcut: ['m', 'm'], permission: 'VIEW_METAL_WORK_PROJECTS' },
-      { title: 'Cnc', url: '/dashboard/Stage/cnc', icon: 'cpu', shortcut: ['m', 'm'], permission: 'VIEW_CNC_PROJECTS' },
-      { title: 'Cutting', url: '/dashboard/Stage/cutting', icon: 'scissors', shortcut: ['m', 'm'], permission: 'VIEW_CUTTING_PROJECTS' },
-      { title: 'Edge Banding', url: '/dashboard/Stage/edgebanding', icon: 'ruler', shortcut: ['m', 'm'], permission: 'VIEW_EDGE_BANDING_PROJECTS' },
-      { title: 'Assembly', url: '/dashboard/Stage/assembly', icon: 'boxes', shortcut: ['m', 'm'], permission: 'VIEW_ASSEMBLY_PROJECTS' },
-      { title: 'Painting', url: '/dashboard/Stage/painting', icon: 'paintbrush', shortcut: ['m', 'm'], permission: 'VIEW_PAINTING_PROJECTS' },
-      { title: 'Finishing', url: '/dashboard/Stage/finishing', icon: 'sparkles', shortcut: ['m', 'm'], permission: 'VIEW_FINISHED_PROJECTS' },
-      { title: 'Delivery', url: '/dashboard/Stage/delivery', icon: 'truck', shortcut: ['m', 'm'], permission: 'VIEW_DELIVERY_PROJECTS' },
+      { title: 'Metal Works', url: '/dashboard/Stage/metalworks', icon: 'hammer', shortcut: ['m', 'm'],         countKey: 'METAL_WORKS',
+
+         permission: 'VIEW_METAL_WORK_PROJECTS' },
+      { title: 'Cnc', url: '/dashboard/Stage/cnc', icon: 'cpu', shortcut: ['m', 'm'], countKey: 'CNC',        
+
+        permission: 'VIEW_CNC_PROJECTS' },
+      { title: 'Cutting', url: '/dashboard/Stage/cutting', icon: 'scissors', shortcut: ['m', 'm'],  countKey: 'CUTTING',               
+
+         permission: 'VIEW_CUTTING_PROJECTS' },
+      { title: 'Edge Banding', url: '/dashboard/Stage/edgebanding', icon: 'ruler', shortcut: ['m', 'm'],    countKey: 'EDGE_BANDING',            
+
+
+        permission: 'VIEW_EDGE_BANDING_PROJECTS' },
+      { title: 'Assembly', url: '/dashboard/Stage/assembly', icon: 'boxes', shortcut: ['m', 'm'],      countKey: 'ASSEMBLY',
+        permission: 'VIEW_ASSEMBLY_PROJECTS' },
+      { title: 'Painting', url: '/dashboard/Stage/painting', icon: 'paintbrush', shortcut: ['m', 'm'],   countKey: 'PAINTING',
+        permission: 'VIEW_PAINTING_PROJECTS' },
+      { title: 'Finishing', url: '/dashboard/Stage/finishing', icon: 'sparkles', shortcut: ['m', 'm'],  countKey: 'FINISHING',
+        permission: 'VIEW_FINISHED_PROJECTS' },
+      { title: 'Delivery', url: '/dashboard/Stage/delivery', icon: 'truck', shortcut: ['m', 'm'],  countKey: 'DELIVERY',
+        permission: 'VIEW_DELIVERY_PROJECTS' },
       { title: 'Delivery Date Comparison', url: '/dashboard/deliverydatecampare', icon: 'calendar', shortcut: ['d', 'c'], permission: 'VIEW_DELIVERY_PROJECTS' },
-      { title: 'Installation', url: '/dashboard/Stage/installation', icon: 'wrench', shortcut: ['m', 'm'], permission: 'VIEW_INSTALLATION_PROJECTS' }
+      { title: 'Installation', url: '/dashboard/Stage/installation', icon: 'wrench', shortcut: ['m', 'm'],           countKey: 'INSTALLATION',
+
+         permission: 'VIEW_INSTALLATION_PROJECTS' }
     ]
   },
 

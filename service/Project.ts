@@ -708,3 +708,36 @@ export const rescheduleProjectFromCalendar = async (
     throw error;
   }
 };
+
+
+
+export const allowDeliveryWithBalance = async (projectId: string) => {
+  try {
+    const response = await axiosInstance.put(
+      `/projects/${projectId}/allow-delivery-with-balance`,
+    );
+
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    }
+    throw error;
+  }
+};
+
+
+export const disallowDeliveryWithBalance = async (projectId: string) => {
+  try {
+    const response = await axiosInstance.put(
+      `/projects/${projectId}/disallow-delivery-with-balance`,
+    );
+
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    }
+    throw error;
+  }
+};

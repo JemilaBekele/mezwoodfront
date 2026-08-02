@@ -30,7 +30,6 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { UserAvatarProfile } from "@/components/user-avatar-profile";
-import { navItems } from "@/constants/data";
 import {
   IconChevronRight,
   IconChevronsDown,
@@ -48,7 +47,8 @@ import { useAuthStore } from "@/stores/auth.store";
 import { logout } from "@/service/authApi";
 import { toast } from "sonner";
 import { filterNavItemsWithCheckers } from "@/lib/filterNavItems";
-
+import { navItems } from "@/constants/data";
+import { getStageProjectCount } from '@/service/Stages';
 export const company = {
   name: "Acme Inc",
   logo: IconPhotoUp,
@@ -65,7 +65,9 @@ export default function AppSidebar() {
   const hasAnyPermission = useAuthStore((s) => s.hasAnyPermission);
   const hasAllPermissions = useAuthStore((s) => s.hasAllPermissions);
   const permissions = useAuthStore((s) => s.permissions);
-
+const [stageCounts, setStageCounts] = React.useState<
+  { stage: string; projectCount: number }[]
+>([]);
   const isLoading = !hydrated;
 
   // Memoize filtered nav items — no useEffect + setState needed
@@ -99,7 +101,28 @@ export default function AppSidebar() {
       toast.error("Failed to sign out");
     }
   };
+React.useEffect(() => {
+  const fetchStageCounts = async () => {
+    try {
+      const data = await getStageProjectCount();
+      setStageCounts(data);
+    } catch (error) {
+      console.error('Failed to fetch stage project counts:', error);
+    }
+  };
 
+  fetchStageCounts();
+}, []);
+const getStageCount = React.useCallback(
+  (countKey?: string) => {
+    if (!countKey) return undefined;
+
+    return stageCounts.find(
+      (item) => item.stage === countKey
+    )?.projectCount;
+  },
+  [stageCounts]
+);
   if (!user || isLoading) {
     return (
       <Sidebar collapsible="icon">
@@ -173,26 +196,38 @@ export default function AppSidebar() {
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {item.items?.map((subItem) => {
-                            const SubIcon = subItem.icon
-                              ? Icons[subItem.icon]
-                              : undefined;
-                            return (
-                              <SidebarMenuSubItem key={subItem.title}>
-                                <SidebarMenuSubButton
-                                  asChild
-                                  isActive={pathname === subItem.url}
-                                >
-                                  <Link href={subItem.url}>
-                                    {SubIcon && <SubIcon className="h-4 w-4" />}
-                                    <span>{subItem.title}</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
+                     <SidebarMenuSub>
+  {item.items?.map((subItem) => {
+    const SubIcon = subItem.icon
+      ? Icons[subItem.icon]
+      : undefined;
+
+    const count = getStageCount(subItem.countKey);
+
+    return (
+      <SidebarMenuSubItem key={subItem.title}>
+        <SidebarMenuSubButton
+          asChild
+          isActive={pathname === subItem.url}
+        >
+          <Link href={subItem.url}>
+            {SubIcon && <SubIcon className="h-4 w-4" />}
+
+            <span className="flex-1">
+              {subItem.title}
+            </span>
+
+            {count !== undefined && count > 0 && (
+              <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                {count}
+              </span>
+            )}
+          </Link>
+        </SidebarMenuSubButton>
+      </SidebarMenuSubItem>
+    );
+  })}
+</SidebarMenuSub>
                       </CollapsibleContent>
                     </SidebarMenuItem>
                   </Collapsible>
