@@ -32,7 +32,8 @@ import { getProformaInvoiceById } from '@/service/ProformaInvoice';
 import { createProject } from '@/service/Project';
 import { 
   calculateDeliveryEstimation,
-  createDeliveryEstimation 
+  createDeliveryEstimation,
+  deriveStageQuantities,
 } from '@/service/delivery-estimation';
 import { IProformaInvoice } from '@/models/ProformaInvoice';
 import { EstimationStatus } from '@/models/delivery-estimation';
@@ -142,7 +143,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
     setIsCalculating(true);
     try {
       // Prepare stage quantities from invoice items
-      const stageQuantities = prepareStageQuantities(invoiceData);
+      const stageQuantities = await prepareStageQuantities(invoiceData);
       
       const payload = {
         difficulty: form.getValues('difficulty') || DifficultyLevel.EASY,
@@ -163,7 +164,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
   };
 
   // Prepare stage quantities from invoice items
-  const prepareStageQuantities = (invoiceData: IProformaInvoice) => {
+  const prepareStageQuantities = async (invoiceData: IProformaInvoice) => {
     const quantities = {
       DESIGN: 0,
       METAL_WORKS: 0,
@@ -178,14 +179,13 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
 
     if (!invoiceData.items) return quantities;
 
-    let totalUnits = 0;
     let metalUnits = 0;
     let laminatedMDFUnits = 0;
     let plainMDFUnits = 0;
+    let woodUnits = 0;
 
     invoiceData.items.forEach((item: any) => {
       const qty = item.quantity || 1;
-      totalUnits += qty;
 
       // Check item materials
       if (item.proformaItemMaterials) {
@@ -200,22 +200,28 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
           if (mat.material?.plainMDF) {
             plainMDFUnits += materialQty * qty;
           }
+          if (mat.material?.wood) {
+            woodUnits += materialQty * qty;
+          }
         });
       }
     });
 
-    // Calculate stage quantities based on materials
-    quantities.DESIGN = Math.max(1, Math.ceil(totalUnits * 0.3));
-    quantities.METAL_WORKS = metalUnits;
-    quantities.CNC = metalUnits > 0 ? Math.ceil(metalUnits / 2) : 0;
-    quantities.CUTTING = totalUnits - metalUnits;
-    quantities.EDGE_BANDING = laminatedMDFUnits;
-    quantities.ASSEMBLY = totalUnits - metalUnits;
-    quantities.PAINTING = plainMDFUnits + metalUnits;
-    quantities.FINISHING = totalUnits;
-    quantities.DELIVERY = totalUnits;
-
-    return quantities;
+    try {
+      const result = await deriveStageQuantities({
+        materials: {
+          laminatedMDF: laminatedMDFUnits,
+          plainMDF: plainMDFUnits,
+          wood: woodUnits,
+          metal: metalUnits,
+          other: 0, // Fallback for other
+        },
+      });
+      return result.stageQuantities as any;
+    } catch {
+      toast.error('Could not calculate stage quantities. Please try again.');
+      return quantities;
+    }
   };
 
   // Handle difficulty change - recalculate estimation
@@ -225,7 +231,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
     if (invoice) {
       setIsCalculating(true);
       try {
-        const stageQuantities = prepareStageQuantities(invoice);
+        const stageQuantities = await prepareStageQuantities(invoice);
         
         const payload = {
           difficulty: difficulty,
@@ -266,7 +272,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
       // Create delivery estimation if not already created
       if (calculationResult) {
         try {
-          const stageQuantities = prepareStageQuantities(invoice!);
+          const stageQuantities = await prepareStageQuantities(invoice!);
           
           const estimationData = {
             piId: data.invoiceId,

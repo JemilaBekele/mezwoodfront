@@ -72,6 +72,7 @@ import { getProformaInvoiceById } from '@/service/ProformaInvoice';
 import {
   calculateDeliveryEstimation,
   createDeliveryEstimation,
+  deriveStageQuantities,
 } from '@/service/delivery-estimation';
 import { getItems } from '@/service/item';
 import { DifficultyLevel } from '@/models/Projects';
@@ -388,30 +389,36 @@ export default function DeliveryEstimationFromPIPage({
   }, [selectedItems]);
 
   // Calculate stage quantities from items
-  const calculateStageQuantitiesFromItems = useCallback((): StageQuantity => {
+  const calculateStageQuantitiesFromItems = useCallback(async (): Promise<StageQuantity | null> => {
     const materialTotals = calculateMaterialTotals();
     
-    const hasMetal = materialTotals.metal > 0;
-    const hasLaminatedMDF = materialTotals.laminatedMDF > 0;
-    
-    return {
-      DESIGN: materialTotals.total,
-      METAL_WORKS: hasMetal ? materialTotals.metal : 0,
-      CNC: hasMetal ? Math.ceil(materialTotals.metal / 2) : 0,
-      CUTTING: materialTotals.total - materialTotals.metal,
-      EDGE_BANDING: hasLaminatedMDF ? materialTotals.laminatedMDF : 0,
-      ASSEMBLY: materialTotals.total - materialTotals.metal,
-      PAINTING: materialTotals.plainMDF + materialTotals.wood + materialTotals.metal,
-      FINISHING: materialTotals.total,
-      DELIVERY: materialTotals.total,
-    };
+    try {
+      const result = await deriveStageQuantities({
+        materials: {
+          laminatedMDF: materialTotals.laminatedMDF,
+          plainMDF: materialTotals.plainMDF,
+          wood: materialTotals.wood,
+          metal: materialTotals.metal,
+          other: materialTotals.other,
+        },
+      });
+      return result.stageQuantities as unknown as StageQuantity;
+    } catch {
+      toast.error('Could not calculate stage quantities. Please try again.');
+      return null;
+    }
   }, [calculateMaterialTotals]);
 
-  // Auto-calculate stage quantities when items change
   useEffect(() => {
     if (!isManualMode && selectedItems.length > 0) {
-      const calculated = calculateStageQuantitiesFromItems();
-      setStageQuantities(calculated);
+      let cancelled = false;
+      (async () => {
+        const calculated = await calculateStageQuantitiesFromItems();
+        if (!cancelled && calculated) setStageQuantities(calculated);
+      })();
+      return () => {
+        cancelled = true;
+      };
     }
   }, [selectedItems, calculateStageQuantitiesFromItems, isManualMode]);
 
@@ -478,10 +485,10 @@ export default function DeliveryEstimationFromPIPage({
   };
 
   // Reset to automatic mode
-  const resetToAutomaticMode = () => {
+  const resetToAutomaticMode = async () => {
     if (selectedItems.length > 0) {
-      const calculated = calculateStageQuantitiesFromItems();
-      setStageQuantities(calculated);
+      const calculated = await calculateStageQuantitiesFromItems();
+      if (calculated) setStageQuantities(calculated);
       setIsManualMode(false);
       toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
     } else {
