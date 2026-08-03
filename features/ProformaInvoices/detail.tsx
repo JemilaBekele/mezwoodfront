@@ -1227,23 +1227,20 @@ const formatCurrency = (amount: number | undefined | null) => {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="max-w-65">
-  <div className="space-y-1">
-   <TableCell className="max-w-75">
-  <p className="wrap-break-word">
-    {formatDescription(item.description)}
-  </p>
-</TableCell>
-
-    {item.additionalDescription && (
-      <div className="text-xs text-muted-foreground">
-  <p className="wrap-break-word">
-    {formatDescription(item.additionalDescription)}
-        </p>
-      </div>
-    )}
-  </div>
-</TableCell>
+                          <TableCell className="max-w-75">
+                            <div className="space-y-1">
+                              <p className="wrap-break-word">
+                                {formatDescription(item.description)}
+                              </p>
+                              {item.additionalDescription && (
+                                <div className="text-xs text-muted-foreground">
+                                  <p className="wrap-break-word">
+                                    {formatDescription(item.additionalDescription)}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })}

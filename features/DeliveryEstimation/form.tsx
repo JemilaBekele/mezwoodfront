@@ -598,7 +598,7 @@ const formatMinutes = (minutes: number): string => {
 const watchedCustomerName = form.watch('customerName');
 
   // Reset to automatic mode
-  const resetToAutomaticMode = () => {
+  const resetToAutomaticMode = async () => {
     if (selectedItems.length > 0) {
       const calculated = await calculateStageQuantitiesFromItems();
       if (calculated) setStageQuantities(calculated);
