@@ -598,16 +598,17 @@ const formatMinutes = (minutes: number): string => {
 const watchedCustomerName = form.watch('customerName');
 
   // Reset to automatic mode
-  const resetToAutomaticMode = () => {
-    if (selectedItems.length > 0) {
-      const calculated = await calculateStageQuantitiesFromItems();
-      if (calculated) setStageQuantities(calculated);
-      setIsManualMode(false);
-      toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
-    } else {
-      toast.error('Please select items first to use automatic mode.');
-    }
-  };
+  // To this:
+const resetToAutomaticMode = async () => {
+  if (selectedItems.length > 0) {
+    const calculated = await calculateStageQuantitiesFromItems();
+    if (calculated) setStageQuantities(calculated);
+    setIsManualMode(false);
+    toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
+  } else {
+    toast.error('Please select items first to use automatic mode.');
+  }
+};
 
   // Get status badge color
   const getStatusBadge = (status: EstimationStatus) => {
