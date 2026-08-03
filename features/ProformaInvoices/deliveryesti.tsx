@@ -504,15 +504,7 @@ export default function DeliveryEstimationFromPIPage({
       const calculationPayload: any = {
         difficulty: values.difficulty,
         stageQuantities: stageQuantities,
-        piId: piId,
       };
-      
-      if (!isManualMode && selectedItems.length > 0) {
-        calculationPayload.items = selectedItems.map(item => ({
-          itemId: item.itemId,
-          quantity: item.quantity,
-        }));
-      }
 
       const result = await calculateDeliveryEstimation(calculationPayload);
       

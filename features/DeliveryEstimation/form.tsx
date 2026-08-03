@@ -566,13 +566,6 @@ export default function DeliveryEstimationForm({
         difficulty: values.difficulty,
         stageQuantities: stageQuantities,
       };
-      
-      if (!isManualMode && selectedItems.length > 0) {
-        calculationPayload.items = selectedItems.map(item => ({
-          itemId: item.itemId,
-          quantity: item.quantity
-        }));
-      }
 
       const result = await calculateDeliveryEstimation(calculationPayload);
       

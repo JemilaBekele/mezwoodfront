@@ -147,11 +147,6 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
       const payload = {
         difficulty: form.getValues('difficulty') || DifficultyLevel.EASY,
         stageQuantities: stageQuantities,
-        piId: id,
-        items: invoiceData.items?.map((item: any) => ({
-          itemId: item.itemId || item.id,
-          quantity: item.quantity || 1,
-        })) || []
       };
 
       const result = await calculateDeliveryEstimation(payload);
@@ -235,11 +230,6 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
         const payload = {
           difficulty: difficulty,
           stageQuantities: stageQuantities,
-          piId: id,
-          items: invoice.items?.map((item: any) => ({
-            itemId: item.itemId || item.id,
-            quantity: item.quantity || 1,
-          })) || []
         };
 
         const result = await calculateDeliveryEstimation(payload);
