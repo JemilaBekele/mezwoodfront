@@ -271,28 +271,23 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
       }
 
       // Create delivery estimation if not already created
+      let createdEstimationCode: string | undefined = undefined;
       if (calculationResult) {
         try {
-          const stageQuantities = await prepareStageQuantities(invoice!);
-          
           const estimationData = {
             piId: data.invoiceId,
             difficulty: data.difficulty,
-            status: EstimationStatus.ESTIMATED,
-            DESIGN: stageQuantities.DESIGN,
-            METAL_WORKS: stageQuantities.METAL_WORKS,
-            CNC: stageQuantities.CNC,
-            CUTTING: stageQuantities.CUTTING,
-            EDGE_BANDING: stageQuantities.EDGE_BANDING,
-            ASSEMBLY: stageQuantities.ASSEMBLY,
-            PAINTING: stageQuantities.PAINTING,
-            FINISHING: stageQuantities.FINISHING,
-            DELIVERY: stageQuantities.DELIVERY,
+            status: EstimationStatus.ESTIMATED, // Use enum value
+            // Spread the calculated stage quantities here
+            ...calculationResult.stageQuantitiesCalculated, // Ensure your API returns this
             customerName: invoice?.customer?.name || '',
             phone: invoice?.customer?.phone1 || '',
           };
 
-          await createDeliveryEstimation(estimationData);
+          const estimationResponse = await createDeliveryEstimation(estimationData);
+          if (estimationResponse?.estimation?.code) {
+            createdEstimationCode = estimationResponse.estimation.code;
+          }
         } catch (estimationError) {
           console.warn('Failed to create delivery estimation:', estimationError);
           // Continue with project creation even if estimation creation fails
@@ -304,6 +299,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
         customerId: invoice?.customerId,
         difficulty: data.difficulty,
         requestedDelivery: data.requestedDelivery,
+        ...(createdEstimationCode && { deliveryEstimationcode: createdEstimationCode })
       };
 
       await createProject(projectData);
