@@ -16,6 +16,7 @@ import { AlertModal } from '@/components/modal/alert-modal';
 
 import {
   IconDotsVertical,
+  IconEye,
   IconTrash} from '@tabler/icons-react';
 
 import {
@@ -29,6 +30,7 @@ import {
   confirmDeliveryEstimation,
 } from '@/service/delivery-estimation';
 import CreateProjectFromEstimationModal from './CreateProjectFromEstimationModal';
+import DeliveryEstimationDetailModal from './DeliveryEstimationDetailModal';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
@@ -42,6 +44,7 @@ export const DeliveryEstimationCellAction: React.FC<
   const [loading, setLoading] = useState(false);
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [openCreateProjectModal, setOpenCreateProjectModal] = useState(false); // ⭐ NEW STATE
+  const [openDetailModal, setOpenDetailModal] = useState(false);
 
   const router = useRouter();
 
@@ -105,6 +108,12 @@ export const DeliveryEstimationCellAction: React.FC<
 
   return (
     <>
+      <DeliveryEstimationDetailModal 
+        isOpen={openDetailModal}
+        onClose={() => setOpenDetailModal(false)}
+        estimation={data}
+      />
+
       {/* ⭐ Create Project Modal */}
       <CreateProjectFromEstimationModal
         isOpen={openCreateProjectModal}
@@ -133,6 +142,10 @@ export const DeliveryEstimationCellAction: React.FC<
 
 
  
+          <DropdownMenuItem onClick={() => setOpenDetailModal(true)}>
+            <IconEye className="mr-2 h-4 w-4" />
+            View Details
+          </DropdownMenuItem>
        
   <PermissionGuard
             requiredPermission={PERMISSIONS.DELIVERY_ESTIMATION.DELETE.name}

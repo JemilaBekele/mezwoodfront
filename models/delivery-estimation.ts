@@ -54,6 +54,7 @@ export interface IDeliveryEstimation {
 
   // Set once converted — the queryable other side of Project.deliveryEstimationcode.
   projectId?: string | null;
+  piId?: string | null;
 
   status: EstimationStatus;
 
