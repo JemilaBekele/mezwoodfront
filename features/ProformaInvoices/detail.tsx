@@ -789,29 +789,29 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         
         {/* Status & Control Card */}
-        <Card className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-md">
+        <Card className="rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Current Status</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Current Status</span>
                 <span className={`h-2.5 w-2.5 rounded-full ${statusConfig.dotClass} animate-pulse`} />
               </div>
               <div className="mt-2 flex items-center space-x-2.5">
                 <statusConfig.icon className={`h-6 w-6 ${statusConfig.textClass}`} />
-                <h3 className="text-xl font-bold tracking-tight text-white">{statusConfig.label}</h3>
+                <h3 className="text-xl font-bold tracking-tight text-slate-900">{statusConfig.label}</h3>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Created on {formatDate(invoice.createdAt)}</p>
+              <p className="text-xs text-slate-500 mt-1">Created on {formatDate(invoice.createdAt)}</p>
             </div>
 
-            <div className="pt-3 border-t border-slate-700/80 space-y-2">
-              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Change Status</label>
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Change Status</label>
               <Select value={selectedStatus} onValueChange={handleStatusChange} disabled={updatingStatus || invoice.status === PIStatus.APPROVED_CREATE_PROJECT}>
-                <SelectTrigger className="w-full h-9 rounded-lg border-slate-700 bg-slate-800/90 text-white text-xs font-medium focus:ring-emerald-500">
+                <SelectTrigger className="w-full h-9 rounded-lg border-slate-300 bg-white text-slate-900 text-xs font-medium focus:ring-slate-900">
                   <SelectValue placeholder="Update status" />
                 </SelectTrigger>
-                <SelectContent className="rounded-lg border-slate-700 bg-slate-900 text-white">
+                <SelectContent className="rounded-lg border-slate-200 bg-white text-slate-900">
                   {Object.values(PIStatus).map((status) => (
-                    <SelectItem key={status} value={status} className="text-xs focus:bg-slate-800 focus:text-white">
+                    <SelectItem key={status} value={status} className="text-xs focus:bg-slate-50 focus:text-slate-900">
                       {getStatusConfig(status).label}
                     </SelectItem>
                   ))}
