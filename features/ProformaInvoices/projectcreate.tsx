@@ -183,6 +183,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
     let laminatedMDFUnits = 0;
     let plainMDFUnits = 0;
     let woodUnits = 0;
+    let otherUnits = 0;
 
     invoiceData.items.forEach((item: any) => {
       const qty = item.quantity || 1;
@@ -191,17 +192,17 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
       if (item.proformaItemMaterials) {
         item.proformaItemMaterials.forEach((mat: any) => {
           const materialQty = mat.quantity || 1;
-          if (mat.material?.metal) {
+          const m = mat.material;
+          if (m?.metal) {
             metalUnits += materialQty * qty;
-          }
-          if (mat.material?.laminatedMDF) {
+          } else if (m?.laminatedMDF) {
             laminatedMDFUnits += materialQty * qty;
-          }
-          if (mat.material?.plainMDF) {
+          } else if (m?.plainMDF) {
             plainMDFUnits += materialQty * qty;
-          }
-          if (mat.material?.wood) {
+          } else if (m?.wood) {
             woodUnits += materialQty * qty;
+          } else {
+            otherUnits += materialQty * qty;
           }
         });
       }
@@ -214,7 +215,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
           plainMDF: plainMDFUnits,
           wood: woodUnits,
           metal: metalUnits,
-          other: 0, // Fallback for other
+          other: otherUnits,
         },
       });
       return result.stageQuantities as any;
