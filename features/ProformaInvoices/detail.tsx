@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,12 +39,19 @@ import {
   Phone,
   MapPin,
   ArrowRight,
+  ArrowLeft,
   Image as ImageIcon,
   AlertTriangle,
   Store,
   CreditCard,
   History,
   Clock,
+  ChevronRight,
+  Plus,
+  Percent,
+  TrendingUp,
+  ShieldCheck,
+  Paperclip,
 } from 'lucide-react';
 import {
   Table,
@@ -131,17 +138,16 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<PIStatus | null>(null);
   
-  // Customer search state
+  // Customer state
   const [customers, setCustomers] = useState<any[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   
-  // Add bank state
+  // Bank state
   const [banks, setBanks] = useState<IBank[]>([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
   
-  // Update payment data state to include bankId
+  // Payment form state
   const [paymentData, setPaymentData] = useState({
     amountPaid: 0,
     amountDate: new Date().toISOString().split('T')[0],
@@ -151,34 +157,6 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
 
   // Check if this is a store invoice
   const isStoreInvoice = invoice?.store === true;
-  const getPaymentStatusVariant = (
-    status: string
-  ): 'default' | 'destructive' | 'outline' | 'secondary' => {
-    switch (status) {
-      case 'PAID':
-        return 'default';
-      case 'PARTIAL':
-        return 'secondary';
-      case 'PENDING':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
-
-  // Filter customers based on search term
-  const filteredCustomers = useMemo(() => {
-    if (!searchTerm) return customers;
-    
-    const term = searchTerm.toLowerCase();
-    return customers.filter(customer => 
-      customer.name.toLowerCase().includes(term) ||
-      (customer.companyName && customer.companyName.toLowerCase().includes(term)) ||
-      (customer.phone1 && customer.phone1.includes(term)) ||
-      (customer.email && customer.email.toLowerCase().includes(term)) ||
-      (customer.tinNumber && customer.tinNumber.includes(term))
-    );
-  }, [customers, searchTerm]);
 
   // Fetch invoice data
   useEffect(() => {
@@ -189,7 +167,6 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
           setInvoice(invoiceData);
           setSelectedStatus(invoiceData.status);
           
-          // Find and set selected customer from invoice
           if (invoiceData.customerId && customers.length > 0) {
             const customer = customers.find(c => c.id === invoiceData.customerId);
             setSelectedCustomer(customer || null);
@@ -224,7 +201,7 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     fetchCustomers();
   }, []);
 
-  // Fetch banks when payment dialog opens (only for non-store invoices)
+  // Fetch banks when payment dialog opens
   useEffect(() => {
     const fetchBanksData = async () => {
       if (paymentDialogOpen && !isStoreInvoice) {
@@ -233,7 +210,6 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
           const banksData = await getBanks();
           setBanks(banksData);
           
-          // Set default bank if banks exist
           if (banksData.length > 0 && !paymentData.bankId) {
             setPaymentData(prev => ({
               ...prev,
@@ -252,7 +228,7 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     fetchBanksData();
   }, [paymentData.bankId, paymentDialogOpen, isStoreInvoice]);
 
-  // Handle status change - shows alert immediately when status is selected
+  // Handle status change
   const handleStatusChange = (value: PIStatus) => {
     setSelectedStatus(value);
     if (value !== invoice?.status) {
@@ -271,16 +247,15 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
 
     setUpdatingStatus(true);
     try {
-      const updated = await updateProformaInvoiceStatus(id, pendingStatus);
+      await updateProformaInvoiceStatus(id, pendingStatus);
       setInvoice((prev) => (prev ? { ...prev, status: pendingStatus } : null));
       toast.success(`Status updated to ${getStatusConfig(pendingStatus).label} successfully`);
       
-      // If status is APPROVED_CREATE_PROJECT, redirect to project creation page with proforma invoice ID
       if (pendingStatus === PIStatus.APPROVED_CREATE_PROJECT) {
         toast.success('Redirecting to project creation...');
         setTimeout(() => {
           router.push(`/dashboard/ProformaInvoice/Project?id=${id}`);
-        }, 1500);
+        }, 1200);
       }
     } catch (error: any) {
       toast.error('Failed to update status');
@@ -292,7 +267,7 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     }
   };
 
-  // Handle payment addition request (only for non-store invoices)
+  // Handle payment addition request
   const handlePaymentRequest = () => {
     if (!paymentData.amountPaid || paymentData.amountPaid <= 0) {
       toast.error('Please enter a valid payment amount');
@@ -317,7 +292,7 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     setShowPaymentAlert(true);
   };
 
-  // Handle payment addition confirm (only for non-store invoices)
+  // Handle payment addition confirm
   const handlePaymentConfirm = async () => {
     if (!id || !paymentData.amountPaid || paymentData.amountPaid <= 0) {
       setShowPaymentAlert(false);
@@ -333,7 +308,6 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
         paidBy: paymentData.paidBy,
       });
 
-      // Refresh invoice data
       const updatedInvoice = await getProformaInvoiceById(id);
       setInvoice(updatedInvoice);
 
@@ -377,61 +351,61 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     if (newStatus === PIStatus.APPROVED_CREATE_PROJECT) {
       return {
         title: 'Confirm Project Creation',
-        description: `Are you sure you want to approve this invoice and create a project? This will mark the invoice as "Approved - Create Project" and redirect you to the project creation page.`,
+        description: `Approve this invoice and proceed to create a new project? This will change status to "Approved - Create Project" and redirect to the project workflow.`,
         variant: 'default'
       };
     } else if (newStatus === PIStatus.APPROVED_ST) {
       return {
         title: 'Confirm Approval',
-        description: `Are you sure you want to approve this invoice? This will change the status from ${currentStatus} to ${statusConfig.label}.`,
+        description: `Approve this invoice? Status will update from ${currentStatus} to ${statusConfig.label}.`,
         variant: 'default'
       };
     } else if (newStatus === PIStatus.SENT_TO_CLIENT) {
       return {
         title: 'Confirm Send to Client',
-        description: `Are you sure you want to mark this invoice as sent to client? This will change the status from ${currentStatus} to ${statusConfig.label}.`,
+        description: `Mark invoice as sent to client? Status will change from ${currentStatus} to ${statusConfig.label}.`,
         variant: 'default'
       };
     } else if (newStatus === PIStatus.APPROVED_CLIENT) {
       return {
         title: 'Confirm Client Approval',
-        description: `Are you sure you want to mark this invoice as client approved? This will change the status from ${currentStatus} to ${statusConfig.label}.`,
+        description: `Mark invoice as approved by client? Status will change from ${currentStatus} to ${statusConfig.label}.`,
         variant: 'default'
       };
     } else if (newStatus === PIStatus.REVISION) {
       return {
         title: 'Confirm Revision Request',
-        description: `Are you sure you want to request revisions for this invoice? This will change the status from ${currentStatus} to ${statusConfig.label}.`,
+        description: `Request revisions for this invoice? Status will change from ${currentStatus} to ${statusConfig.label}.`,
         variant: 'destructive'
       };
     } else if (newStatus === PIStatus.CANCELLED) {
       return {
         title: 'Confirm Cancellation',
-        description: `Are you sure you want to cancel this invoice? This action cannot be undone.`,
+        description: `Cancel this invoice? This action is permanent.`,
         variant: 'destructive'
       };
     }
     
     return {
       title: 'Confirm Status Change',
-      description: `Are you sure you want to change the status from ${currentStatus} to ${statusConfig.label}?`,
+      description: `Change status from ${currentStatus} to ${statusConfig.label}?`,
       variant: 'default'
     };
   };
 
-  // Get payment alert message (only for non-store invoices)
+  // Get payment alert message
   const getPaymentAlertMessage = () => {
     const newBalance = (invoice?.balance || 0) - paymentData.amountPaid;
     const isFullyPaid = newBalance === 0;
     
     return {
-      title: 'Confirm Payment',
-      description: `Are you sure you want to record a payment of ${formatCurrency(paymentData.amountPaid)}?`,
+      title: 'Confirm Payment Entry',
+      description: `Record a payment of ${formatCurrency(paymentData.amountPaid)}?`,
       details: [
         `Amount: ${formatCurrency(paymentData.amountPaid)}`,
         `Current Balance: ${formatCurrency(invoice?.balance || 0)}`,
         `New Balance: ${formatCurrency(newBalance)}`,
-        isFullyPaid ? 'This will fully pay off the invoice.' : `Remaining balance after payment: ${formatCurrency(newBalance)}`,
+        isFullyPaid ? 'This payment will fully settle the invoice balance.' : `Remaining balance after payment: ${formatCurrency(newBalance)}`,
       ],
       isFullyPaid
     };
@@ -442,116 +416,155 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return 0;
     return item.proformaItemMaterials.reduce((total, material) => total + material.quantity, 0);
   };
+
   // Get all images for an item
   const getAllImages = (item: IProformaInvoiceItem): IProformaInvoiceItemImage[] => {
     return item.images || [];
   };
 
-  // Status badge configuration
+  // Status badge configuration with executive color system
   const getStatusConfig = (status: PIStatus) => {
     const config = {
       [PIStatus.PENDING_ST]: {
-        label: 'Pending',
+        label: 'Pending Approval',
         variant: 'secondary' as const,
         icon: AlertCircle,
-        color: 'text-yellow-500',
-        bgColor: 'bg-yellow-50 border-yellow-200',
+        badgeClass: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+        textClass: 'text-amber-600',
+        dotClass: 'bg-amber-500',
       },
       [PIStatus.APPROVED_ST]: {
         label: 'Approved',
         variant: 'default' as const,
         icon: Check,
-        color: 'text-green-500',
-        bgColor: 'bg-green-50 border-green-200',
+        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+        textClass: 'text-emerald-600',
+        dotClass: 'bg-emerald-500',
       },
       [PIStatus.APPROVED_CREATE_PROJECT]: {
         label: 'Approved - Create Project',
         variant: 'default' as const,
         icon: ArrowRight,
-        color: 'text-green-600',
-        bgColor: 'bg-green-50 border-green-300',
+        badgeClass: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100',
+        textClass: 'text-teal-600',
+        dotClass: 'bg-teal-500',
       },
       [PIStatus.SENT_TO_CLIENT]: {
         label: 'Sent to Client',
         variant: 'outline' as const,
         icon: Mail,
-        color: 'text-blue-500',
-        bgColor: 'bg-blue-50 border-blue-200',
+        badgeClass: 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100',
+        textClass: 'text-sky-600',
+        dotClass: 'bg-sky-500',
       },
       [PIStatus.REVISION]: {
-        label: 'Revision',
+        label: 'Under Revision',
         variant: 'destructive' as const,
         icon: RefreshCw,
-        color: 'text-orange-500',
-        bgColor: 'bg-orange-50 border-orange-200',
+        badgeClass: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
+        textClass: 'text-orange-600',
+        dotClass: 'bg-orange-500',
       },
       [PIStatus.APPROVED_CLIENT]: {
         label: 'Client Approved',
         variant: 'default' as const,
         icon: FileCheck,
-        color: 'text-green-600',
-        bgColor: 'bg-green-50 border-green-200',
+        badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
+        textClass: 'text-indigo-600',
+        dotClass: 'bg-indigo-500',
       },
       [PIStatus.CANCELLED]: {
         label: 'Cancelled',
         variant: 'destructive' as const,
         icon: FileX,
-        color: 'text-red-500',
-        bgColor: 'bg-red-50 border-red-200',
+        badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
+        textClass: 'text-rose-600',
+        dotClass: 'bg-rose-500',
       },
     };
-    return config[status];
+    return config[status] || {
+      label: status,
+      variant: 'outline' as const,
+      icon: Info,
+      badgeClass: 'bg-slate-50 text-slate-700 border-slate-200',
+      textClass: 'text-slate-600',
+      dotClass: 'bg-slate-400',
+    };
   };
-const formatDescription = (text: string, limit = 80) => {
-  if (text.length <= limit) return text;
 
-  const firstLine = text.slice(0, limit);
-  const secondLine = text.slice(limit);
+  const getPaymentBadgeClass = (status: string) => {
+    switch (status) {
+      case 'PAID':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'PARTIAL':
+        return 'bg-amber-100 text-amber-800 border-amber-300';
+      case 'PENDING':
+        return 'bg-rose-100 text-rose-800 border-rose-300';
+      default:
+        return 'bg-slate-100 text-slate-800 border-slate-300';
+    }
+  };
 
-  return (
-    <>
-      {firstLine}
-      <br />
-      {secondLine}
-    </>
-  );
-};
-  // Format currency
-// Format currency with safety checks
-const formatCurrency = (amount: number | undefined | null) => {
-  // Handle undefined, null, or NaN
-  if (amount === undefined || amount === null || isNaN(amount)) {
-    return 'ETB 0.00';
-  }
-  
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'ETB',
-  }).format(amount);
-};
+  const formatDescription = (text: string, limit = 80) => {
+    if (!text) return '-';
+    if (text.length <= limit) return text;
 
-  // Handle create project button click
+    const firstLine = text.slice(0, limit);
+    const secondLine = text.slice(limit);
+
+    return (
+      <>
+        {firstLine}
+        <br />
+        {secondLine}
+      </>
+    );
+  };
+
+  const formatCurrency = (amount: number | undefined | null) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return 'ETB 0.00';
+    }
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'ETB',
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
+
   const handleCreateProject = () => {
     router.push(`/dashboard/ProformaInvoice/Project?id=${id}`);
   };
-    const handleCreateDeliveryEstimation = () => {
+
+  const handleCreateDeliveryEstimation = () => {
     router.push(`/dashboard/ProformaInvoice/deliveryestimation?piId=${id}`);
   };
 
-  // Loading state
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="mr-2 h-8 w-8 animate-spin" />
-        <p>Loading invoice details...</p>
+      <div className="flex h-[70vh] flex-col items-center justify-center space-y-4">
+        <div className="relative flex items-center justify-center">
+          <div className="h-14 w-14 rounded-full border-4 border-slate-200 border-t-slate-900 animate-spin"></div>
+          <FileText className="absolute h-6 w-6 text-slate-700" />
+        </div>
+        <p className="text-sm font-medium tracking-wide text-slate-500">Loading proforma invoice details...</p>
       </div>
     );
   }
 
   if (!invoice) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p>Proforma invoice not found</p>
+      <div className="flex h-[60vh] flex-col items-center justify-center space-y-4 text-center">
+        <div className="rounded-full bg-rose-50 p-4 text-rose-500">
+          <AlertCircle className="h-10 w-10" />
+        </div>
+        <h2 className="text-xl font-semibold text-slate-900">Invoice Not Found</h2>
+        <p className="text-sm text-slate-500 max-w-md">The requested proforma invoice could not be found or may have been deleted.</p>
+        <Button onClick={() => router.push('/dashboard/ProformaInvoice')} variant="outline" className="mt-2">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Invoices
+        </Button>
       </div>
     );
   }
@@ -562,55 +575,135 @@ const formatCurrency = (amount: number | undefined | null) => {
   const alertMessage = getStatusAlertMessage();
   const paymentAlert = getPaymentAlertMessage();
 
+  // Financial statistics calculations
+  const paidPercent = invoice.total > 0 ? Math.min(100, Math.max(0, (invoice.amountPaid / invoice.total) * 100)) : 0;
+  const totalItemsCount = invoice.items.length;
+  const totalQtyCount = invoice.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+  // Initials for avatar
+  const getCustomerInitials = (name?: string) => {
+    if (!name) return 'CU';
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
   return (
-    <div className="container mx-auto space-y-6 p-4 md:p-6 lg:p-8">
-    
+    <div className="mx-auto max-w-7xl space-y-8 p-4 md:p-8 animate-in fade-in duration-500">
+      
+      {/* Top Navigation & Breadcrumb */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
+        <div className="flex items-center space-x-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push('/dashboard/ProformaInvoice')}
+            className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="space-y-0.5">
+            <div className="flex items-center space-x-2 text-xs font-medium text-slate-500">
+              <span className="cursor-pointer hover:text-slate-800" onClick={() => router.push('/dashboard/ProformaInvoice')}>Proforma Invoices</span>
+              <ChevronRight className="h-3 w-3 text-slate-400" />
+              <span className="font-mono text-slate-700">#{invoice.piNumber}</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                #{invoice.piNumber}
+              </h1>
+              {isStoreInvoice && (
+                <Badge variant="outline" className="rounded-full border-blue-200 bg-blue-50 text-blue-700 text-xs px-2.5 py-0.5 font-medium flex items-center gap-1">
+                  <Store className="h-3 w-3" />
+                  Store Invoice
+                </Badge>
+              )}
+              <Badge variant="outline" className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${getPaymentBadgeClass(invoice.paymentStatus)}`}>
+                {invoice.paymentStatus}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {/* Primary Action Buttons Group */}
+        <div className="flex flex-wrap items-center gap-2">
+          <ProformaInvoicePrinter invoice={invoice} items={invoice.items} totalPrice={invoice.total} />
+          <ProformaInvoicePDFGenerator invoice={invoice} items={invoice.items} totalPrice={invoice.total} />
+          {id && <SendToClientButton invoiceId={id} />}
+          
+          <PermissionGuard requiredPermission={PERMISSIONS.DELIVERY_ESTIMATION.CREATE.name}>
+            <Button
+              onClick={handleCreateDeliveryEstimation}
+              variant="outline"
+              className="h-9 rounded-lg border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm font-medium text-xs px-3"
+            >
+              <Package className="mr-1.5 h-3.5 w-3.5 text-slate-500" />
+              Estimate
+            </Button>
+          </PermissionGuard>
+
+          <PermissionGuard requiredPermission={PERMISSIONS.PROJECT.CREATE.name}>
+            {invoice.status === PIStatus.APPROVED_CREATE_PROJECT && (
+              <Button
+                onClick={handleCreateProject}
+                className="h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold text-xs px-4"
+              >
+                <ArrowRight className="mr-1.5 h-4 w-4" />
+                Create Project
+              </Button>
+            )}
+          </PermissionGuard>
+        </div>
+      </div>
+
       {/* Status Update Alert Dialog */}
       <AlertDialog open={showStatusAlert} onOpenChange={setShowStatusAlert}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+            <AlertDialogTitle className="flex items-center gap-2 text-slate-900">
               {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && (
-                <ArrowRight className="h-5 w-5 text-green-600" />
+                <ArrowRight className="h-5 w-5 text-emerald-600" />
               )}
               {pendingStatus === PIStatus.CANCELLED && (
-                <AlertTriangle className="h-5 w-5 text-red-600" />
+                <AlertTriangle className="h-5 w-5 text-rose-600" />
               )}
               {pendingStatus === PIStatus.REVISION && (
                 <RefreshCw className="h-5 w-5 text-orange-600" />
               )}
               {alertMessage.title}
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-slate-600 text-sm mt-1">
               {alertMessage.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
           
-          {/* Additional warnings based on status */}
           {pendingStatus === PIStatus.CANCELLED && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-700 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
+            <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+              <p className="text-xs text-rose-700 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
                 Warning: Cancelling this invoice is permanent and cannot be undone.
               </p>
             </div>
           )}
           
           {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-sm text-green-700 flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                You will be redirected to create a project for this invoice.
+            <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-xs text-emerald-700 flex items-center gap-2">
+                <Info className="h-4 w-4 shrink-0" />
+                You will be automatically redirected to project setup after confirmation.
               </p>
             </div>
           )}
           
-          <AlertDialogFooter>
+          <AlertDialogFooter className="mt-4">
             <AlertDialogCancel 
+              className="rounded-lg border-slate-200"
               onClick={() => {
                 setShowStatusAlert(false);
                 setPendingStatus(null);
-                // Reset selected status back to current invoice status
                 setSelectedStatus(invoice.status);
               }}
             >
@@ -621,10 +714,10 @@ const formatCurrency = (amount: number | undefined | null) => {
               disabled={updatingStatus}
               className={
                 pendingStatus === PIStatus.CANCELLED
-                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  ? 'rounded-lg bg-rose-600 hover:bg-rose-700 text-white'
                   : pendingStatus === PIStatus.APPROVED_CREATE_PROJECT
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : ''
+                  ? 'rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'rounded-lg bg-slate-900 hover:bg-slate-800 text-white'
               }
             >
               {updatingStatus ? (
@@ -640,43 +733,43 @@ const formatCurrency = (amount: number | undefined | null) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Payment Confirmation Alert Dialog - Only show for non-store invoices */}
+      {/* Payment Confirmation Alert Dialog */}
       {!isStoreInvoice && (
         <AlertDialog open={showPaymentAlert} onOpenChange={setShowPaymentAlert}>
-          <AlertDialogContent>
+          <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl max-w-md">
             <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <Banknote className="h-5 w-5 text-green-600" />
+              <AlertDialogTitle className="flex items-center gap-2 text-slate-900">
+                <Banknote className="h-5 w-5 text-emerald-600" />
                 {paymentAlert.title}
               </AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription className="text-slate-600 text-sm">
                 {paymentAlert.description}
               </AlertDialogDescription>
             </AlertDialogHeader>
             
-            <div className="mt-4 space-y-2">
+            <div className="mt-3 space-y-2 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
               {paymentAlert.details.map((detail, index) => (
-                <p key={index} className="text-sm">
+                <p key={index} className="text-xs font-mono text-slate-700">
                   {detail}
                 </p>
               ))}
             </div>
             
             {paymentAlert.isFullyPaid && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-                <p className="text-sm text-green-700 flex items-center gap-2">
-                  <Check className="h-4 w-4" />
-                  This payment will fully settle the invoice.
+              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <p className="text-xs text-emerald-700 flex items-center gap-2 font-medium">
+                  <Check className="h-4 w-4 text-emerald-600" />
+                  This payment will fully settle the invoice balance.
                 </p>
               </div>
             )}
             
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogFooter className="mt-4">
+              <AlertDialogCancel className="rounded-lg border-slate-200">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handlePaymentConfirm}
                 disabled={addingPayment}
-                className="bg-green-600 hover:bg-green-700"
+                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {addingPayment ? (
                   <>
@@ -692,552 +785,447 @@ const formatCurrency = (amount: number | undefined | null) => {
         </AlertDialog>
       )}
 
-      {/* Header Section */}
-      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-              Proforma Invoice #{invoice.piNumber}
-            </h1>
-            {isStoreInvoice && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                <Store className="mr-1 h-3 w-3" />
-                Store
-              </Badge>
-            )}
-                <Badge variant={getPaymentStatusVariant(invoice.paymentStatus)}>
-                <CreditCard className='mr-1 h-3 w-3' />
-                {invoice.paymentStatus}
-              </Badge>
-          </div>
-          <p className="text-muted-foreground mt-2 flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            Created on {formatDate(invoice.createdAt)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          
-          <ProformaInvoicePrinter 
-    invoice={invoice}
-    items={invoice.items}
-    totalPrice={invoice.total}
-  />
+      {/* Executive Overview Banner & KPI Cards */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        
+        {/* Status & Control Card */}
+        <Card className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-md">
+          <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Current Status</span>
+                <span className={`h-2.5 w-2.5 rounded-full ${statusConfig.dotClass} animate-pulse`} />
+              </div>
+              <div className="mt-2 flex items-center space-x-2.5">
+                <statusConfig.icon className={`h-6 w-6 ${statusConfig.textClass}`} />
+                <h3 className="text-xl font-bold tracking-tight text-white">{statusConfig.label}</h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Created on {formatDate(invoice.createdAt)}</p>
+            </div>
 
-          
-           <ProformaInvoicePDFGenerator 
-    invoice={invoice}
-    items={invoice.items}
-    totalPrice={invoice.total}
-  />
-{id && <SendToClientButton invoiceId={id} />}
+            <div className="pt-3 border-t border-slate-700/80 space-y-2">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Change Status</label>
+              <Select value={selectedStatus} onValueChange={handleStatusChange} disabled={updatingStatus || invoice.status === PIStatus.APPROVED_CREATE_PROJECT}>
+                <SelectTrigger className="w-full h-9 rounded-lg border-slate-700 bg-slate-800/90 text-white text-xs font-medium focus:ring-emerald-500">
+                  <SelectValue placeholder="Update status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-lg border-slate-700 bg-slate-900 text-white">
+                  {Object.values(PIStatus).map((status) => (
+                    <SelectItem key={status} value={status} className="text-xs focus:bg-slate-800 focus:text-white">
+                      {getStatusConfig(status).label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
-                      <PermissionGuard requiredPermission={PERMISSIONS.PROJECT.CREATE.name}>
+        {/* Total Financial Stat Card */}
+        <Card className="rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Grand Total</p>
+                <h2 className="text-3xl font-black text-slate-900 font-mono tracking-tight mt-1">
+                  {formatCurrency(invoice.total)}
+                </h2>
+              </div>
+              <div className="rounded-xl bg-slate-100 p-2.5 text-slate-700">
+                <DollarSign className="h-5 w-5" />
+              </div>
+            </div>
 
-          {invoice.status === PIStatus.APPROVED_CREATE_PROJECT && (
-            <Button 
-              variant="default" 
-              size="sm"
-              onClick={handleCreateProject}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <ArrowRight className="mr-2 h-4 w-4" />
-              Create Project
-            </Button>
-          )}          </PermissionGuard>
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 text-xs">
+              <div>
+                <span className="text-slate-400 text-[10px] font-semibold uppercase block">Subtotal</span>
+                <span className="font-mono font-bold text-slate-700">{formatCurrency(invoice.subtotal)}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] font-semibold uppercase block">VAT</span>
+                <span className="font-mono font-bold text-slate-700">{formatCurrency(invoice.vat || 0)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                      <PermissionGuard requiredPermission={PERMISSIONS.DELIVERY_ESTIMATION.CREATE.name}>
+        {/* Payment Balance Progress Stat Card */}
+        <Card className="rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Payment Balance</p>
+                <div className="flex items-baseline space-x-2 mt-1">
+                  <span className="text-2xl font-black font-mono text-emerald-700">{formatCurrency(invoice.amountPaid)}</span>
+                  <span className="text-xs text-slate-400 font-mono">paid</span>
+                </div>
+              </div>
+              <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
+                <CreditCard className="h-5 w-5" />
+              </div>
+            </div>
 
-                <Button 
-              variant="default" 
-              size="sm"
-              onClick={handleCreateDeliveryEstimation}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <ArrowRight className="mr-2 h-4 w-4" />
-              Create Delivery Estimation
-            </Button>
-            </PermissionGuard>
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 text-[11px] font-medium">Balance Due: <strong className="font-mono text-amber-700 font-bold">{formatCurrency(invoice.balance)}</strong></span>
+                <span className="font-mono font-bold text-emerald-700">{paidPercent.toFixed(0)}%</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-500 rounded-full"
+                  style={{ width: `${paidPercent}%` }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        </div>
       </div>
 
-      {/* Status Update Card */}
-      <Card className="shadow-lg">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <statusConfig.icon className={`h-5 w-5 ${statusConfig.color}`} />
-            Invoice Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className={`rounded-lg px-4 py-3 ${statusConfig.bgColor} border`}>
-              <Badge variant={statusConfig.variant} className="px-3 py-1 text-sm">
-                <statusConfig.icon className="mr-2 h-4 w-4" />
-                {statusConfig.label}
-              </Badge>
-            </div>
-
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <Select
-  value={selectedStatus}
-  onValueChange={handleStatusChange}
-  disabled={
-    updatingStatus ||
-    invoice.status === PIStatus.APPROVED_CREATE_PROJECT
-  }
->
-  <SelectTrigger className="w-full sm:w-48">
-    <SelectValue placeholder="Change status" />
-  </SelectTrigger>
-
-  <SelectContent>
-    {Object.values(PIStatus).map((status) => (
-      <SelectItem key={status} value={status}>
-        {getStatusConfig(status).label}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
-              
-              {updatingStatus && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Updating status...
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {selectedStatus === PIStatus.APPROVED_CREATE_PROJECT && selectedStatus !== invoice.status && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm text-blue-700 flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Updating to this status will redirect you to create a project for this invoice.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Main Content Tabs */}
+      {/* Main Tabs Navigation */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="items">Items</TabsTrigger>
-          <TabsTrigger value="materials">Materials</TabsTrigger>
-          <TabsTrigger value="attachments">Attachments</TabsTrigger>
-          {!isStoreInvoice && <TabsTrigger value="payments">Payments</TabsTrigger>}
-          <TabsTrigger value="logs" className="flex items-center gap-1">
-            <History className="h-4 w-4" />
-            Logs
-          </TabsTrigger>
-        </TabsList>
+        <div className="border-b border-slate-200">
+          <TabsList className="h-11 bg-transparent p-0 space-x-2">
+            <TabsTrigger 
+              value="overview" 
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+            >
+              <FileText className="mr-2 h-3.5 w-3.5 inline" /> Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="items" 
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+            >
+              <Package className="mr-2 h-3.5 w-3.5 inline" /> Items ({totalItemsCount})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="materials" 
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+            >
+              <Box className="mr-2 h-3.5 w-3.5 inline" /> Materials
+            </TabsTrigger>
+            <TabsTrigger 
+              value="attachments" 
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+            >
+              <Paperclip className="mr-2 h-3.5 w-3.5 inline" /> Attachments ({invoice.attachments?.length || 0})
+            </TabsTrigger>
+            {!isStoreInvoice && (
+              <TabsTrigger 
+                value="payments" 
+                className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+              >
+                <Banknote className="mr-2 h-3.5 w-3.5 inline" /> Payments
+              </TabsTrigger>
+            )}
+            <TabsTrigger 
+              value="logs" 
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+            >
+              <History className="mr-2 h-3.5 w-3.5 inline" /> Audit Logs ({invoice.piLogs?.length || 0})
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        {/* Overview Tab */}
+        {/* OVERVIEW TAB */}
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Left Column - Invoice Details */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Customer Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Customer Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {selectedCustomer && (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm font-medium">Name</p>
-                          </div>
-                          <p className="text-muted-foreground text-sm">
-                            {selectedCustomer.name || ''}
-                          </p>
-                        </div>
-                        {selectedCustomer.companyName && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Building className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-sm font-medium">Company</p>
-                            </div>
-                            <p className="text-muted-foreground text-sm">
-                              {selectedCustomer.companyName}
-                            </p>
-                          </div>
-                        )}
-                        {selectedCustomer.tinNumber && (
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">TIN Number</p>
-                            <p className="text-muted-foreground text-sm">
-                              {selectedCustomer.tinNumber}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-3">
-                        {selectedCustomer.phone1 && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Phone className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-sm font-medium">Phone 1</p>
-                            </div>
-                            <p className="text-muted-foreground text-sm">
-                              {selectedCustomer.phone1}
-                            </p>
-                          </div>
-                        )}
-                        {selectedCustomer.phone2 && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Phone className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-sm font-medium">Phone 2</p>
-                            </div>
-                            <p className="text-muted-foreground text-sm">
-                              {selectedCustomer.phone2}
-                            </p>
-                          </div>
-                        )}
-                        {selectedCustomer.address && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-sm font-medium">Address</p>
-                            </div>
-                            <p className="text-muted-foreground text-sm">
-                              {selectedCustomer.address}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Financial Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
-                    Financial Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Subtotal</p>
-                        <p className="text-2xl font-bold">
-                          {formatCurrency(invoice.subtotal)}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">VAT</p>
-                        <p className="text-2xl font-bold">
-                          {formatCurrency(invoice.vat || 0)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Total Amount</p>
-                      <p className="text-3xl font-bold text-primary">
-                        {formatCurrency(invoice.total)}
-                      </p>
-                    </div>
-
-                    <Separator />
-
-                    {/* For store invoices, show simplified summary */}
-                    {isStoreInvoice ? (
-                      <div className="">
-                       
-                      </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">Amount Paid</p>
-                            <p className="text-xl font-semibold text-green-600">
-                              {formatCurrency(invoice.amountPaid)}
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">Balance Due</p>
-                            <p className="text-xl font-semibold text-amber-600">
-                              {formatCurrency(invoice.balance)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {invoice.amountDate && (
-                          <div className="pt-2">
-                            <p className="text-sm font-medium">Last Payment Date</p>
-                            <p className="text-muted-foreground text-sm">
-                              {formatDate(invoice.amountDate)}
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    )}
+            
+            {/* Client Data Card */}
+            <Card className="rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <User className="h-4 w-4 text-slate-500" />
+                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800">Client Information</CardTitle>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column - Sidebar Info */}
-            <div className="space-y-6">
-              {/* Personnel Info */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4" />
-                    Personnel
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {invoice.preparedBy && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium">Prepared By</p>
-                      <p className="text-muted-foreground text-sm">
-                        {invoice.preparedBy.name || invoice.preparedBy.email}
-                      </p>
-                    </div>
+                  {selectedCustomer?.tinNumber && (
+                    <Badge variant="outline" className="font-mono text-xs border-slate-300 bg-white text-slate-700">
+                      TIN: {selectedCustomer.tinNumber}
+                    </Badge>
                   )}
-
-                  {invoice.approvedBy && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium">Approved By</p>
-                      <p className="text-muted-foreground text-sm">
-                        {invoice.approvedBy.name || invoice.approvedBy.email}
-                      </p>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {selectedCustomer ? (
+                  <div className="space-y-6">
+                    <div className="flex items-start space-x-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 font-bold text-white shadow-sm">
+                        {getCustomerInitials(selectedCustomer.name)}
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-lg font-bold text-slate-900">{selectedCustomer.name}</h3>
+                        {selectedCustomer.companyName && (
+                          <p className="text-sm text-slate-600 font-medium flex items-center gap-1.5">
+                            <Building className="h-3.5 w-3.5 text-slate-400" />
+                            {selectedCustomer.companyName}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
 
-       
-            </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 text-sm">
+                      {selectedCustomer.phone1 && (
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                          <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400">Primary Phone</p>
+                            <p className="font-mono text-xs font-semibold text-slate-800">{selectedCustomer.phone1}</p>
+                          </div>
+                        </div>
+                      )}
+                      {selectedCustomer.phone2 && (
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                          <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400">Secondary Phone</p>
+                            <p className="font-mono text-xs font-semibold text-slate-800">{selectedCustomer.phone2}</p>
+                          </div>
+                        </div>
+                      )}
+                      {selectedCustomer.email && (
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                          <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400">Email Address</p>
+                            <p className="text-xs font-medium text-slate-800">{selectedCustomer.email}</p>
+                          </div>
+                        </div>
+                      )}
+                      {selectedCustomer.address && (
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                          <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400">Physical Address</p>
+                            <p className="text-xs font-medium text-slate-800">{selectedCustomer.address}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-sm font-mono text-slate-400">
+                    No customer data associated with this invoice
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Personnel & Governance Card */}
+            <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-slate-500" />
+                  Governance & Personnel
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4 divide-y divide-slate-100">
+                {invoice.preparedBy && (
+                  <div className="pt-2 first:pt-0 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prepared By</p>
+                    <div className="flex items-center space-x-2.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                        {(invoice.preparedBy.name || invoice.preparedBy.email || 'P')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{invoice.preparedBy.name || 'Staff'}</p>
+                        <p className="text-xs text-slate-500">{invoice.preparedBy.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {invoice.approvedBy ? (
+                  <div className="pt-4 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Approved By</p>
+                    <div className="flex items-center space-x-2.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">
+                        {(invoice.approvedBy.name || invoice.approvedBy.email || 'A')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{invoice.approvedBy.name || 'Approver'}</p>
+                        <p className="text-xs text-slate-500">{invoice.approvedBy.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-4 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Approval Status</p>
+                    <p className="text-xs text-slate-500 italic">Pending formal sign-off</p>
+                  </div>
+                )}
+
+                <div className="pt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Invoice Type:</span>
+                    <span className="font-semibold text-slate-800">{isStoreInvoice ? 'Store Sales' : 'Standard Project'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Created Date:</span>
+                    <span className="font-mono text-slate-800">{formatDate(invoice.createdAt)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
           </div>
-        </TabsContent>
 
-        {/* Items Tab */}
-        <TabsContent value="items">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Invoice Items ({invoice.items.length})
+          {/* Financial Breakdown Card */}
+          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-slate-500" />
+                Financial Calculation Tree
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {/* Mobile View */}
-              <div className="space-y-4 md:hidden">
-                {invoice.items.map((item: IProformaInvoiceItem, index) => (
-                  <Card key={item.id || index} className="overflow-hidden">
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-semibold">{item.description}</h4>
-                            {item.size && (
-                              <p className="text-muted-foreground text-sm">
-                                Size: {item.size}
-                              </p>
-                            )}
-                          </div>
-                          <Badge variant="outline">
-                            {formatCurrency(item.amount)}
-                          </Badge>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                              Quantity
-                            </p>
-                            <p className="font-medium">{item.quantity}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                              Unit Price
-                            </p>
-                            <p className="font-medium">
-                              {formatCurrency(item.unitPrice)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Layers className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">
-                              {item.proformaItemMaterials.length} material(s) •{' '}
-                              {getItemMaterialsTotal(item)} total units
-                            </span>
-                          </div>
-                        )}
-
-                        {(item.additionalDescription) && (
-                          <div className="space-y-2 pt-2 border-t">
-                            {item.additionalDescription && (
-                              <div>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                  Additional Description
-                                </p>
-                                <p className="text-sm line-clamp-2">
-                                  {item.additionalDescription}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {getAllImages(item).length > 0 && (
-                          <div className="pt-2">
-                            <p className="text-xs font-medium text-muted-foreground mb-2">
-                              Images ({getAllImages(item).length})
-                            </p>
-                            <div className="flex gap-2 overflow-x-auto">
-                              {getAllImages(item).map((image, imgIndex) => (
-                                <Dialog key={image.id || imgIndex}>
-                                  <DialogTrigger asChild>
-                                    <div className="relative w-20 h-20 shrink-0 border rounded-md overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
-                                      <img
-                                        src={normalizeImagePath(image.imageUrl)}
-                                        alt={`${item.description} - image ${imgIndex + 1}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-3xl">
-                                    <DialogHeader>
-                                      <DialogTitle>
-                                         Image {imgIndex + 1}
-                                      </DialogTitle>
-                                    </DialogHeader>
-                                    <div className="relative aspect-video">
-                                      <img
-                                        src={normalizeImagePath(image.imageUrl)}
-                                        alt={` image ${imgIndex + 1}`}
-                                        className="object-contain w-full h-full rounded-md"
-                                      />
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Subtotal Amount</p>
+                  <p className="text-xl font-bold font-mono text-slate-800 mt-1">{formatCurrency(invoice.subtotal)}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">VAT ({subtotal > 0 ? ((vat / subtotal) * 100).toFixed(0) : '0'}%)</p>
+                  <p className="text-xl font-bold font-mono text-slate-800 mt-1">{formatCurrency(vat)}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900 text-white shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Grand Total</p>
+                  <p className="text-xl font-bold font-mono text-white mt-1">{formatCurrency(invoice.total)}</p>
+                </div>
+                {!isStoreInvoice ? (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Amount Paid</p>
+                    <p className="text-xl font-bold font-mono text-emerald-800 mt-1">{formatCurrency(invoice.amountPaid)}</p>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                    <span className="text-xs text-slate-400 font-medium">Store Checkout</span>
+                  </div>
+                )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              {/* Desktop View */}
+        {/* ITEMS TAB */}
+        <TabsContent value="items" className="space-y-4">
+          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Package className="h-4 w-4 text-slate-500" />
+                Line Items Breakdown
+              </CardTitle>
+              <div className="flex items-center space-x-3 text-xs text-slate-500">
+                <span>Total Items: <strong className="text-slate-800 font-mono">{totalItemsCount}</strong></span>
+                <span>•</span>
+                <span>Total Units: <strong className="text-slate-800 font-mono">{totalQtyCount}</strong></span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              
+              {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-50">Product</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Price</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Materials</TableHead>
-                      <TableHead className="min-w-37.5">Images</TableHead>
-                                            <TableHead className="min-w-50">Description</TableHead>
-
+                  <TableHeader className="bg-slate-100/70 border-b border-slate-200">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-12 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">#</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[180px]">Product / Service</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[100px]">Size</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Qty</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Unit Price</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right min-w-[120px]">Line Amount</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Materials</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Images</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[200px]">Description</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {invoice.items.map((item: IProformaInvoiceItem, index) => {
+                  <TableBody className="divide-y divide-slate-100">
+                    {invoice.items.map((item: IProformaInvoiceItem, index: number) => {
                       const images = getAllImages(item);
                       
                       return (
-                        <TableRow key={item.id || index}>
-                                                  <TableCell>{item.item?.name || item.category?.name || '' }</TableCell>
-
-                          <TableCell>{item.size || ''}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{formatCurrency(item.unitPrice)}</TableCell>
-                          <TableCell className="font-semibold">
+                        <TableRow key={item.id || index} className="hover:bg-slate-50/80 transition-colors">
+                          <TableCell className="text-center font-mono text-xs font-semibold text-slate-400">
+                            {index + 1}
+                          </TableCell>
+                          <TableCell className="font-semibold text-sm text-slate-900">
+                            {item.item?.name || item.category?.name || 'Item'}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-600">
+                            {item.size ? (
+                              <Badge variant="outline" className="font-mono text-[11px] border-slate-200 bg-slate-50">
+                                {item.size}
+                              </Badge>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs font-bold text-slate-800 text-right">
+                            {item.quantity}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-slate-600 text-right">
+                            {formatCurrency(item.unitPrice)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs font-bold text-slate-900 text-right bg-slate-50/50">
                             {formatCurrency(item.amount)}
                           </TableCell>
                           <TableCell>
                             {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
-                              <Badge variant="outline" className="flex items-center gap-1">
+                              <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700 text-[11px] font-medium flex w-fit items-center gap-1">
                                 <Layers className="h-3 w-3" />
-                                {item.proformaItemMaterials.length} material(s)
+                                {item.proformaItemMaterials.length} MAT
                               </Badge>
                             ) : (
-                              'No materials'
+                              <span className="text-[11px] font-mono text-slate-400">None</span>
                             )}
                           </TableCell>
                           <TableCell>
                             {images.length > 0 ? (
-                              <div className="flex gap-1">
+                              <div className="flex gap-1 items-center">
                                 {images.slice(0, 3).map((image, imgIndex) => (
                                   <Dialog key={image.id || imgIndex}>
                                     <DialogTrigger asChild>
-                                      <div className="relative w-10 h-10 border rounded-md overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
+                                      <div className="relative h-9 w-9 rounded-md border border-slate-200 overflow-hidden cursor-pointer hover:border-slate-400 transition-all">
                                         <img
                                           src={normalizeImagePath(image.imageUrl)}
-                                          alt={`Thumbnail ${imgIndex + 1}`}
+                                          alt={`Item thumbnail ${imgIndex + 1}`}
                                           className="w-full h-full object-cover"
                                         />
                                       </div>
                                     </DialogTrigger>
-                                    <DialogContent className="max-w-3xl">
-                                      <DialogHeader>
-                                        <DialogTitle>
-                                           Image {imgIndex + 1}
+                                    <DialogContent className="max-w-2xl rounded-xl p-0 overflow-hidden">
+                                      <DialogHeader className="p-4 border-b border-slate-100 bg-slate-50">
+                                        <DialogTitle className="text-sm font-semibold">
+                                          Image Preview ({imgIndex + 1} of {images.length})
                                         </DialogTitle>
                                       </DialogHeader>
-                                      <div className="relative aspect-video">
+                                      <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px]">
                                         <img
                                           src={normalizeImagePath(image.imageUrl)}
-                                          alt={` image ${imgIndex + 1}`}
-                                          className="object-contain w-full h-full rounded-md"
+                                          alt={`Full image ${imgIndex + 1}`}
+                                          className="object-contain max-h-[70vh] rounded-lg shadow-sm"
                                         />
                                       </div>
                                     </DialogContent>
                                   </Dialog>
                                 ))}
                                 {images.length > 3 && (
-                                  <Badge variant="secondary" className="flex items-center gap-1">
-                                    +{images.length - 3} more
+                                  <Badge variant="secondary" className="text-[10px] font-mono h-6 px-1.5">
+                                    +{images.length - 3}
                                   </Badge>
                                 )}
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <ImageIcon className="h-4 w-4" />
-                                <span className="text-sm">No images</span>
-                              </div>
+                              <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                                <ImageIcon className="h-3 w-3 text-slate-300" /> No Image
+                              </span>
                             )}
                           </TableCell>
-                          <TableCell className="max-w-75">
+                          <TableCell className="max-w-xs text-xs text-slate-600">
                             <div className="space-y-1">
-                              <p className="wrap-break-word">
-                                {formatDescription(item.description)}
-                              </p>
+                              <p className="break-words font-medium">{formatDescription(item.description)}</p>
                               {item.additionalDescription && (
-                                <div className="text-xs text-muted-foreground">
-                                  <p className="wrap-break-word">
-                                    {formatDescription(item.additionalDescription)}
-                                  </p>
-                                </div>
+                                <p className="text-[11px] text-slate-400 italic break-words">
+                                  {formatDescription(item.additionalDescription)}
+                                </p>
                               )}
                             </div>
                           </TableCell>
@@ -1248,561 +1236,527 @@ const formatCurrency = (amount: number | undefined | null) => {
                 </Table>
               </div>
 
-              {/* Summary Footer */}
-              <div className="mt-6 flex flex-col items-end space-y-2">
-                <div className="flex w-full max-w-sm justify-between text-sm">
+              {/* Mobile Card View */}
+              <div className="divide-y divide-slate-100 md:hidden p-4 space-y-4">
+                {invoice.items.map((item: IProformaInvoiceItem, index: number) => (
+                  <div key={item.id || index} className="pt-4 first:pt-0 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-bold text-slate-900">{item.item?.name || item.description}</h4>
+                        {item.size && (
+                          <Badge variant="outline" className="mt-1 text-[10px] font-mono">
+                            Size: {item.size}
+                          </Badge>
+                        )}
+                      </div>
+                      <Badge className="bg-slate-900 text-white font-mono text-xs">
+                        {formatCurrency(item.amount)}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <div>
+                        <span className="text-slate-400 text-[10px] uppercase font-semibold block">Quantity</span>
+                        <span className="font-mono font-bold text-slate-800">{item.quantity}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] uppercase font-semibold block">Unit Price</span>
+                        <span className="font-mono font-bold text-slate-800">{formatCurrency(item.unitPrice)}</span>
+                      </div>
+                    </div>
+
+                    {item.additionalDescription && (
+                      <p className="text-xs text-slate-500 italic bg-white p-2 rounded border border-slate-100">
+                        {item.additionalDescription}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Sticky Summary Footer */}
+              <div className="border-t border-slate-200 bg-slate-50 p-4 flex flex-col items-end space-y-1.5 text-xs">
+                <div className="flex justify-between w-full max-w-xs text-slate-600">
                   <span>Subtotal:</span>
-                  <span className="font-medium">
-                    {formatCurrency(invoice.subtotal)}
-                  </span>
+                  <span className="font-mono font-semibold text-slate-900">{formatCurrency(invoice.subtotal)}</span>
                 </div>
-                <div className="flex w-full max-w-sm justify-between text-sm">
-                  <span>
-                    VAT (
-                    {subtotal > 0
-                      ? ((vat / subtotal) * 100).toFixed(0)
-                      : '0'}
-                    %):
-                  </span>
-                  <span className="font-medium">
-                    {formatCurrency(vat)}
-                  </span>
+                <div className="flex justify-between w-full max-w-xs text-slate-600">
+                  <span>VAT ({subtotal > 0 ? ((vat / subtotal) * 100).toFixed(0) : '0'}%):</span>
+                  <span className="font-mono font-semibold text-slate-900">{formatCurrency(vat)}</span>
                 </div>
-                <Separator className="max-w-sm" />
-                <div className="flex w-full max-w-sm justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span className="text-primary">
-                    {formatCurrency(invoice.total)}
-                  </span>
+                <Separator className="my-1 max-w-xs" />
+                <div className="flex justify-between w-full max-w-xs text-sm font-bold text-slate-900">
+                  <span>Grand Total:</span>
+                  <span className="font-mono text-base text-slate-900">{formatCurrency(invoice.total)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Materials Tab */}
-        <TabsContent value="materials">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Box className="h-5 w-5" />
-                Materials Summary
+        {/* MATERIALS TAB */}
+        <TabsContent value="materials" className="space-y-6">
+          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Box className="h-4 w-4 text-slate-500" />
+                Materials Requirement Summary
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="rounded-lg bg-muted p-4">
-                  <h3 className="font-semibold mb-3">Total Materials Required</h3>
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <div>
-                      <p className="text-xl font-bold">
-                        {invoice.items.reduce(
-                          (total, item) => total + (item.proformaItemMaterials?.length || 0),
-                          0
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Material Types</p>
-                    </div>
-                  </div>
+            <CardContent className="p-6 space-y-6">
+              
+              {/* Materials Count Metric Banner */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Types</p>
+                  <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+                    {invoice.items.reduce(
+                      (total, item) => total + (item.proformaItemMaterials?.length || 0),
+                      0
+                    )}
+                  </p>
                 </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Units</p>
+                  <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+                    {invoice.items.reduce(
+                      (total, item) => total + getItemMaterialsTotal(item),
+                      0
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 col-span-2 md:col-span-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Items with Specs</p>
+                  <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+                    {invoice.items.filter(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0).length} / {invoice.items.length}
+                  </p>
+                </div>
+              </div>
 
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Materials by Item</h3>
-                  {invoice.items.map((item) => {
-                    if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+              {/* Item Materials Accordion/Card Breakdown */}
+              <div className="space-y-4">
+                {invoice.items.map((item) => {
+                  if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
 
-                    return (
-                      <Card key={item.id}>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm flex items-center justify-between">
-                            <span className="flex items-center gap-2">
-                              <Package className="h-4 w-4" />
-                              {item.item?.name}
-                              {item.size && (
-                                <Badge variant="outline" className="ml-2">
-                                  Size: {item.size}
-                                </Badge>
-                              )}
-                            </span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Material Name</TableHead>
-                                <TableHead>Color</TableHead>
-                                <TableHead>Size</TableHead>
-                                <TableHead>Quantity</TableHead>
-                                                                                  <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
-                                
-                                <TableHead>Note</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {item.proformaItemMaterials.map((material: IProformaItemMaterial) => (
-                                <TableRow key={material.id}>
-                                  <TableCell>
-                                    <p className="font-medium">
-                                      {material.material?.name || ''}
-                                    </p>
-                                  </TableCell>
-                                  <TableCell>
-                                    {material.material?.color || ''}
-                                  </TableCell>
-                                  <TableCell>
-                                    {material.material?.size || ''}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">{material.quantity} units</Badge>
-                                  </TableCell>
-                                    <TableCell className="text-sm">
-                                                                                      <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0}</Badge>
-                                                                                    </TableCell>
-                                  <TableCell>
-                                    {material.note ? (
-                                      <div className="max-w-xs">
-                                        <p className="text-sm line-clamp-2">{material.note}</p>
-                                      </div>
-                                    ) : (
-                                      <span className="text-muted-foreground text-sm">
-                                        No note
-                                      </span>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-
-                  {invoice.items.filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0)
-                    .length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <Info className="h-4 w-4" />
-                          Items Without Materials
+                  return (
+                    <Card key={item.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                      <CardHeader className="bg-slate-50/80 px-5 py-3 border-b border-slate-100">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <Package className="h-3.5 w-3.5 text-slate-500" />
+                            {item.item?.name || item.description}
+                            {item.size && (
+                              <Badge variant="outline" className="ml-2 font-mono text-[10px]">
+                                {item.size}
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            {item.proformaItemMaterials.length} material(s)
+                          </span>
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {invoice.items
-                            .filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0)
-                            .map((item) => (
-                              <div
-                                key={item.id}
-                                className="flex items-center justify-between p-2 border rounded"
-                              >
-                                <div>
-                                  <p className="font-medium">{item.description}</p>
-                                  {item.additionalDescription && (
-                                    <p className="text-sm text-muted-foreground">
-                                      {item.additionalDescription}
-                                    </p>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader className="bg-slate-50/40">
+                            <TableRow>
+                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Material Name</TableHead>
+                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Color</TableHead>
+                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Size</TableHead>
+                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Qty</TableHead>
+                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add. Qty</TableHead>
+                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Notes</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody className="divide-y divide-slate-100 text-xs">
+                            {item.proformaItemMaterials.map((material: IProformaItemMaterial) => (
+                              <TableRow key={material.id} className="hover:bg-slate-50/50">
+                                <TableCell className="font-semibold text-slate-800">
+                                  {material.material?.name || '-'}
+                                </TableCell>
+                                <TableCell className="text-slate-600">{material.material?.color || '-'}</TableCell>
+                                <TableCell className="font-mono text-slate-600">{material.material?.size || '-'}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="font-mono text-xs border-slate-200">
+                                    {material.quantity} units
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="font-mono text-xs">
+                                    +{material?.additionalQuantity || 0}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-slate-500 text-xs">
+                                  {material.note ? (
+                                    <span className="line-clamp-1">{material.note}</span>
+                                  ) : (
+                                    <span className="text-slate-300 italic">No notes</span>
                                   )}
-                                </div>
-                                <Badge variant="outline">
-                                  {formatCurrency(item.amount)}
-                                </Badge>
-                              </div>
+                                </TableCell>
+                              </TableRow>
                             ))}
-                        </div>
+                          </TableBody>
+                        </Table>
                       </CardContent>
                     </Card>
-                  )}
-                </div>
+                  );
+                })}
+
+                {/* Items Without Materials Card */}
+                {invoice.items.filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0).length > 0 && (
+                  <Card className="rounded-xl border border-slate-200 bg-amber-50/30 shadow-sm">
+                    <CardHeader className="py-3 px-5 border-b border-amber-100">
+                      <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-amber-600" />
+                        Items Without Specified Materials
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-2">
+                      {invoice.items
+                        .filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0)
+                        .map((item) => (
+                          <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg border border-amber-200/60 bg-white text-xs">
+                            <span className="font-medium text-slate-800">{item.description}</span>
+                            <Badge variant="outline" className="font-mono border-amber-300 text-amber-800">
+                              {formatCurrency(item.amount)}
+                            </Badge>
+                          </div>
+                        ))}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
+
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Attachments Tab */}
-        <TabsContent value="attachments">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Attachments ({invoice.attachments?.length || 0})
+        {/* ATTACHMENTS TAB */}
+        <TabsContent value="attachments" className="space-y-4">
+          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-slate-500" />
+                Attached Documents & Proofs ({invoice.attachments?.length || 0})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {invoice.attachments && invoice.attachments.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {invoice.attachments.map((attachment: IAttachment, index) => (
-                    <Card key={attachment.id || index} className="overflow-hidden">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-2">
-                            <div>
-                              <p className="font-medium">
-                                Attachment {index + 1}
-                              </p>
-                              <p className="text-muted-foreground text-xs">
-                                {attachment.createdAt && formatDate(attachment.createdAt)}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  window.open(
-                                    normalizeImagePath(attachment.fileUrl),
-                                    '_blank'
-                                  )
-                                }
-                              >
-                                <Eye className="mr-2 h-3 w-3" />
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const link = document.createElement('a');
-                                  link.href = normalizeImagePath(attachment.fileUrl);
-                                  link.download = `attachment-${index + 1}`;
-                                  link.click();
-                                }}
-                              >
-                                <Download className="mr-2 h-3 w-3" />
-                                Download
-                              </Button>
-                            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {invoice.attachments.map((attachment: IAttachment, index: number) => (
+                    <div key={attachment.id || index} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3 hover:border-slate-300 transition-all">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="rounded-lg bg-slate-900 p-2 text-white">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">Attachment #{index + 1}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">
+                              {attachment.createdAt ? formatDate(attachment.createdAt) : 'Added'}
+                            </p>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 flex-1 rounded-lg text-xs font-medium border-slate-300"
+                          onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
+                        >
+                          <Eye className="mr-1.5 h-3.5 w-3.5" /> Preview
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 flex-1 rounded-lg text-xs font-medium border-slate-300"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = normalizeImagePath(attachment.fileUrl);
+                            link.download = `attachment-${index + 1}`;
+                            link.click();
+                          }}
+                        >
+                          <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                        </Button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-4 text-muted-foreground">
-                    No attachments found for this invoice
-                  </p>
+                <div className="text-center py-12">
+                  <Paperclip className="mx-auto h-10 w-10 text-slate-300" />
+                  <p className="mt-3 text-sm text-slate-500 font-medium">No attachments uploaded for this invoice</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Payments Tab - Only for non-store invoices */}
+        {/* PAYMENTS TAB (Non-Store) */}
         {!isStoreInvoice && (
-          <TabsContent value="payments">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Banknote className="h-5 w-5" />
-                  Payment History
+          <TabsContent value="payments" className="space-y-6">
+            <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-slate-500" />
+                  Payment Records & History
                 </CardTitle>
+                <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ADD_PAYMENT.name}>
+                  <Button
+                    onClick={() => setPaymentDialogOpen(true)}
+                    className="h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 shadow-sm"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Record Payment
+                  </Button>
+                </PermissionGuard>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="rounded-lg bg-muted p-4">
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                      <div>
-                        <p className="text-sm font-medium">Total Amount</p>
-                        <p className="text-xl font-bold text-primary">
-                          {formatCurrency(invoice.total)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Amount Paid</p>
-                        <p className="text-xl font-bold text-green-600">
-                          {formatCurrency(invoice.amountPaid)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Balance Due</p>
-                        <p className="text-xl font-bold text-amber-600">
-                          {formatCurrency(invoice.balance)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Payment Progress</p>
-                        <p className="text-xl font-bold">
-                          {invoice.total > 0
-                            ? ((invoice.amountPaid / invoice.total) * 100).toFixed(1)
-                            : '0'}
-                          %
-                        </p>
-                      </div>
-                    </div>
+              <CardContent className="p-0">
+                
+                {/* Financial Metric Header */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 border-b border-slate-200 bg-slate-50/50">
+                  <div className="p-4 text-center">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Invoice Total</p>
+                    <p className="text-lg font-bold font-mono text-slate-900 mt-0.5">{formatCurrency(invoice.total)}</p>
                   </div>
-
-                  <div className="flex justify-end">
-                    <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ADD_PAYMENT.name}>
-                      <Button onClick={() => setPaymentDialogOpen(true)}>
-                        <Banknote className="mr-2 h-4 w-4" />
-                        Add Payment
-                      </Button>
-                    </PermissionGuard>
+                  <div className="p-4 text-center">
+                    <p className="text-[10px] font-bold uppercase text-emerald-700">Total Paid</p>
+                    <p className="text-lg font-bold font-mono text-emerald-800 mt-0.5">{formatCurrency(invoice.amountPaid)}</p>
                   </div>
+                  <div className="p-4 text-center">
+                    <p className="text-[10px] font-bold uppercase text-amber-700">Balance Remaining</p>
+                    <p className="text-lg font-bold font-mono text-amber-800 mt-0.5">{formatCurrency(invoice.balance)}</p>
+                  </div>
+                  <div className="p-4 text-center flex flex-col justify-center">
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Settlement Progress</p>
+                    <p className="text-xl font-bold font-mono text-slate-900 mt-0.5">{paidPercent.toFixed(1)}%</p>
+                  </div>
+                </div>
 
-                  {/* Payment Modal Dialog - Separated from button */}
-                  <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add Payment</DialogTitle>
-                        <DialogDescription>
-                          Record a payment for this invoice.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                       <div className="space-y-2">
-  <Label htmlFor="amount">Amount</Label>
-  <Input
-    id="amount"
-    type="text"
-    value={
-      paymentData.amountPaid
-        ? paymentData.amountPaid.toLocaleString('en-US')
-        : ""
-    }
-    onChange={(e) => {
-      // Remove commas and any non-numeric characters except decimal point
-      const rawValue = e.target.value.replace(/,/g, "").replace(/[^\d.]/g, "");
+                {/* Add Payment Modal Dialog */}
+                <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+                  <DialogContent className="rounded-xl border border-slate-200 shadow-xl max-w-md p-0 overflow-hidden">
+                    <DialogHeader className="p-6 border-b border-slate-100 bg-slate-50">
+                      <DialogTitle className="text-base font-bold text-slate-900">Record New Payment</DialogTitle>
+                      <DialogDescription className="text-xs text-slate-500 mt-1">
+                        Enter details for payment received against invoice balance.
+                      </DialogDescription>
+                    </DialogHeader>
 
-      setPaymentData({
-        ...paymentData,
-        amountPaid: parseFloat(rawValue) || 0,
-      });
-    }}
-    placeholder="Enter payment amount"
-  />
-  <p className="text-xs text-muted-foreground">
-    Balance due: {formatCurrency(invoice.balance)}
-  </p>
-</div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="date">Payment Date</Label>
-                          <Input
-                            id="date"
-                            type="date"
-                            value={paymentData.amountDate}
-                            onChange={(e) =>
-                              setPaymentData({
-                                ...paymentData,
-                                amountDate: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="bank">Select Bank</Label>
-                          {loadingBanks ? (
-                            <div className="flex items-center space-x-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-sm">Loading banks...</span>
-                            </div>
-                          ) : banks.length > 0 ? (
-                            <Select
-                              value={paymentData.bankId}
-                              onValueChange={(value) =>
-                                setPaymentData({ ...paymentData, bankId: value })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a bank" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {banks.map((bank) => (
-                                  <SelectItem key={bank.id} value={bank.id || ''}>
-                                    {bank.bankName}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">
-                              No banks available. Please add banks first.
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="paidBy">Payer Name</Label>
-                          <Input
-                            id="paidBy"
-                            value={paymentData.paidBy}
-                            onChange={(e) =>
-                              setPaymentData({
-                                ...paymentData,
-                                paidBy: e.target.value,
-                              })
-                            }
-                            placeholder="Enter payer name"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Name of the person or company making the payment
-                          </p>
-                        </div>
-
-                        <Button
-                          onClick={handlePaymentRequest}
-                          disabled={addingPayment || !paymentData.bankId || !paymentData.paidBy}
-                          className="w-full"
-                        >
-                          Review Payment
-                        </Button>
+                    <div className="p-6 space-y-4 bg-white">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="amount" className="text-xs font-semibold text-slate-700">Payment Amount (ETB)</Label>
+                        <Input
+                          id="amount"
+                          type="text"
+                          className="h-9 rounded-lg border-slate-300 font-mono text-sm"
+                          value={paymentData.amountPaid ? paymentData.amountPaid.toLocaleString('en-US') : ""}
+                          onChange={(e) => {
+                            const rawValue = e.target.value.replace(/,/g, "").replace(/[^\d.]/g, "");
+                            setPaymentData({
+                              ...paymentData,
+                              amountPaid: parseFloat(rawValue) || 0,
+                            });
+                          }}
+                          placeholder="0.00"
+                        />
+                        <p className="text-[11px] text-amber-700 font-mono">
+                          Remaining balance due: <strong>{formatCurrency(invoice.balance)}</strong>
+                        </p>
                       </div>
-                    </DialogContent>
-                  </Dialog>
 
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Bank</TableHead>
-                          <TableHead>Paid By</TableHead>
-                          <TableHead>Created By</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {invoice.banks && invoice.banks.length > 0 ? (
-                          invoice.banks.map((bankRecord: IProformaInvoiceBank) => (
-                            <TableRow key={bankRecord.id}>
-                              <TableCell>
-                                {bankRecord.createdAt ? formatDate(bankRecord.createdAt) : ''}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {formatCurrency(bankRecord.amount || 0)}
-                              </TableCell>
-                              <TableCell>
-                                {bankRecord.bank?.bankName || ''}
-                              </TableCell>
-                              <TableCell>
-                                {bankRecord.paidBy || ''}
-                              </TableCell>
-                              <TableCell>
-                                {bankRecord.createdBy?.name || ''}
-                              </TableCell>
-                            </TableRow>
-                          ))
+                      <div className="space-y-1.5">
+                        <Label htmlFor="date" className="text-xs font-semibold text-slate-700">Payment Date</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          className="h-9 rounded-lg border-slate-300 text-xs font-mono"
+                          value={paymentData.amountDate}
+                          onChange={(e) =>
+                            setPaymentData({
+                              ...paymentData,
+                              amountDate: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="bank" className="text-xs font-semibold text-slate-700">Bank Account</Label>
+                        {loadingBanks ? (
+                          <div className="flex items-center space-x-2 text-xs text-slate-500 py-1">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Loading banks...
+                          </div>
+                        ) : banks.length > 0 ? (
+                          <Select
+                            value={paymentData.bankId}
+                            onValueChange={(value) =>
+                              setPaymentData({ ...paymentData, bankId: value })
+                            }
+                          >
+                            <SelectTrigger className="h-9 rounded-lg border-slate-300 text-xs">
+                              <SelectValue placeholder="Select bank" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-lg border-slate-200">
+                              {banks.map((bank) => (
+                                <SelectItem key={bank.id} value={bank.id || ''} className="text-xs">
+                                  {bank.bankName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center py-4">
-                              No payment records found
+                          <p className="text-xs text-rose-600 italic">No bank accounts available</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="paidBy" className="text-xs font-semibold text-slate-700">Payer Name</Label>
+                        <Input
+                          id="paidBy"
+                          className="h-9 rounded-lg border-slate-300 text-xs"
+                          value={paymentData.paidBy}
+                          onChange={(e) =>
+                            setPaymentData({
+                              ...paymentData,
+                              paidBy: e.target.value,
+                            })
+                          }
+                          placeholder="Person or organization name"
+                        />
+                      </div>
+
+                      <Button
+                        onClick={handlePaymentRequest}
+                        disabled={addingPayment || !paymentData.bankId || !paymentData.paidBy}
+                        className="w-full h-10 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs mt-2"
+                      >
+                        Review Payment Entry
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Payments Table */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-100/70 border-b border-slate-200">
+                      <TableRow>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Amount</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Bank Account</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Paid By</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Recorded By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-slate-100 text-xs">
+                      {invoice.banks && invoice.banks.length > 0 ? (
+                        invoice.banks.map((bankRecord: IProformaInvoiceBank) => (
+                          <TableRow key={bankRecord.id} className="hover:bg-slate-50/60">
+                            <TableCell className="font-mono text-slate-600">
+                              {bankRecord.createdAt ? formatDate(bankRecord.createdAt) : '-'}
+                            </TableCell>
+                            <TableCell className="font-mono font-bold text-emerald-700 text-right">
+                              {formatCurrency(bankRecord.amount || 0)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="font-mono text-[11px] border-slate-200 bg-slate-50">
+                                {bankRecord.bank?.bankName || 'Unknown Bank'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-semibold text-slate-800">
+                              {bankRecord.paidBy || '-'}
+                            </TableCell>
+                            <TableCell className="text-slate-500">
+                              {bankRecord.createdBy?.name || '-'}
                             </TableCell>
                           </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-slate-400 text-xs font-mono">
+                            No payment transactions recorded yet
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         )}
 
-        {/* Logs Tab */}
-        <TabsContent value="logs">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Activity Logs ({invoice.piLogs?.length || 0})
+        {/* AUDIT LOGS TAB */}
+        <TabsContent value="logs" className="space-y-4">
+          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <History className="h-4 w-4 text-slate-500" />
+                Audit Trail & History ({invoice.piLogs?.length || 0})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {invoice.piLogs && invoice.piLogs.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="rounded-lg bg-muted p-4">
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                      <div>
-                        <p className="text-sm font-medium">Total Activities</p>
-                        <p className="text-xl font-bold">{invoice.piLogs.length}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Status Changes</p>
-                        <p className="text-xl font-bold">
-                          {invoice.piLogs.filter(log => log.action.includes('Status changed')).length}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Views</p>
-                        <p className="text-xl font-bold">
-                          {invoice.piLogs.filter(log => log.action.includes('Viewed')).length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-48">Date & Time</TableHead>
-                          <TableHead>Action</TableHead>
-                          <TableHead className="w-32">User</TableHead>
+                <Table>
+                  <TableHeader className="bg-slate-100/70 border-b border-slate-200">
+                    <TableRow>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 w-44">Timestamp</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Action Description</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 w-48">Performed By</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-slate-100 text-xs">
+                    {invoice.piLogs.map((log: IPiLog) => {
+                      const isStatusChange = log.action.includes('Status changed');
+                      const isView = log.action.includes('Viewed');
+                      
+                      return (
+                        <TableRow key={log.id} className="hover:bg-slate-50/60">
+                          <TableCell className="font-mono text-slate-500 whitespace-nowrap">
+                            <div className="flex items-center space-x-1.5">
+                              <Clock className="h-3.5 w-3.5 text-slate-400" />
+                              <span>{formatDate(log.createdAt)}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-800">
+                            <div className="flex items-center space-x-2">
+                              {isStatusChange && (
+                                <Badge variant="outline" className="text-[10px] font-semibold uppercase border-blue-200 bg-blue-50 text-blue-700">
+                                  Status Update
+                                </Badge>
+                              )}
+                              {isView && (
+                                <Badge variant="outline" className="text-[10px] font-semibold uppercase border-slate-200 bg-slate-50 text-slate-600">
+                                  View Log
+                                </Badge>
+                              )}
+                              <span className="font-medium">{log.action}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-700">
+                            <div className="flex items-center space-x-1.5">
+                              <User className="h-3.5 w-3.5 text-slate-400" />
+                              <span>{log.piuser?.name || log.piuser?.email || 'System'}</span>
+                            </div>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {invoice.piLogs.map((log: IPiLog) => {
-                          // Determine if this is a status change to show badge
-                          const isStatusChange = log.action.includes('Status changed');
-                          const isView = log.action.includes('Viewed');
-                          
-                          return (
-                            <TableRow key={log.id}>
-                              <TableCell className="whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-sm">
-                                    {formatDate(log.createdAt)}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  {isStatusChange && (
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                      Status Change
-                                    </Badge>
-                                  )}
-                                  {isView && (
-                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                                      View
-                                    </Badge>
-                                  )}
-                                  <span className="text-sm">{log.action}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <User className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-sm">
-                                    {log.piuser?.name || log.piuser?.email || 'System'}
-                                  </span>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               ) : (
-                <div className="text-center py-8">
-                  <History className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-4 text-muted-foreground">
-                    No activity logs found for this invoice
-                  </p>
+                <div className="py-12 text-center text-slate-400 text-xs font-mono">
+                  No activity logs recorded for this invoice
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
+
       </Tabs>
     </div>
   );
