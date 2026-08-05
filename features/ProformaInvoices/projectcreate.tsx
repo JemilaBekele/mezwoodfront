@@ -498,7 +498,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
 
       {/* Delivery Estimation Visualizer Card */}
       {calculationResult && (
-        <Card className="rounded-xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/30 shadow-sm overflow-hidden">
+        <Card className="rounded-xl border border-emerald-200/80 bg-linear-to-br from-emerald-50/40 via-white to-teal-50/30 shadow-sm overflow-hidden">
           <CardHeader className="border-b border-emerald-100 bg-emerald-50/50 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
