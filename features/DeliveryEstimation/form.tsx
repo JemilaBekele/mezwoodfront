@@ -371,26 +371,53 @@ export default function DeliveryEstimationForm({
       }
     }, [calculateMaterialTotals]);
 
+  // Update stage quantity with auto-sync for DESIGN, FINISHING, DELIVERY
+  const updateStageQuantity = (stage: keyof StageQuantity, value: number) => {
+    setStageQuantities(prev => {
+      const newValue = Math.max(0, value);
+      const updated = { ...prev, [stage]: newValue };
+
+      // If DESIGN is updated, update FINISHING and DELIVERY to match
+      if (stage === 'DESIGN') {
+        updated.FINISHING = newValue;
+        updated.DELIVERY = newValue;
+      }
+      // If FINISHING is updated, update DESIGN and DELIVERY to match
+      else if (stage === 'FINISHING') {
+        updated.DESIGN = newValue;
+        updated.DELIVERY = newValue;
+      }
+      // If DELIVERY is updated, update DESIGN and FINISHING to match
+      else if (stage === 'DELIVERY') {
+        updated.DESIGN = newValue;
+        updated.FINISHING = newValue;
+      }
+
+      return updated;
+    });
+  };
+
   // Auto-calculate stage quantities when items change
   useEffect(() => {
     if (isManualMode || selectedItems.length === 0) return;
     let cancelled = false;
     (async () => {
       const calculated = await calculateStageQuantitiesFromItems();
-      if (!cancelled && calculated) setStageQuantities(calculated);
+      if (!cancelled && calculated) {
+        // Ensure DESIGN, FINISHING, DELIVERY are all equal
+        const designQty = calculated.DESIGN;
+        setStageQuantities({
+          ...calculated,
+          DESIGN: designQty,
+          FINISHING: designQty,
+          DELIVERY: designQty,
+        });
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [selectedItems, calculateStageQuantitiesFromItems, isManualMode]);
-
-  // Update stage quantity for a specific stage
-  const updateStageQuantity = (stage: keyof StageQuantity, value: number) => {
-    setStageQuantities(prev => ({
-      ...prev,
-      [stage]: Math.max(0, value)
-    }));
-  };
 
   // Add item to selection from dropdown
   const addItemFromDropdown = () => {
@@ -485,6 +512,20 @@ export default function DeliveryEstimationForm({
       return;
     }
 
+    // Ensure DESIGN, FINISHING, DELIVERY are equal before submission
+    const designQty = stageQuantities.DESIGN;
+    const syncedQuantities = {
+      ...stageQuantities,
+      FINISHING: designQty,
+      DELIVERY: designQty,
+    };
+
+    if (stageQuantities.DESIGN !== stageQuantities.FINISHING || 
+        stageQuantities.DESIGN !== stageQuantities.DELIVERY) {
+      toast.warning('DESIGN, FINISHING, and DELIVERY have been automatically synchronized.');
+      setStageQuantities(syncedQuantities);
+    }
+
     const validation = validateForm(data);
     
     if (!validation.isValid) {
@@ -503,15 +544,15 @@ export default function DeliveryEstimationForm({
       const submissionData: any = {
         difficulty: data.difficulty,
         status: showCustomerForm ? EstimationStatus.ON_HOLD : EstimationStatus.ESTIMATED,
-        DESIGN: stageQuantities.DESIGN,
-        METAL_WORKS: stageQuantities.METAL_WORKS,
-        CNC: stageQuantities.CNC,
-        CUTTING: stageQuantities.CUTTING,
-        EDGE_BANDING: stageQuantities.EDGE_BANDING,
-        ASSEMBLY: stageQuantities.ASSEMBLY,
-        PAINTING: stageQuantities.PAINTING,
-        FINISHING: stageQuantities.FINISHING,
-        DELIVERY: stageQuantities.DELIVERY,
+        DESIGN: syncedQuantities.DESIGN,
+        METAL_WORKS: syncedQuantities.METAL_WORKS,
+        CNC: syncedQuantities.CNC,
+        CUTTING: syncedQuantities.CUTTING,
+        EDGE_BANDING: syncedQuantities.EDGE_BANDING,
+        ASSEMBLY: syncedQuantities.ASSEMBLY,
+        PAINTING: syncedQuantities.PAINTING,
+        FINISHING: syncedQuantities.FINISHING,
+        DELIVERY: syncedQuantities.DELIVERY,
       };
       
       if (showCustomerForm) {
@@ -560,11 +601,33 @@ export default function DeliveryEstimationForm({
       return;
     }
 
+    // Validate DESIGN, FINISHING, DELIVERY are equal
+    if (stageQuantities.DESIGN !== stageQuantities.FINISHING || 
+        stageQuantities.DESIGN !== stageQuantities.DELIVERY) {
+      toast.warning('DESIGN, FINISHING, and DELIVERY quantities will be automatically synchronized.');
+      // Auto-sync them
+      const designQty = stageQuantities.DESIGN;
+      setStageQuantities(prev => ({
+        ...prev,
+        DESIGN: designQty,
+        FINISHING: designQty,
+        DELIVERY: designQty,
+      }));
+    }
+
     setIsLoading(true);
     try {
+      // Ensure DESIGN, FINISHING, DELIVERY are equal before sending
+      const designQty = stageQuantities.DESIGN;
+      const syncedQuantities = {
+        ...stageQuantities,
+        FINISHING: designQty,
+        DELIVERY: designQty,
+      };
+
       const calculationPayload: any = {
         difficulty: values.difficulty,
-        stageQuantities: stageQuantities,
+        stageQuantities: syncedQuantities,
       };
 
       const result = await calculateDeliveryEstimation(calculationPayload);
@@ -579,24 +642,35 @@ export default function DeliveryEstimationForm({
       setIsLoading(false);
     }
   };
-// Add this with your other helper functions
-const formatMinutes = (minutes: number): string => {
-  if (!minutes && minutes !== 0) return '';
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours === 0) return `${mins} min`;
-  if (mins === 0) return `${hours} hr`;
-  return `${hours} hr ${mins} min`;
-};
-const watchedCustomerName = form.watch('customerName');
+
+  // Add this with your other helper functions
+  const formatMinutes = (minutes: number): string => {
+    if (!minutes && minutes !== 0) return '';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins} min`;
+    if (mins === 0) return `${hours} hr`;
+    return `${hours} hr ${mins} min`;
+  };
+  
+  const watchedCustomerName = form.watch('customerName');
 
   // Reset to automatic mode
   const resetToAutomaticMode = async () => {
     if (selectedItems.length > 0) {
       const calculated = await calculateStageQuantitiesFromItems();
-      if (calculated) setStageQuantities(calculated);
-      setIsManualMode(false);
-      toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
+      if (calculated) {
+        // Ensure DESIGN, FINISHING, DELIVERY are all equal
+        const designQty = calculated.DESIGN;
+        setStageQuantities({
+          ...calculated,
+          DESIGN: designQty,
+          FINISHING: designQty,
+          DELIVERY: designQty,
+        });
+        setIsManualMode(false);
+        toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
+      }
     } else {
       toast.error('Please select items first to use automatic mode.');
     }
@@ -822,74 +896,72 @@ const watchedCustomerName = form.watch('customerName');
                       </div>
 
                       {/* Selected Items */}
-                   {/* Selected Items */}
-{selectedItems.length > 0 && (
-  <div className="space-y-3 mt-6">
-    <div className="flex items-center justify-between">
-      <h4 className="font-medium">Selected Items ({selectedItems.length})</h4>
-      {!isManualMode && (
-        <span className="text-xs text-green-600">
-          Auto-calculating stage quantities...
-        </span>
-      )}
-    </div>
-    <div className="space-y-2">
-      {selectedItems.map((item, index) => (
-        <div key={index} className="flex items-center justify-between p-3 rounded-md border">
-          <div className="flex-1">
-            <p className="font-medium">{item.itemName}</p>
-            <p className="text-xs text-gray-500">
-              {item.materials?.length || 0} material types
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <span className="text-sm text-gray-500">Qty:</span>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={() => updateItemQuantity(index, item.quantity - 1)}
-                  disabled={item.quantity <= 1}
-                >
-                  -
-                </Button>
-                <Input
-                  type="number"
-                  min={1}
-                  value={item.quantity}
-                  onChange={(e) => updateItemQuantity(index, parseInt(e.target.value) || 1)}
-                  className="w-16 h-8 text-center"
-                  // REMOVE the disabled condition or change it based on your needs
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={() => updateItemQuantity(index, item.quantity + 1)}
-                >
-                  +
-                </Button>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => removeItem(index)}
-              className="text-red-500 hover:text-red-700"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                      {selectedItems.length > 0 && (
+                        <div className="space-y-3 mt-6">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">Selected Items ({selectedItems.length})</h4>
+                            {!isManualMode && (
+                              <span className="text-xs text-green-600">
+                                Auto-calculating stage quantities...
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            {selectedItems.map((item, index) => (
+                              <div key={index} className="flex items-center justify-between p-3 rounded-md border">
+                                <div className="flex-1">
+                                  <p className="font-medium">{item.itemName}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {item.materials?.length || 0} material types
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-sm text-gray-500">Qty:</span>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => updateItemQuantity(index, item.quantity - 1)}
+                                        disabled={item.quantity <= 1}
+                                      >
+                                        -
+                                      </Button>
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        value={item.quantity}
+                                        onChange={(e) => updateItemQuantity(index, parseInt(e.target.value) || 1)}
+                                        className="w-16 h-8 text-center"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => updateItemQuantity(index, item.quantity + 1)}
+                                      >
+                                        +
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeItem(index)}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Material Summary */}
@@ -971,27 +1043,42 @@ const watchedCustomerName = form.watch('customerName');
                       Enter the quantity for each production stage. These values will be used for capacity calculation.
                     </p>
 
+                    {/* Auto-sync notice for DESIGN, FINISHING, DELIVERY */}
+
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {Object.entries(stageQuantities)
                         // CNC is a manual-add stage: only shown when the project has metal.
                         .filter(([stage]) => stage !== 'CNC' || materialTotals.metal > 0)
-                        .map(([stage, value]) => (
-                        <div key={stage} className="p-3 border rounded-lg">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            {stage.replace('_', ' ')}
-                            {stage === 'CNC' && (
-                              <span className="ml-1 text-xs text-amber-600">(manual)</span>
-                            )}
-                          </label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={value}
-                            onChange={(e) => updateStageQuantity(stage as keyof StageQuantity, parseInt(e.target.value) || 0)}
-                            className="w-full"
-                          />
-                        </div>
-                      ))}
+                        .map(([stage, value]) => {
+                          // Determine if this is a synchronized stage
+                          const isSynchronized = ['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage);
+                          return (
+                            <div key={stage} className={`p-3 border rounded-lg `}>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {stage.replace('_', ' ')}
+                                {stage === 'CNC' && (
+                                  <span className="ml-1 text-xs text-amber-600">(manual)</span>
+                                )}
+                              
+                              </label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={value}
+                                onChange={(e) => updateStageQuantity(stage as keyof StageQuantity, parseInt(e.target.value) || 0)}
+                                className={`w-full `}
+                              />
+                              {/* {isSynchronized && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                  {stage === 'DESIGN' && 'Updates FINISHING & DELIVERY'}
+                                  {stage === 'FINISHING' && 'Updates DESIGN & DELIVERY'}
+                                  {stage === 'DELIVERY' && 'Updates DESIGN & FINISHING'}
+                                </p>
+                              )} */}
+                            </div>
+                          );
+                        })}
                     </div>
 
                     {/* Time-based stages — scheduled but not user-editable.
@@ -1118,81 +1205,80 @@ const watchedCustomerName = form.watch('customerName');
                       </div>
 
                       {/* Stage Results */}
-                     {/* Stage Results with Detailed Timeline */}
-{calculationResult.stageResults && Object.keys(calculationResult.stageResults).length > 0 && (
-  <div className="p-4 border rounded-lg">
-    <h4 className="font-semibold text-lg mb-3">Stage Duration Details</h4>
-    <div className="space-y-4">
-      {Object.entries(calculationResult.stageResults).map(([stage, data]: [string, any]) => (
-        <div key={stage} className="border-b last:border-0 pb-3">
-          <div className="flex items-center justify-between mb-2">
-            <h5 className="font-medium text-md text-blue-700">{stage.replace('_', ' ')}</h5>
-            <Badge variant="outline" className="bg-blue-50">
-              {data.daysUsed} day{data.daysUsed !== 1 ? 's' : ''}
-            </Badge>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            {/* Duration */}
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">Duration:</span>
-              <span className="font-medium">{data.timeTakenFormatted || formatMinutes(data.timeTaken)}</span>
-            </div>
-            
-            {/* Start Date & Time */}
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">Start:</span>
-              <span className="font-medium">
-                {data.startDateTime ? new Date(data.startDateTime).toLocaleString() : ''}
-              </span>
-            </div>
-            
-            {/* End Date & Time */}
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">End:</span>
-              <span className="font-medium">
-                {data.endDateTime ? new Date(data.endDateTime).toLocaleString() : ''}
-              </span>
-            </div>
-            
-            {/* Work Units */}
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">Units Processed:</span>
-              <span className="font-medium">{data.actualWorkUnits || data.workUnits}</span>
-            </div>
-          </div>
-          
-          {/* Daily Allocations Breakdown */}
-          {data.allocations && data.allocations.length > 0 && (
-            <div className="mt-3 pl-4 border-l-2 border-blue-200">
-              <p className="text-xs font-medium text-gray-500 mb-2">Daily Breakdown:</p>
-              <div className="space-y-1">
-                {data.allocations.map((alloc: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-3 text-xs">
-                    <span className="text-gray-500 w-28">
-                      {new Date(alloc.date).toLocaleDateString()}:
-                    </span>
-                    <span className="font-medium">
-                      {alloc.minutes} min ({alloc.units} units)
-                    </span>
-                    <span className="text-gray-400">
-                      {new Date(alloc.date).toLocaleTimeString()} - 
-                      {alloc.endDateTime ? new Date(alloc.endDateTime).toLocaleTimeString() : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                      {calculationResult.stageResults && Object.keys(calculationResult.stageResults).length > 0 && (
+                        <div className="p-4 border rounded-lg">
+                          <h4 className="font-semibold text-lg mb-3">Stage Duration Details</h4>
+                          <div className="space-y-4">
+                            {Object.entries(calculationResult.stageResults).map(([stage, data]: [string, any]) => (
+                              <div key={stage} className="border-b last:border-0 pb-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="font-medium text-md text-blue-700">{stage.replace('_', ' ')}</h5>
+                                  <Badge variant="outline" className="bg-blue-50">
+                                    {data.daysUsed} day{data.daysUsed !== 1 ? 's' : ''}
+                                  </Badge>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                  {/* Duration */}
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-gray-500" />
+                                    <span className="text-gray-600">Duration:</span>
+                                    <span className="font-medium">{data.timeTakenFormatted || formatMinutes(data.timeTaken)}</span>
+                                  </div>
+                                  
+                                  {/* Start Date & Time */}
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-gray-500" />
+                                    <span className="text-gray-600">Start:</span>
+                                    <span className="font-medium">
+                                      {data.startDateTime ? new Date(data.startDateTime).toLocaleString() : ''}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* End Date & Time */}
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-gray-500" />
+                                    <span className="text-gray-600">End:</span>
+                                    <span className="font-medium">
+                                      {data.endDateTime ? new Date(data.endDateTime).toLocaleString() : ''}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Work Units */}
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-gray-500" />
+                                    <span className="text-gray-600">Units Processed:</span>
+                                    <span className="font-medium">{data.actualWorkUnits || data.workUnits}</span>
+                                  </div>
+                                </div>
+                                
+                                {/* Daily Allocations Breakdown */}
+                                {data.allocations && data.allocations.length > 0 && (
+                                  <div className="mt-3 pl-4 border-l-2 border-blue-200">
+                                    <p className="text-xs font-medium text-gray-500 mb-2">Daily Breakdown:</p>
+                                    <div className="space-y-1">
+                                      {data.allocations.map((alloc: any, idx: number) => (
+                                        <div key={idx} className="flex items-center gap-3 text-xs">
+                                          <span className="text-gray-500 w-28">
+                                            {new Date(alloc.date).toLocaleDateString()}:
+                                          </span>
+                                          <span className="font-medium">
+                                            {alloc.minutes} min ({alloc.units} units)
+                                          </span>
+                                          <span className="text-gray-400">
+                                            {new Date(alloc.date).toLocaleTimeString()} - 
+                                            {alloc.endDateTime ? new Date(alloc.endDateTime).toLocaleTimeString() : ''}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Customer Information Form */}
                       <div className="space-y-4 p-6 borderrounded-lg">
@@ -1259,9 +1345,16 @@ const watchedCustomerName = form.watch('customerName');
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                           {Object.entries(stageQuantities).map(([stage, qty]) => (
                             qty > 0 && (
-                              <div key={stage} className="flex justify-between items-center p-2  rounded">
-                                <span className="text-sm font-medium">{stage}:</span>
-                                <span className="text-sm font-bold text-blue-600">{qty} units</span>
+                              <div key={stage} className={`flex justify-between items-center p-2 rounded ${['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) ? 'bg-amber-50' : 'bg-muted/20'}`}>
+                                <span className={`text-sm font-medium ${['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) ? 'text-amber-700' : ''}`}>
+                                  {stage}:
+                                  {['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) && (
+                                    <span className="ml-1 text-xs text-amber-500">(synced)</span>
+                                  )}
+                                </span>
+                                <span className={`text-sm font-bold ${['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) ? 'text-amber-700' : 'text-blue-600'}`}>
+                                  {qty} units
+                                </span>
                               </div>
                             )
                           ))}
@@ -1279,12 +1372,12 @@ const watchedCustomerName = form.watch('customerName');
                           <Sliders className="h-4 w-4" />
                           Adjust Stages
                         </Button>
-                      <Button
-  type="button"
-  onClick={form.handleSubmit(onSubmit)}
-  disabled={isLoading || !watchedCustomerName}
-  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
->
+                        <Button
+                          type="button"
+                          onClick={form.handleSubmit(onSubmit)}
+                          disabled={isLoading || !watchedCustomerName}
+                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                        >
                           {isLoading ? (
                             <>Saving...</>
                           ) : (

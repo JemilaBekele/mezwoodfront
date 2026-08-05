@@ -270,7 +270,7 @@ export default function DeliveryEstimationFromPIPage({
 
         // Extract customer info
         if (invoiceData.customerId) {
-          const customerName = invoiceData.customer?.name || invoiceData.customer?.companyName || '';                          '';
+          const customerName = invoiceData.customer?.name || invoiceData.customer?.companyName || '';
           form.setValue('customerName', customerName);
         }
 
@@ -409,26 +409,53 @@ export default function DeliveryEstimationFromPIPage({
     }
   }, [calculateMaterialTotals]);
 
+  // Update stage quantity with auto-sync for DESIGN, FINISHING, DELIVERY
+  const updateStageQuantity = (stage: keyof StageQuantity, value: number) => {
+    setStageQuantities(prev => {
+      const newValue = Math.max(0, value);
+      const updated = { ...prev, [stage]: newValue };
+
+      // If DESIGN is updated, update FINISHING and DELIVERY to match
+      if (stage === 'DESIGN') {
+        updated.FINISHING = newValue;
+        updated.DELIVERY = newValue;
+      }
+      // If FINISHING is updated, update DESIGN and DELIVERY to match
+      else if (stage === 'FINISHING') {
+        updated.DESIGN = newValue;
+        updated.DELIVERY = newValue;
+      }
+      // If DELIVERY is updated, update DESIGN and FINISHING to match
+      else if (stage === 'DELIVERY') {
+        updated.DESIGN = newValue;
+        updated.FINISHING = newValue;
+      }
+
+      return updated;
+    });
+  };
+
   useEffect(() => {
     if (!isManualMode && selectedItems.length > 0) {
       let cancelled = false;
       (async () => {
         const calculated = await calculateStageQuantitiesFromItems();
-        if (!cancelled && calculated) setStageQuantities(calculated);
+        if (!cancelled && calculated) {
+          // Ensure DESIGN, FINISHING, DELIVERY are all equal
+          const designQty = calculated.DESIGN;
+          setStageQuantities({
+            ...calculated,
+            DESIGN: designQty,
+            FINISHING: designQty,
+            DELIVERY: designQty,
+          });
+        }
       })();
       return () => {
         cancelled = true;
       };
     }
   }, [selectedItems, calculateStageQuantitiesFromItems, isManualMode]);
-
-  // Update stage quantity
-  const updateStageQuantity = (stage: keyof StageQuantity, value: number) => {
-    setStageQuantities(prev => ({
-      ...prev,
-      [stage]: Math.max(0, value),
-    }));
-  };
 
   // Add item from dropdown
   const addItemFromDropdown = () => {
@@ -488,9 +515,18 @@ export default function DeliveryEstimationFromPIPage({
   const resetToAutomaticMode = async () => {
     if (selectedItems.length > 0) {
       const calculated = await calculateStageQuantitiesFromItems();
-      if (calculated) setStageQuantities(calculated);
-      setIsManualMode(false);
-      toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
+      if (calculated) {
+        // Ensure DESIGN, FINISHING, DELIVERY are all equal
+        const designQty = calculated.DESIGN;
+        setStageQuantities({
+          ...calculated,
+          DESIGN: designQty,
+          FINISHING: designQty,
+          DELIVERY: designQty,
+        });
+        setIsManualMode(false);
+        toast.success('Switched to automatic mode. Stage quantities updated from selected items.');
+      }
     } else {
       toast.error('Please select items first to use automatic mode.');
     }
@@ -506,11 +542,33 @@ export default function DeliveryEstimationFromPIPage({
       return;
     }
 
+    // Validate DESIGN, FINISHING, DELIVERY are equal
+    if (stageQuantities.DESIGN !== stageQuantities.FINISHING || 
+        stageQuantities.DESIGN !== stageQuantities.DELIVERY) {
+      toast.warning('DESIGN, FINISHING, and DELIVERY quantities will be automatically synchronized.');
+      // Auto-sync them
+      const designQty = stageQuantities.DESIGN;
+      setStageQuantities(prev => ({
+        ...prev,
+        DESIGN: designQty,
+        FINISHING: designQty,
+        DELIVERY: designQty,
+      }));
+    }
+
     setIsLoading(true);
     try {
+      // Ensure DESIGN, FINISHING, DELIVERY are equal before sending
+      const designQty = stageQuantities.DESIGN;
+      const syncedQuantities = {
+        ...stageQuantities,
+        FINISHING: designQty,
+        DELIVERY: designQty,
+      };
+
       const calculationPayload: any = {
         difficulty: values.difficulty,
-        stageQuantities: stageQuantities,
+        stageQuantities: syncedQuantities,
       };
 
       const result = await calculateDeliveryEstimation(calculationPayload);
@@ -538,21 +596,35 @@ export default function DeliveryEstimationFromPIPage({
       return;
     }
 
+    // Ensure DESIGN, FINISHING, DELIVERY are equal before submission
+    const designQty = stageQuantities.DESIGN;
+    const syncedQuantities = {
+      ...stageQuantities,
+      FINISHING: designQty,
+      DELIVERY: designQty,
+    };
+
+    if (stageQuantities.DESIGN !== stageQuantities.FINISHING || 
+        stageQuantities.DESIGN !== stageQuantities.DELIVERY) {
+      toast.warning('DESIGN, FINISHING, and DELIVERY have been automatically synchronized.');
+      setStageQuantities(syncedQuantities);
+    }
+
     setIsLoading(true);
     try {
       const submissionData: any = {
         piId: piId,
         difficulty: data.difficulty,
         status: EstimationStatus.ESTIMATED,
-        DESIGN: stageQuantities.DESIGN,
-        METAL_WORKS: stageQuantities.METAL_WORKS,
-        CNC: stageQuantities.CNC,
-        CUTTING: stageQuantities.CUTTING,
-        EDGE_BANDING: stageQuantities.EDGE_BANDING,
-        ASSEMBLY: stageQuantities.ASSEMBLY,
-        PAINTING: stageQuantities.PAINTING,
-        FINISHING: stageQuantities.FINISHING,
-        DELIVERY: stageQuantities.DELIVERY,
+        DESIGN: syncedQuantities.DESIGN,
+        METAL_WORKS: syncedQuantities.METAL_WORKS,
+        CNC: syncedQuantities.CNC,
+        CUTTING: syncedQuantities.CUTTING,
+        EDGE_BANDING: syncedQuantities.EDGE_BANDING,
+        ASSEMBLY: syncedQuantities.ASSEMBLY,
+        PAINTING: syncedQuantities.PAINTING,
+        FINISHING: syncedQuantities.FINISHING,
+        DELIVERY: syncedQuantities.DELIVERY,
       };
       
       submissionData.customerName = getSafeStringValue(data.customerName);
@@ -1004,26 +1076,35 @@ export default function DeliveryEstimationFromPIPage({
                       Enter the quantity for each production stage. These values will be used for capacity calculation.
                     </p>
 
+                    {/* Auto-sync notice for DESIGN, FINISHING, DELIVERY */}
+                   
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {Object.entries(stageQuantities)
                         .filter(([stage]) => stage !== 'CNC' || materialTotals.metal > 0)
-                        .map(([stage, value]) => (
-                          <div key={stage} className="p-3 border rounded-lg">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {stage.replace('_', ' ')}
-                              {stage === 'CNC' && (
-                                <span className="ml-1 text-xs text-amber-600">(manual)</span>
-                              )}
-                            </label>
-                            <Input
-                              type="number"
-                              min={0}
-                              value={value}
-                              onChange={(e) => updateStageQuantity(stage as keyof StageQuantity, parseInt(e.target.value) || 0)}
-                              className="w-full"
-                            />
-                          </div>
-                        ))}
+                        .map(([stage, value]) => {
+                          // Determine if this is a synchronized stage
+                          const isSynchronized = ['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage);
+                          return (
+                            <div key={stage} className={`p-3 border rounded-lg `}>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {stage.replace('_', ' ')}
+                                {stage === 'CNC' && (
+                                  <span className="ml-1 text-xs text-amber-600">(manual)</span>
+                                )}
+                              
+                              </label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={value}
+                                onChange={(e) => updateStageQuantity(stage as keyof StageQuantity, parseInt(e.target.value) || 0)}
+                                className={`w-full `}
+                              />
+                            
+                            </div>
+                          );
+                        })}
                     </div>
 
                     {/* Total Quantity Summary */}
@@ -1231,9 +1312,16 @@ export default function DeliveryEstimationFromPIPage({
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                           {Object.entries(stageQuantities).map(([stage, qty]) => (
                             qty > 0 && (
-                              <div key={stage} className="flex justify-between items-center p-2 bg-muted/20 rounded">
-                                <span className="text-sm font-medium">{stage}:</span>
-                                <span className="text-sm font-bold text-blue-600">{qty} units</span>
+                              <div key={stage} className={`flex justify-between items-center p-2 rounded ${['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) ? 'bg-amber-50' : 'bg-muted/20'}`}>
+                                <span className={`text-sm font-medium ${['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) ? 'text-amber-700' : ''}`}>
+                                  {stage}:
+                                  {['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) && (
+                                    <span className="ml-1 text-xs text-amber-500">(synced)</span>
+                                  )}
+                                </span>
+                                <span className={`text-sm font-bold ${['DESIGN', 'FINISHING', 'DELIVERY'].includes(stage) ? 'text-amber-700' : 'text-blue-600'}`}>
+                                  {qty} units
+                                </span>
                               </div>
                             )
                           ))}

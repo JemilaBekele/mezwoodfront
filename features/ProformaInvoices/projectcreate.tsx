@@ -504,7 +504,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
               <div className="flex items-center space-x-2">
                 <Clock className="h-4 w-4 text-emerald-600" />
                 <CardTitle className="text-xs font-bold uppercase tracking-wider text-emerald-900">
-                  Automated Manufacturing & Delivery Estimation
+                  Delivery Estimation
                 </CardTitle>
                 {isCalculating && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600 ml-1" />}
               </div>
@@ -546,7 +546,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
 
             {/* Toggle Stage Details */}
             <div>
-              <Button
+              {/* <Button
                 type="button"
                 variant="outline"
                 size="sm"
@@ -555,7 +555,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
               >
                 <Layers className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
                 {showEstimationDetails ? 'Hide Manufacturing Stages' : 'Show Manufacturing Stages Breakdown'}
-              </Button>
+              </Button> */}
 
               {showEstimationDetails && (
                 <div className="mt-4 p-4 rounded-xl bg-white border border-emerald-200/80 shadow-2xs space-y-4">
@@ -624,7 +624,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
                           <SelectContent className="rounded-lg border-slate-200">
                             <SelectItem value={DifficultyLevel.EASY} className="text-xs">
                               <div className="flex items-center justify-between w-full">
-                                <span className="font-semibold text-emerald-800">Easy (Standard Woodwork)</span>
+                                <span className="font-semibold text-emerald-800">Easy</span>
                                 <Badge variant="outline" className="ml-2 font-mono text-[10px] border-emerald-200 bg-emerald-50 text-emerald-700">
                                   +0 Days
                                 </Badge>
@@ -632,7 +632,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
                             </SelectItem>
                             <SelectItem value={DifficultyLevel.MEDIUM} className="text-xs">
                               <div className="flex items-center justify-between w-full">
-                                <span className="font-semibold text-amber-800">Medium (Custom Finishing)</span>
+                                <span className="font-semibold text-amber-800">Medium</span>
                                 <Badge variant="outline" className="ml-2 font-mono text-[10px] border-amber-200 bg-amber-50 text-amber-700">
                                   +2 Days
                                 </Badge>
@@ -640,7 +640,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
                             </SelectItem>
                             <SelectItem value={DifficultyLevel.HARD} className="text-xs">
                               <div className="flex items-center justify-between w-full">
-                                <span className="font-semibold text-rose-800">Hard (Complex Metal & Finishing)</span>
+                                <span className="font-semibold text-rose-800">Hard</span>
                                 <Badge variant="outline" className="ml-2 font-mono text-[10px] border-rose-200 bg-rose-50 text-rose-700">
                                   +4 Days
                                 </Badge>
@@ -649,9 +649,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
                           </SelectContent>
                         </Select>
                       </FormControl>
-                      <p className="text-[11px] text-slate-400">
-                        Adjusting difficulty automatically updates timeline estimation calculations.
-                      </p>
+               
                       <FormMessage />
                     </FormItem>
                   )}
@@ -690,9 +688,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
                           required
                         />
                       </FormControl>
-                      <p className="text-[11px] text-slate-400">
-                        Specify agreed target date requested by customer for delivery tracking.
-                      </p>
+                 
                       <FormMessage />
                     </FormItem>
                   )}
