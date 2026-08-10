@@ -1449,14 +1449,14 @@ export default function ProformaInvoiceForm({
                                 <FormControl>
                                   {!isEditMode && isSizeAutoFilled ? (
                                     <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
-                                      {field.value || 'Auto-filled'}
+                                      {safeString(field.value) || 'Auto-filled'}
                                     </div>
                                   ) : (
                                     <Input
                                       type="text"
                                       placeholder={isEditMode ? "Edit size" : "Enter size"}
                                       {...field}
-                                      value={typeof field.value === 'string' ? field.value : ''}
+                                      value={safeString(field.value)}
                                       onChange={(e) => {
                                         if (isEditMode) {
                                           field.onChange(e.target.value);

@@ -622,7 +622,7 @@ export default function ProformaInvoiceForm({
     form.setValue(`items.${itemIndex}.itemId`, item.id);
     
     if (item.size) {
-      form.setValue(`items.${itemIndex}.size`, item.size);
+      form.setValue(`items.${itemIndex}.size`, safeString(item.size));
       setSizeAutoFilled(prev => {
         const newMap = new Map(prev);
         newMap.set(itemIndex, true);
@@ -1414,14 +1414,14 @@ export default function ProformaInvoiceForm({
                                   <FormControl>
                                     {isSizeAutoFilled ? (
                                       <div className="flex h-9 w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-mono text-slate-700">
-                                        {field.value || 'Auto-filled'}
+                                        {safeString(field.value) || 'Auto-filled'}
                                       </div>
                                     ) : (
                                       <Input
                                         type="text"
                                         placeholder="Size spec"
                                         {...field}
-                                        value={typeof field.value === 'string' ? field.value : ''}
+                                        value={safeString(field.value)}
                                         className="h-9 rounded-lg border-slate-300 text-xs font-mono"
                                       />
                                     )}
