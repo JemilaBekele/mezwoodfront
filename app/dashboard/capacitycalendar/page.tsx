@@ -34,7 +34,7 @@ export default async function SupplierPage({
           }
         >
           <div className='w-full'>
-            <ThCapacityCalendar />
+            <CapacityCalendar />
           </div>
         </Suspense>
       </div>
