@@ -959,7 +959,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                           <TableBody>
                             {project.invoice.items.slice(0, 5).map((item, index) => (
                               <TableRow key={index} className="hover:bg-muted/20">
-                               <TableCell className="">{item.item?.name}</TableCell>
+                               <TableCell className="">{item.item?.name || item.category?.name || ''}</TableCell>
                                <TableCell className="text-right tabular-nums text-sm">{item.quantity}</TableCell>
                                <TableCell className="text-right tabular-nums text-sm">{formatCurrency(item.unitPrice)}</TableCell>
                                <TableCell className="text-right tabular-nums text-sm font-medium">{formatCurrency(item.amount)}</TableCell>

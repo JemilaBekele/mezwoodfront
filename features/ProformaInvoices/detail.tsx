@@ -1233,7 +1233,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                   <TableHeader className="bg-slate-100/70 border-b border-slate-200">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-12 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">#</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[180px]">Product / Service</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[180px]">Product </TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[100px]">Size</TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Qty</TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Unit Price</TableHead>

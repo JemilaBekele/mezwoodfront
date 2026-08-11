@@ -22,7 +22,6 @@ import {
   CheckCircle,
   Signal,
   BarChart3,
-
   CheckCheck,
   XCircle,
 } from "lucide-react";
@@ -105,12 +104,11 @@ const PROJECT_STATUS_CONFIG: Record<ProjectStatus, { label: string; icon: React.
   FINISHING: { label: "Finishing", icon: CheckCircle, color: "green" },
   DELIVERY: { label: "Delivery", icon: Package, color: "purple" },
   INSTALLATION: { label: "Installation", icon: Layers, color: "yellow" },
-    COMPLETED: {
+  COMPLETED: {
     label: "Completed",
     icon: CheckCircle,
     color: "emerald",
   },
-
   CANCELLED: {
     label: "Cancelled",
     icon: XCircle,
@@ -133,7 +131,7 @@ const DESIGN_STATUS_CONFIG: Record<
   BOQ: { label: "BOQ", icon: ListChecks, color: "indigo" },
   DESIGN_FINISHED: {
     label: "Design Finished",
-    icon: CheckCheck, // or BadgeCheck
+    icon: CheckCheck,
     color: "green",
   },
   FINISHED: { label: "Finished", icon: CheckCircle, color: "emerald" },
@@ -187,6 +185,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"status" | "design" | "difficulty">("status");
 
+  // ── Load Projects (without search - we'll filter client-side) ──
   useEffect(() => {
     let cancelled = false;
 
@@ -195,10 +194,11 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
         setLoading(true);
         setError(null);
 
+        // Don't send search to API - we'll handle it client-side
         const response = await getProjects({
           page,
           limit,
-          search,
+          // search is intentionally omitted
         });
 
         if (cancelled) return;
@@ -223,7 +223,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [page, limit, search]);
+  }, [page, limit]); // Remove search from dependencies
 
   // ── Helpers ──────────────────────────────────────────────────
   const getStatusDisplayText = useCallback((status: string): string => {
@@ -275,17 +275,26 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     );
   }
 
-  // ── Data ─────────────────────────────────────────────────────
+  // ── Client-side filtering ──────────────────────────────────
   const filteredData = projects.filter((project) => {
-    // Search filter
+    // Search filter - client side
     if (search) {
-      const s = search.toLowerCase();
+      const s = search.toLowerCase().trim();
+      if (s === '') return true;
+      
+      const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
+      const customerName = project.customer?.name || '';
+      const statusText = getStatusDisplayText(project.status);
+      const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
+      const difficultyText = getDifficultyDisplayText(project.difficulty);
+      
       const match =
-        project.invoice?.piNumber?.toLowerCase().includes(s) ||
-        project.customer?.name?.toLowerCase().includes(s) ||
-        getStatusDisplayText(project.status).toLowerCase().includes(s) ||
-        getDesignStatusDisplayText(project.designStatus || '').toLowerCase().includes(s) ||
-        getDifficultyDisplayText(project.difficulty).toLowerCase().includes(s);
+        String(invoiceNumber).toLowerCase().includes(s) ||
+        String(customerName).toLowerCase().includes(s) ||
+        statusText.toLowerCase().includes(s) ||
+        designStatusText.toLowerCase().includes(s) ||
+        difficultyText.toLowerCase().includes(s);
+      
       if (!match) return false;
     }
 

@@ -1340,12 +1340,12 @@ const formatDescription = (text: string, limit = 80) => {
                         <div key={item.id} className="border rounded-lg p-3">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm">{item?.item?.name || ''}</h4>
+                              <h4 className="font-semibold text-sm">{item.item?.name || item.category?.name || ''}</h4>
                               {item.size && item.size !== "" && (
                                 <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                               )}
                             </div>
-                            <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">Qty: {item.quantity}</Badge>
+                            <Badge variant="outline" className="text-xs shrink-0 ml-2">Qty: {item.quantity}</Badge>
                           </div>
 
                           {/* Item Images - No description */}
