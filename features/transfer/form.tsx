@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Select from 'react-select';
+import Image from 'next/image';
 import {
   Form,
   FormControl,
@@ -29,6 +30,8 @@ import { IconTrash } from '@tabler/icons-react';
 import { ITransfer, TransferEntityType } from '@/models/transfer';
 import { getStoresAll } from '@/service/store';
 import { getShowroomsAll, getShowroomsByUser, getStoresByUser } from '@/service/showroom';
+import { Modal } from '@/components/ui/modal';
+import { normalizeImagePath } from '@/lib/norm';
 
 interface FormData {
   reference?: string;
@@ -76,6 +79,69 @@ interface AvailableProduct {
   other?: boolean;
 }
 
+
+// Custom Option component for react-select with image
+const CustomOption = (props: any) => {
+  const { data, innerRef, innerProps, isFocused, isSelected } = props;
+  
+  return (
+    <div
+      ref={innerRef}
+      {...innerProps}
+      className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
+        isFocused ? 'bg-gray-100 dark:bg-gray-700' : ''
+      } ${isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''}`}
+    >
+      {data.imageUrl ? (
+        <div className="relative h-8 w-8 rounded overflow-hidden shrink-0 border border-gray-200 dark:border-gray-600">
+          <Image
+            src={data.imageUrl || ''}
+            alt={data.label}
+            fill
+            className="object-cover"
+            sizes="32px"
+          />
+        </div>
+      ) : (
+        <div className="h-8 w-8 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-600">
+          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+      <span>{data.label}</span>
+    </div>
+  );
+};
+
+// Custom SingleValue component to show image in selected value
+const CustomSingleValue = (props: any) => {
+  const { data } = props;
+  
+  return (
+    <div className="flex items-center gap-3">
+      {data.imageUrl ? (
+        <div className="relative h-6 w-6 rounded overflow-hidden shrink-0 border border-gray-200 dark:border-gray-600">
+          <Image
+            src={data.imageUrl || ''}
+            alt={data.label}
+            fill
+            className="object-cover"
+            sizes="24px"
+          />
+        </div>
+      ) : (
+        <div className="h-6 w-6 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-600">
+          <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+      <span>{data.label}</span>
+    </div>
+  );
+};
+
 export default function TransferForm({
   initialData,
   isEdit = false
@@ -89,6 +155,9 @@ export default function TransferForm({
   const [isMounted, setIsMounted] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingStoresShops, setLoadingStoresShops] = useState(true);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [selectedProductName, setSelectedProductName] = useState<string>('');
   
   const hasFetchedProductsRef = useRef(false);
   const lastSourceRef = useRef<string>('');
@@ -254,6 +323,21 @@ export default function TransferForm({
     })
   };
 
+  // Handle image click to open in modal
+  const handleImageClick = (productId: string) => {
+    const product = availableProducts.find(p => p.id === productId);
+    if (product) {
+      if (product.imageUrl) {
+        setSelectedImageUrl(normalizeImagePath(product.imageUrl) || null);
+        const productName = `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`;
+        setSelectedProductName(productName);
+        setShowImageModal(true);
+      } else {
+        toast.info('No image available for this product');
+      }
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
     try {
@@ -369,91 +453,50 @@ export default function TransferForm({
   }
 
   return (
-    <Card className='mx-auto w-full'>
-      <CardHeader>
-        <CardTitle className='text-left text-2xl font-bold'>
-          {isEdit ? 'Edit Transfer' : 'Create Transfer'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
-            <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-              <FormField
-                control={form.control}
-                name='reference'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Reference (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder='Enter transfer reference'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div></div>
-            </div>
-
-            {/* Product Type Selection - First Step */}
-            <div className='rounded-lg border p-4'>
-              <h3 className='mb-4 text-lg font-semibold'>Step 1: Select Product Type</h3>
-              <FormField
-                control={form.control}
-                name='productType'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>What do you want to transfer?</FormLabel>
-                    <ShadcnSelect
-                      value={field.value}
-                      onValueChange={(value: 'items' | 'materials') => {
-                        field.onChange(value);
-                        // Clear items when product type changes
-                        form.setValue('items', [{ productId: '', quantity: 1 }]);
-                        setAvailableProducts([]);
-                        hasFetchedProductsRef.current = false;
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select product type' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value='items'>Items (Products)</SelectItem>
-                        <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
-                      </SelectContent>
-                    </ShadcnSelect>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Source and Destination Section */}
-            <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-              {/* Source Column */}
-              <div className='space-y-4 rounded-lg border p-4'>
-                <h3 className='text-lg font-semibold'>Step 2: Source Location</h3>
-
+    <>
+      <Card className='mx-auto w-full'>
+        <CardHeader>
+          <CardTitle className='text-left text-2xl font-bold'>
+            {isEdit ? 'Edit Transfer' : 'Create Transfer'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
+              <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
                 <FormField
                   control={form.control}
-                  name='sourceType'
+                  name='reference'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Source Type</FormLabel>
+                      <FormLabel>Reference (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder='Enter transfer reference'
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div></div>
+              </div>
+
+              {/* Product Type Selection - First Step */}
+              <div className='rounded-lg border p-4'>
+                <h3 className='mb-4 text-lg font-semibold'>Step 1: Select Product Type</h3>
+                <FormField
+                  control={form.control}
+                  name='productType'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>What do you want to transfer?</FormLabel>
                       <ShadcnSelect
                         value={field.value}
-                        onValueChange={(value: TransferEntityType) => {
+                        onValueChange={(value: 'items' | 'materials') => {
                           field.onChange(value);
-                          if (value === TransferEntityType.STORE) {
-                            form.setValue('sourceShowroomId', '');
-                          } else {
-                            form.setValue('sourceStoreId', '');
-                          }
+                          // Clear items when product type changes
                           form.setValue('items', [{ productId: '', quantity: 1 }]);
                           setAvailableProducts([]);
                           hasFetchedProductsRef.current = false;
@@ -461,377 +504,507 @@ export default function TransferForm({
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder='Select source type' />
+                            <SelectValue placeholder='Select product type' />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={TransferEntityType.STORE}>
-                            Store
-                          </SelectItem>
-                          <SelectItem value={TransferEntityType.SHOWROOM}>
-                            Showroom
-                          </SelectItem>
+                          <SelectItem value='items'>Items (Products)</SelectItem>
+                          <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
                         </SelectContent>
                       </ShadcnSelect>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {sourceType === TransferEntityType.STORE && (
-                  <FormField
-                    control={form.control}
-                    name='sourceStoreId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Store</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            form.setValue('items', [{ productId: '', quantity: 1 }]);
-                            setAvailableProducts([]);
-                            hasFetchedProductsRef.current = false;
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select source store' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {stores.map((store) => (
-                              <SelectItem key={store.id} value={store.id.toString()}>
-                                {store.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {sourceType === TransferEntityType.SHOWROOM && (
-                  <FormField
-                    control={form.control}
-                    name='sourceShowroomId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Showroom</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            form.setValue('items', [{ productId: '', quantity: 1 }]);
-                            setAvailableProducts([]);
-                            hasFetchedProductsRef.current = false;
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select source showroom' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {showrooms.map((showroom) => (
-                              <SelectItem key={showroom.id} value={showroom.id.toString()}>
-                                {showroom.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
               </div>
 
-              {/* Destination Column */}
-              <div className='space-y-4 rounded-lg border p-4'>
-                <h3 className='text-lg font-semibold'>Step 3: Destination Location</h3>
+              {/* Source and Destination Section */}
+              <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
+                {/* Source Column */}
+                <div className='space-y-4 rounded-lg border p-4'>
+                  <h3 className='text-lg font-semibold'>Step 2: Source Location</h3>
 
+                  <FormField
+                    control={form.control}
+                    name='sourceType'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Source Type</FormLabel>
+                        <ShadcnSelect
+                          value={field.value}
+                          onValueChange={(value: TransferEntityType) => {
+                            field.onChange(value);
+                            if (value === TransferEntityType.STORE) {
+                              form.setValue('sourceShowroomId', '');
+                            } else {
+                              form.setValue('sourceStoreId', '');
+                            }
+                            form.setValue('items', [{ productId: '', quantity: 1 }]);
+                            setAvailableProducts([]);
+                            hasFetchedProductsRef.current = false;
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select source type' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value={TransferEntityType.STORE}>
+                              Store
+                            </SelectItem>
+                            <SelectItem value={TransferEntityType.SHOWROOM}>
+                              Showroom
+                            </SelectItem>
+                          </SelectContent>
+                        </ShadcnSelect>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {sourceType === TransferEntityType.STORE && (
+                    <FormField
+                      control={form.control}
+                      name='sourceStoreId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Store</FormLabel>
+                          <ShadcnSelect
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue('items', [{ productId: '', quantity: 1 }]);
+                              setAvailableProducts([]);
+                              hasFetchedProductsRef.current = false;
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder='Select source store' />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {stores.map((store) => (
+                                <SelectItem key={store.id} value={store.id.toString()}>
+                                  {store.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </ShadcnSelect>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {sourceType === TransferEntityType.SHOWROOM && (
+                    <FormField
+                      control={form.control}
+                      name='sourceShowroomId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Showroom</FormLabel>
+                          <ShadcnSelect
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue('items', [{ productId: '', quantity: 1 }]);
+                              setAvailableProducts([]);
+                              hasFetchedProductsRef.current = false;
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder='Select source showroom' />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {showrooms.map((showroom) => (
+                                <SelectItem key={showroom.id} value={showroom.id.toString()}>
+                                  {showroom.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </ShadcnSelect>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+
+                {/* Destination Column */}
+                <div className='space-y-4 rounded-lg border p-4'>
+                  <h3 className='text-lg font-semibold'>Step 3: Destination Location</h3>
+
+                  <FormField
+                    control={form.control}
+                    name='destinationType'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Destination Type</FormLabel>
+                        <ShadcnSelect
+                          value={field.value}
+                          onValueChange={(value: TransferEntityType) => {
+                            field.onChange(value);
+                            if (value === TransferEntityType.STORE) {
+                              form.setValue('destShowroomId', '');
+                            } else {
+                              form.setValue('destStoreId', '');
+                            }
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select destination type' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value={TransferEntityType.STORE}>
+                              Store
+                            </SelectItem>
+                            <SelectItem value={TransferEntityType.SHOWROOM}>
+                              Showroom
+                            </SelectItem>
+                          </SelectContent>
+                        </ShadcnSelect>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {destinationType === TransferEntityType.STORE && (
+                    <FormField
+                      control={form.control}
+                      name='destStoreId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Store</FormLabel>
+                          <ShadcnSelect value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder='Select destination store' />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {destStores.map((store) => (
+                                <SelectItem key={store.id} value={store.id.toString()}>
+                                  {store.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </ShadcnSelect>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {destinationType === TransferEntityType.SHOWROOM && (
+                    <FormField
+                      control={form.control}
+                      name='destShowroomId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Showroom</FormLabel>
+                          <ShadcnSelect value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder='Select destination showroom' />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {destShowrooms.map((showroom) => (
+                                <SelectItem key={showroom.id} value={showroom.id.toString()}>
+                                  {showroom.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </ShadcnSelect>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Items Selection - Step 4 */}
+              <div className='rounded-lg border p-4'>
+                <h3 className='mb-4 text-lg font-semibold'>Step 4: Select Products to Transfer</h3>
                 <FormField
                   control={form.control}
-                  name='destinationType'
+                  name='items'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Destination Type</FormLabel>
-                      <ShadcnSelect
-                        value={field.value}
-                        onValueChange={(value: TransferEntityType) => {
-                          field.onChange(value);
-                          if (value === TransferEntityType.STORE) {
-                            form.setValue('destShowroomId', '');
-                          } else {
-                            form.setValue('destStoreId', '');
-                          }
-                        }}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder='Select destination type' />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value={TransferEntityType.STORE}>
-                            Store
-                          </SelectItem>
-                          <SelectItem value={TransferEntityType.SHOWROOM}>
-                            Showroom
-                          </SelectItem>
-                        </SelectContent>
-                      </ShadcnSelect>
+                      <FormControl>
+                        <div className='space-y-4'>
+                          <div className='grid grid-cols-7 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
+                            <div className='col-span-3'>Product</div>
+                            <div>Quantity</div>
+                            <div>Available Stock</div>
+                            <div>Image</div>
+                            <div>Action</div>
+                          </div>
+
+                          {field.value.map((item, index) => {
+                            const selectedProduct = availableProducts.find(
+                              (p) => p.id === item.productId
+                            );
+
+                            const productOptions = availableProducts.map((product) => ({
+                              value: product.id,
+                              label: `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`,
+                              imageUrl: product.imageUrl,
+                              data: product
+                            }));
+
+                            return (
+                              <div key={index} className='grid grid-cols-7 items-center gap-4'>
+                                <div className='col-span-3'>
+                                  <Select
+                                    instanceId={`product-select-${index}`}
+                                    options={productOptions}
+                                    onChange={(newValue: any) => {
+                                      const newItems = [...field.value];
+                                      newItems[index].productId = newValue?.value || '';
+                                      newItems[index].quantity = 1;
+                                      field.onChange(newItems);
+                                    }}
+                                    value={
+                                      productOptions.find(
+                                        (p) => p.value === item.productId
+                                      ) || null
+                                    }
+                                    placeholder={loadingProducts ? "Loading products..." : "Search product"}
+                                    isSearchable
+                                    isDisabled={loadingProducts || availableProducts.length === 0}
+                                    isLoading={loadingProducts}
+                                    styles={isDark ? darkStyles : {}}
+                                    components={{
+                                      Option: CustomOption,
+                                      SingleValue: CustomSingleValue
+                                    }}
+                                  />
+                                  {selectedProduct && (
+                                    <div className='mt-1 text-xs text-gray-500'>
+                                      {productType === 'items' ? (
+                                        <>
+                                          {selectedProduct.category && `Category: ${selectedProduct.category}`}
+                                          {selectedProduct.type && ` | Type: ${selectedProduct.type}`}
+                                        </>
+                                      ) : (
+                                        <>
+                                          {selectedProduct.materialType && `Type: ${selectedProduct.materialType}`}
+                                          {selectedProduct.unitOfMeasure && ` | Unit: ${selectedProduct.unitOfMeasure}`}
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <Input
+                                    type='number'
+                                    placeholder='Qty'
+                                    value={item.quantity}
+                                    min={1}
+                                    max={selectedProduct?.stockQuantity || 0}
+                                    onChange={(e) => {
+                                      const newItems = [...field.value];
+                                      const quantity = Number(e.target.value);
+                                      const maxQuantity = selectedProduct?.stockQuantity || 0;
+
+                                      newItems[index].quantity = Math.min(
+                                        isNaN(quantity) ? 0 : quantity,
+                                        maxQuantity
+                                      );
+                                      field.onChange(newItems);
+                                    }}
+                                    disabled={!item.productId || loadingProducts}
+                                  />
+                                </div>
+
+                                <div className='text-muted-foreground text-sm'>
+                                  {loadingProducts ? (
+                                    <div className='flex items-center gap-1'>
+                                      <div className='h-3 w-3 animate-spin rounded-full border-b-2 border-gray-400'></div>
+                                      <span>Loading...</span>
+                                    </div>
+                                  ) : selectedProduct ? (
+                                    <span className={selectedProduct.stockQuantity > 0 ? 'text-green-600' : 'text-red-600'}>
+                                      {selectedProduct.stockQuantity} available
+                                    </span>
+                                  ) : (
+                                    'Select product'
+                                  )}
+                                </div>
+
+                                {/* Image Display - Clickable to view larger */}
+                                <div className='flex items-center justify-center'>
+                                  {item.productId && selectedProduct ? (
+                                    <div 
+                                      className={`relative h-12 w-12 rounded overflow-hidden border-2 border-gray-200 dark:border-gray-600 cursor-pointer hover:border-primary transition-all duration-200 ${
+                                        selectedProduct.imageUrl ? 'hover:scale-105' : ''
+                                      }`}
+                                      onClick={() => handleImageClick(item.productId)}
+                                      title={selectedProduct.imageUrl ? 'Click to view larger' : 'No image available'}
+                                    >
+                                      {selectedProduct.imageUrl ? (
+                                        <Image
+                                          src={normalizeImagePath(selectedProduct.imageUrl) || ''}
+                                          alt={selectedProduct.name}
+                                          fill
+                                          className="object-cover"
+                                          sizes="48px"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                          <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                      {selectedProduct.imageUrl && (
+                                        <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                                          <svg className="h-6 w-6 text-white opacity-0 hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="h-12 w-12 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center">
+                                      <span className="text-xs text-gray-400">No prod.</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <Button
+                                    type='button'
+                                    variant='destructive'
+                                    size='sm'
+                                    onClick={() => {
+                                      const newItems = [...field.value];
+                                      newItems.splice(index, 1);
+                                      field.onChange(newItems);
+                                    }}
+                                    disabled={field.value.length <= 1}
+                                  >
+                                    <IconTrash size={16} />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          <div className='flex justify-end'>
+                            <Button
+                              type='button'
+                              onClick={() => {
+                                field.onChange([
+                                  ...field.value,
+                                  { productId: '', quantity: 1 }
+                                ]);
+                              }}
+                              disabled={loadingProducts || availableProducts.length === 0}
+                            >
+                              Add Item
+                            </Button>
+                          </div>
+
+                          {availableProducts.length === 0 && !loadingProducts && (
+                            <div className='rounded-lg bg-yellow-50 p-4 text-center text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200'>
+                              <p>No products available at the selected source location.</p>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {destinationType === TransferEntityType.STORE && (
-                  <FormField
-                    control={form.control}
-                    name='destStoreId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Store</FormLabel>
-                        <ShadcnSelect value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select destination store' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {destStores.map((store) => (
-                              <SelectItem key={store.id} value={store.id.toString()}>
-                                {store.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {destinationType === TransferEntityType.SHOWROOM && (
-                  <FormField
-                    control={form.control}
-                    name='destShowroomId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Showroom</FormLabel>
-                        <ShadcnSelect value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select destination showroom' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {destShowrooms.map((showroom) => (
-                              <SelectItem key={showroom.id} value={showroom.id.toString()}>
-                                {showroom.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
               </div>
-            </div>
 
-            {/* Items Selection - Step 4 */}
-            <div className='rounded-lg border p-4'>
-              <h3 className='mb-4 text-lg font-semibold'>Step 4: Select Products to Transfer</h3>
               <FormField
                 control={form.control}
-                name='items'
+                name='notes'
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
                     <FormControl>
-                      <div className='space-y-4'>
-                        <div className='grid grid-cols-6 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
-                          <div className='col-span-3'>Product</div>
-                          <div>Quantity</div>
-                          <div>Available Stock</div>
-                          <div>Action</div>
-                        </div>
-
-                        {field.value.map((item, index) => {
-                          const selectedProduct = availableProducts.find(
-                            (p) => p.id === item.productId
-                          );
-
-                          const productOptions = availableProducts.map((product) => ({
-                            value: product.id,
-                            label: `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`,
-                            data: product
-                          }));
-
-                          return (
-                            <div key={index} className='grid grid-cols-6 items-center gap-4'>
-                              <div className='col-span-3'>
-                                <Select
-                                  instanceId={`product-select-${index}`}
-                                  options={productOptions}
-                                  onChange={(newValue: any) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].productId = newValue?.value || '';
-                                    newItems[index].quantity = 1;
-                                    field.onChange(newItems);
-                                  }}
-                                  value={
-                                    productOptions.find(
-                                      (p) => p.value === item.productId
-                                    ) || null
-                                  }
-                                  placeholder={loadingProducts ? "Loading products..." : "Search product"}
-                                  isSearchable
-                                  isDisabled={loadingProducts || availableProducts.length === 0}
-                                  isLoading={loadingProducts}
-                                  styles={isDark ? darkStyles : {}}
-                                />
-                                {selectedProduct && (
-                                  <div className='mt-1 text-xs text-gray-500'>
-                                    {productType === 'items' ? (
-                                      <>
-                                        {selectedProduct.category && `Category: ${selectedProduct.category}`}
-                                        {selectedProduct.type && ` | Type: ${selectedProduct.type}`}
-                                      </>
-                                    ) : (
-                                      <>
-                                        {selectedProduct.materialType && `Type: ${selectedProduct.materialType}`}
-                                        {selectedProduct.unitOfMeasure && ` | Unit: ${selectedProduct.unitOfMeasure}`}
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div>
-                                <Input
-                                  type='number'
-                                  placeholder='Qty'
-                                  value={item.quantity}
-                                  min={1}
-                                  max={selectedProduct?.stockQuantity || 0}
-                                  onChange={(e) => {
-                                    const newItems = [...field.value];
-                                    const quantity = Number(e.target.value);
-                                    const maxQuantity = selectedProduct?.stockQuantity || 0;
-
-                                    newItems[index].quantity = Math.min(
-                                      isNaN(quantity) ? 0 : quantity,
-                                      maxQuantity
-                                    );
-                                    field.onChange(newItems);
-                                  }}
-                                  disabled={!item.productId || loadingProducts}
-                                />
-                              </div>
-
-                              <div className='text-muted-foreground text-sm'>
-                                {loadingProducts ? (
-                                  <div className='flex items-center gap-1'>
-                                    <div className='h-3 w-3 animate-spin rounded-full border-b-2 border-gray-400'></div>
-                                    <span>Loading...</span>
-                                  </div>
-                                ) : selectedProduct ? (
-                                  <span className={selectedProduct.stockQuantity > 0 ? 'text-green-600' : 'text-red-600'}>
-                                    {selectedProduct.stockQuantity} available
-                                  </span>
-                                ) : (
-                                  'Select product'
-                                )}
-                              </div>
-
-                              <div>
-                                <Button
-                                  type='button'
-                                  variant='destructive'
-                                  size='sm'
-                                  onClick={() => {
-                                    const newItems = [...field.value];
-                                    newItems.splice(index, 1);
-                                    field.onChange(newItems);
-                                  }}
-                                  disabled={field.value.length <= 1}
-                                >
-                                  <IconTrash size={16} />
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        <div className='flex justify-end'>
-                          <Button
-                            type='button'
-                            onClick={() => {
-                              field.onChange([
-                                ...field.value,
-                                { productId: '', quantity: 1 }
-                              ]);
-                            }}
-                            disabled={loadingProducts || availableProducts.length === 0}
-                          >
-                            Add Item
-                          </Button>
-                        </div>
-
-                        {availableProducts.length === 0 && !loadingProducts && (
-                          <div className='rounded-lg bg-yellow-50 p-4 text-center text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200'>
-                            <p>No products available at the selected source location.</p>
-                          </div>
-                        )}
-                      </div>
+                      <Input placeholder='Enter any additional notes' {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name='notes'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder='Enter any additional notes' {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <div className='flex justify-end gap-2'>
+                <Button
+                  type='submit'
+                  disabled={isLoading}
+                  className='min-w-24'
+                >
+                  {isLoading ? (
+                    <div className='flex items-center gap-2'>
+                      <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-white'></div>
+                      {isEdit ? 'Updating...' : 'Creating...'}
+                    </div>
+                  ) : isEdit ? (
+                    'Update Transfer'
+                  ) : (
+                    'Create Transfer'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
 
-            <div className='flex justify-end gap-2'>
-              <Button
-                type='submit'
-                disabled={isLoading}
-                className='min-w-24'
-              >
-                {isLoading ? (
-                  <div className='flex items-center gap-2'>
-                    <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-white'></div>
-                    {isEdit ? 'Updating...' : 'Creating...'}
-                  </div>
-                ) : isEdit ? (
-                  'Update Transfer'
-                ) : (
-                  'Create Transfer'
-                )}
-              </Button>
+      {/* Image View Modal - Big Image Preview */}
+      <Modal
+        isOpen={showImageModal}
+        onClose={() => setShowImageModal(false)}
+        title={`Product: ${selectedProductName}`}
+        description='Click outside or press ESC to close'
+      >
+        <div className="relative w-full max-h-[70vh] flex items-center justify-center">
+          {selectedImageUrl ? (
+            <div className="relative w-full h-[60vh]">
+              <Image
+                src={selectedImageUrl}
+                alt={selectedProductName}
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, 80vw"
+                priority
+              />
             </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+          ) : (
+            <div className="flex items-center justify-center h-[60vh] w-full bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <div className="text-center">
+                <svg className="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-gray-500 dark:text-gray-400">No image available</p>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowImageModal(false)}
+          >
+            Close
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }

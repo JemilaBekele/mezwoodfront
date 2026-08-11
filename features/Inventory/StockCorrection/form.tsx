@@ -5,6 +5,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import Select from 'react-select';
+import Image from 'next/image';
 import {
   Form,
   FormControl,
@@ -33,6 +34,8 @@ import {
 import { getStoresAll } from '@/service/store';
 import { getShowroomsAll } from '@/service/showroom';
 import { getProducts } from '@/service/transfer';
+import { Modal } from '@/components/ui/modal';
+import { normalizeImagePath } from '@/lib/norm';
 
 // Define types for form data
 interface FormItemType {
@@ -89,6 +92,69 @@ const reasonOptions = [
   { value: 'MANUAL_ADJUSTMENT', label: 'Manual Adjustment' }
 ];
 
+
+// Custom Option component for react-select with image
+const CustomOption = (props: any) => {
+  const { data, innerRef, innerProps, isFocused, isSelected } = props;
+  
+  return (
+    <div
+      ref={innerRef}
+      {...innerProps}
+      className={`flex items-center gap-3 px-3 py-2 cursor-pointer ${
+        isFocused ? 'bg-gray-100 dark:bg-gray-700' : ''
+      } ${isSelected ? 'bg-primary/10 dark:bg-primary/20' : ''}`}
+    >
+      {data.imageUrl ? (
+        <div className="relative h-8 w-8 rounded overflow-hidden shrink-0 border border-gray-200 dark:border-gray-600">
+          <Image
+            src={normalizeImagePath(data.imageUrl) || ''}
+            alt={data.label}
+            fill
+            className="object-cover"
+            sizes="32px"
+          />
+        </div>
+      ) : (
+        <div className="h-8 w-8 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-600">
+          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+      <span>{data.label}</span>
+    </div>
+  );
+};
+
+// Custom SingleValue component to show image in selected value
+const CustomSingleValue = (props: any) => {
+  const { data } = props;
+  
+  return (
+    <div className="flex items-center gap-3">
+      {data.imageUrl ? (
+        <div className="relative h-6 w-6 rounded overflow-hidden shrink-0 border border-gray-200 dark:border-gray-600">
+          <Image
+            src={normalizeImagePath(data.imageUrl) || ''}
+            alt={data.label}
+            fill
+            className="object-cover"
+            sizes="24px"
+          />
+        </div>
+      ) : (
+        <div className="h-6 w-6 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-600">
+          <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+      <span>{data.label}</span>
+    </div>
+  );
+};
+
 export default function StockCorrectionForm({
   initialData,
   isEdit = false
@@ -100,6 +166,9 @@ export default function StockCorrectionForm({
   const [isMounted, setIsMounted] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingLocations, setLoadingLocations] = useState(true);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [selectedProductName, setSelectedProductName] = useState<string>('');
   
   const hasFetchedProductsRef = useRef(false);
   const lastLocationRef = useRef<string>('');
@@ -295,6 +364,21 @@ export default function StockCorrectionForm({
     return () => observer.disconnect();
   }, []);
 
+  // Handle image click to open in modal
+  const handleImageClick = (productId: string) => {
+    const product = availableProducts.find(p => p.id === productId);
+    if (product) {
+      if (product.imageUrl) {
+        setSelectedImageUrl(normalizeImagePath(product.imageUrl) || null);
+        const productName = `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`;
+        setSelectedProductName(productName);
+        setShowImageModal(true);
+      } else {
+        toast.info('No image available for this product');
+      }
+    }
+  };
+
   const darkStyles = {
     control: (base: any) => ({
       ...base,
@@ -418,120 +502,81 @@ export default function StockCorrectionForm({
   }
 
   return (
-    <Card className='mx-auto w-full'>
-      <CardHeader>
-        <CardTitle className='text-left text-2xl font-bold'>
-          {isEdit ? 'Edit Stock Correction' : 'Create Stock Correction'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
-            <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
-              <FormField
-                control={form.control}
-                name='reason'
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel>Reason</FormLabel>
-                    <ShadcnSelect
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select reason' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {reasonOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </ShadcnSelect>
-                    {fieldState.error && (
-                      <p className='text-sm font-medium text-destructive'>
-                        {fieldState.error.message}
-                      </p>
-                    )}
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='reference'
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel>Reference (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder='Enter reference' {...field} />
-                    </FormControl>
-                    {fieldState.error && (
-                      <p className='text-sm font-medium text-destructive'>
-                        {fieldState.error.message}
-                      </p>
-                    )}
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Product Type Selection */}
-            <div className='rounded-lg border p-4'>
-              <h3 className='mb-4 text-lg font-semibold'>Step 1: Select Product Type</h3>
-              <FormField
-                control={form.control}
-                name='productType'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>What do you want to adjust?</FormLabel>
-                    <ShadcnSelect
-                      value={field.value}
-                      onValueChange={(value: 'items' | 'materials') => {
-                        field.onChange(value);
-                        form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
-                        setAvailableProducts([]);
-                        hasFetchedProductsRef.current = false;
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='Select product type' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value='items'>Items (Products)</SelectItem>
-                        <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
-                      </SelectContent>
-                    </ShadcnSelect>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Location Selection */}
-            <div className='rounded-lg border p-4'>
-              <h3 className='mb-4 text-lg font-semibold'>Step 2: Select Location</h3>
+    <>
+      <Card className='mx-auto w-full'>
+        <CardHeader>
+          <CardTitle className='text-left text-2xl font-bold'>
+            {isEdit ? 'Edit Stock Correction' : 'Create Stock Correction'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
               <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
                 <FormField
                   control={form.control}
-                  name='locationType'
-                  render={({ field }) => (
+                  name='reason'
+                  render={({ field, fieldState }) => (
                     <FormItem>
-                      <FormLabel>Location Type</FormLabel>
+                      <FormLabel>Reason</FormLabel>
                       <ShadcnSelect
                         value={field.value}
-                        onValueChange={(value: 'STORE' | 'SHOWROOM') => {
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder='Select reason' />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {reasonOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </ShadcnSelect>
+                      {fieldState.error && (
+                        <p className='text-sm font-medium text-destructive'>
+                          {fieldState.error.message}
+                        </p>
+                      )}
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='reference'
+                  render={({ field, fieldState }) => (
+                    <FormItem>
+                      <FormLabel>Reference (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder='Enter reference' {...field} />
+                      </FormControl>
+                      {fieldState.error && (
+                        <p className='text-sm font-medium text-destructive'>
+                          {fieldState.error.message}
+                        </p>
+                      )}
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Product Type Selection */}
+              <div className='rounded-lg border p-4'>
+                <h3 className='mb-4 text-lg font-semibold'>Step 1: Select Product Type</h3>
+                <FormField
+                  control={form.control}
+                  name='productType'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>What do you want to adjust?</FormLabel>
+                      <ShadcnSelect
+                        value={field.value}
+                        onValueChange={(value: 'items' | 'materials') => {
                           field.onChange(value);
-                          if (value === 'STORE') {
-                            form.setValue('showroomId', '');
-                          } else {
-                            form.setValue('storeId', '');
-                          }
                           form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
                           setAvailableProducts([]);
                           hasFetchedProductsRef.current = false;
@@ -539,286 +584,414 @@ export default function StockCorrectionForm({
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder='Select location type' />
+                            <SelectValue placeholder='Select product type' />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value='STORE'>Store</SelectItem>
-                          <SelectItem value='SHOWROOM'>Showroom</SelectItem>
+                          <SelectItem value='items'>Items (Products)</SelectItem>
+                          <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
                         </SelectContent>
                       </ShadcnSelect>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {locationType === 'STORE' && (
-                  <FormField
-                    control={form.control}
-                    name='storeId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Store</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
-                            setAvailableProducts([]);
-                            hasFetchedProductsRef.current = false;
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select store' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {stores.map((store) => (
-                              <SelectItem key={store.id} value={store.id.toString()}>
-                                {store.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {locationType === 'SHOWROOM' && (
-                  <FormField
-                    control={form.control}
-                    name='showroomId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Showroom</FormLabel>
-                        <ShadcnSelect
-                          value={field.value}
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
-                            setAvailableProducts([]);
-                            hasFetchedProductsRef.current = false;
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder='Select showroom' />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {showrooms.map((showroom) => (
-                              <SelectItem key={showroom.id} value={showroom.id.toString()}>
-                                {showroom.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
               </div>
-            </div>
 
-            {/* Items Selection */}
-            <div className='rounded-lg border p-4'>
-              <h3 className='mb-4 text-lg font-semibold'>Step 3: Select Products to Adjust</h3>
+              {/* Location Selection */}
+              <div className='rounded-lg border p-4'>
+                <h3 className='mb-4 text-lg font-semibold'>Step 2: Select Location</h3>
+                <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='locationType'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location Type</FormLabel>
+                        <ShadcnSelect
+                          value={field.value}
+                          onValueChange={(value: 'STORE' | 'SHOWROOM') => {
+                            field.onChange(value);
+                            if (value === 'STORE') {
+                              form.setValue('showroomId', '');
+                            } else {
+                              form.setValue('storeId', '');
+                            }
+                            form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
+                            setAvailableProducts([]);
+                            hasFetchedProductsRef.current = false;
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select location type' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value='STORE'>Store</SelectItem>
+                            <SelectItem value='SHOWROOM'>Showroom</SelectItem>
+                          </SelectContent>
+                        </ShadcnSelect>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {locationType === 'STORE' && (
+                    <FormField
+                      control={form.control}
+                      name='storeId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Store</FormLabel>
+                          <ShadcnSelect
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
+                              setAvailableProducts([]);
+                              hasFetchedProductsRef.current = false;
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder='Select store' />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {stores.map((store) => (
+                                <SelectItem key={store.id} value={store.id.toString()}>
+                                  {store.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </ShadcnSelect>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {locationType === 'SHOWROOM' && (
+                    <FormField
+                      control={form.control}
+                      name='showroomId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Showroom</FormLabel>
+                          <ShadcnSelect
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue('items', [{ productId: '', quantity: 1, availableStock: 0 }]);
+                              setAvailableProducts([]);
+                              hasFetchedProductsRef.current = false;
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder='Select showroom' />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {showrooms.map((showroom) => (
+                                <SelectItem key={showroom.id} value={showroom.id.toString()}>
+                                  {showroom.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </ShadcnSelect>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Items Selection */}
+              <div className='rounded-lg border p-4'>
+                <h3 className='mb-4 text-lg font-semibold'>Step 3: Select Products to Adjust</h3>
+                <FormField
+                  control={form.control}
+                  name='items'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className='space-y-4'>
+                          <div className='grid grid-cols-6 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
+                            <div className='col-span-2'>Product</div>
+                            <div>Quantity (+/-)</div>
+                            <div>Available Stock</div>
+                            <div>Image</div>
+                            <div>Action</div>
+                          </div>
+
+                          {field.value.map((item, index) => {
+                            const selectedProduct = availableProducts.find(
+                              (p) => p.id === item.productId
+                            );
+
+                            const productOptions = availableProducts.map((product) => ({
+                              value: product.id,
+                              label: `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`,
+                              imageUrl: product.imageUrl,
+                              data: product
+                            }));
+
+                            return (
+                              <div key={index} className='grid grid-cols-6 items-center gap-4'>
+                                <div className='col-span-2'>
+                                  <Select
+                                    instanceId={`product-select-${index}`}
+                                    options={productOptions}
+                                    onChange={(newValue: any) => {
+                                      const newItems = [...field.value];
+                                      const selectedProductData = availableProducts.find(p => p.id === newValue?.value);
+                                      newItems[index].productId = newValue?.value || '';
+                                      newItems[index].quantity = 1;
+                                      newItems[index].availableStock = selectedProductData?.stockQuantity || 0;
+                                      newItems[index].stockError = undefined;
+                                      field.onChange(newItems);
+                                    }}
+                                    value={
+                                      productOptions.find(
+                                        (p) => p.value === item.productId
+                                      ) || null
+                                    }
+                                    placeholder={loadingProducts ? "Loading products..." : "Search product"}
+                                    isSearchable
+                                    isDisabled={loadingProducts || availableProducts.length === 0}
+                                    isLoading={loadingProducts}
+                                    styles={isDark ? darkStyles : {}}
+                                    components={{
+                                      Option: CustomOption,
+                                      SingleValue: CustomSingleValue
+                                    }}
+                                  />
+                                  {selectedProduct && (
+                                    <div className='mt-1 text-xs text-gray-500'>
+                                      {productType === 'items' ? (
+                                        <>
+                                          {selectedProduct.category && `Category: ${selectedProduct.category}`}
+                                          {selectedProduct.type && ` | Type: ${selectedProduct.type}`}
+                                        </>
+                                      ) : (
+                                        <>
+                                          {selectedProduct.materialType && `Type: ${selectedProduct.materialType}`}
+                                          {selectedProduct.unitOfMeasure && ` | Unit: ${selectedProduct.unitOfMeasure}`}
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <Input
+                                    type='text'
+                                    inputMode='decimal'
+                                    placeholder='+/- Qty'
+                                    value={item.quantity.toString()}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      // Allow numbers, decimal point, and minus sign
+                                      const validPattern = /^-?\d*\.?\d*$/;
+                                      
+                                      if (validPattern.test(value)) {
+                                        const newItems = [...field.value];
+                                        newItems[index].quantity = value;
+                                        field.onChange(newItems);
+                                      }
+                                    }}
+                                    disabled={!item.productId || loadingProducts}
+                                    className={form.getFieldState(`items.${index}.quantity` as any).error ? 'border-red-500' : ''}
+                                  />
+                                  {form.getFieldState(`items.${index}.quantity` as any).error && (
+                                    <p className='text-sm font-medium text-destructive mt-1'>
+                                      {form.getFieldState(`items.${index}.quantity` as any).error?.message}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className='text-sm'>
+                                  {selectedProduct ? (
+                                    <span className={selectedProduct.stockQuantity === 0 ? 'text-red-500' : 'text-green-600'}>
+                                      {selectedProduct.stockQuantity} available
+                                    </span>
+                                  ) : (
+                                    <span className='text-gray-400'>Select product</span>
+                                  )}
+                                </div>
+
+                                {/* Image Display - Clickable to view larger */}
+                                <div className='flex items-center justify-center'>
+                                  {item.productId && selectedProduct ? (
+                                    <div 
+                                      className={`relative h-12 w-12 rounded overflow-hidden border-2 border-gray-200 dark:border-gray-600 cursor-pointer hover:border-primary transition-all duration-200 ${
+                                        selectedProduct.imageUrl ? 'hover:scale-105' : ''
+                                      }`}
+                                      onClick={() => handleImageClick(item.productId)}
+                                      title={selectedProduct.imageUrl ? 'Click to view larger' : 'No image available'}
+                                    >
+                                      {selectedProduct.imageUrl ? (
+                                        <Image
+                                          src={normalizeImagePath(selectedProduct.imageUrl) || ''}
+                                          alt={selectedProduct.name}
+                                          fill
+                                          className="object-cover"
+                                          sizes="48px"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                          <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                      {selectedProduct.imageUrl && (
+                                        <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                                          <svg className="h-6 w-6 text-white opacity-0 hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="h-12 w-12 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center">
+                                      <span className="text-xs text-gray-400">No prod.</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <Button
+                                    type='button'
+                                    variant='destructive'
+                                    size='sm'
+                                    onClick={() => {
+                                      const newItems = [...field.value];
+                                      newItems.splice(index, 1);
+                                      field.onChange(newItems);
+                                    }}
+                                    disabled={field.value.length <= 1}
+                                  >
+                                    <IconTrash size={16} />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          <div className='flex justify-end'>
+                            <Button
+                              type='button'
+                              onClick={() => {
+                                field.onChange([
+                                  ...field.value,
+                                  { productId: '', quantity: 1, availableStock: 0 }
+                                ]);
+                              }}
+                              disabled={loadingProducts || availableProducts.length === 0}
+                            >
+                              Add Item
+                            </Button>
+                          </div>
+
+                          {availableProducts.length === 0 && !loadingProducts && (
+                            <div className='rounded-lg bg-yellow-50 p-4 text-center text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200'>
+                              <p>No products available at the selected location.</p>
+                              <p className='text-sm mt-1'>Please check that you have selected the correct product type and location.</p>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
-                name='items'
-                render={({ field }) => (
+                name='notes'
+                render={({ field, fieldState }) => (
                   <FormItem>
+                    <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <div className='space-y-4'>
-                        <div className='grid grid-cols-5 gap-4 text-sm font-semibold text-gray-700 dark:text-gray-300'>
-                          <div className='col-span-2'>Product</div>
-                          <div>Quantity (+/-)</div>
-                          <div>Available Stock</div>
-                          <div>Action</div>
-                        </div>
-
-                        {field.value.map((item, index) => {
-                          const selectedProduct = availableProducts.find(
-                            (p) => p.id === item.productId
-                          );
-
-                          const productOptions = availableProducts.map((product) => ({
-                            value: product.id,
-                            label: `${product.name}${product.color ? ` - ${product.color}` : ''}${product.size ? ` (${product.size})` : ''}`,
-                            data: product
-                          }));
-
-                          return (
-                            <div key={index} className='grid grid-cols-5 items-center gap-4'>
-                              <div className='col-span-2'>
-                                <Select
-                                  instanceId={`product-select-${index}`}
-                                  options={productOptions}
-                                  onChange={(newValue: any) => {
-                                    const newItems = [...field.value];
-                                    const selectedProductData = availableProducts.find(p => p.id === newValue?.value);
-                                    newItems[index].productId = newValue?.value || '';
-                                    newItems[index].quantity = 1;
-                                    newItems[index].availableStock = selectedProductData?.stockQuantity || 0;
-                                    newItems[index].stockError = undefined;
-                                    field.onChange(newItems);
-                                  }}
-                                  value={
-                                    productOptions.find(
-                                      (p) => p.value === item.productId
-                                    ) || null
-                                  }
-                                  placeholder={loadingProducts ? "Loading products..." : "Search product"}
-                                  isSearchable
-                                  isDisabled={loadingProducts || availableProducts.length === 0}
-                                  isLoading={loadingProducts}
-                                  styles={isDark ? darkStyles : {}}
-                                />
-                                {selectedProduct && (
-                                  <div className='mt-1 text-xs text-gray-500'>
-                                    {productType === 'items' ? (
-                                      <>
-                                        {selectedProduct.category && `Category: ${selectedProduct.category}`}
-                                        {selectedProduct.type && ` | Type: ${selectedProduct.type}`}
-                                      </>
-                                    ) : (
-                                      <>
-                                        {selectedProduct.materialType && `Type: ${selectedProduct.materialType}`}
-                                        {selectedProduct.unitOfMeasure && ` | Unit: ${selectedProduct.unitOfMeasure}`}
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div>
-                                <Input
-                                  type='text'
-                                  inputMode='decimal'
-                                  placeholder='+/- Qty'
-                                  value={item.quantity.toString()}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    // Allow numbers, decimal point, and minus sign
-                                    const validPattern = /^-?\d*\.?\d*$/;
-                                    
-                                    if (validPattern.test(value)) {
-                                      const newItems = [...field.value];
-                                      newItems[index].quantity = value;
-                                      field.onChange(newItems);
-                                    }
-                                  }}
-                                  disabled={!item.productId || loadingProducts}
-                                  className={form.getFieldState(`items.${index}.quantity` as any).error ? 'border-red-500' : ''}
-                                />
-                                {form.getFieldState(`items.${index}.quantity` as any).error && (
-                                  <p className='text-sm font-medium text-destructive mt-1'>
-                                    {form.getFieldState(`items.${index}.quantity` as any).error?.message}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className='text-sm'>
-                                {selectedProduct ? (
-                                  <span className={selectedProduct.stockQuantity === 0 ? 'text-red-500' : 'text-green-600'}>
-                                    {selectedProduct.stockQuantity} available
-                                  </span>
-                                ) : (
-                                  <span className='text-gray-400'>Select product</span>
-                                )}
-                              </div>
-
-                              <div>
-                                <Button
-                                  type='button'
-                                  variant='destructive'
-                                  size='sm'
-                                  onClick={() => {
-                                    const newItems = [...field.value];
-                                    newItems.splice(index, 1);
-                                    field.onChange(newItems);
-                                  }}
-                                  disabled={field.value.length <= 1}
-                                >
-                                  <IconTrash size={16} />
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        <div className='flex justify-end'>
-                          <Button
-                            type='button'
-                            onClick={() => {
-                              field.onChange([
-                                ...field.value,
-                                { productId: '', quantity: 1, availableStock: 0 }
-                              ]);
-                            }}
-                            disabled={loadingProducts || availableProducts.length === 0}
-                          >
-                            Add Item
-                          </Button>
-                        </div>
-
-                        {availableProducts.length === 0 && !loadingProducts && (
-                          <div className='rounded-lg bg-yellow-50 p-4 text-center text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200'>
-                            <p>No products available at the selected location.</p>
-                            <p className='text-sm mt-1'>Please check that you have selected the correct product type and location.</p>
-                          </div>
-                        )}
-                      </div>
+                      <Input placeholder='Enter notes (optional)' {...field} />
                     </FormControl>
-                    <FormMessage />
+                    {fieldState.error && (
+                      <p className='text-sm font-medium text-destructive'>
+                        {fieldState.error.message}
+                      </p>
+                    )}
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name='notes'
-              render={({ field, fieldState }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Input placeholder='Enter notes (optional)' {...field} />
-                  </FormControl>
-                  {fieldState.error && (
-                    <p className='text-sm font-medium text-destructive'>
-                      {fieldState.error.message}
-                    </p>
+              <div className='flex justify-end gap-2'>
+                <Button
+                  type='submit'
+                  disabled={isLoading || loadingProducts}
+                  className='min-w-24'
+                >
+                  {isLoading ? (
+                    <div className='flex items-center gap-2'>
+                      <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-white'></div>
+                      {isEdit ? 'Updating...' : 'Creating...'}
+                    </div>
+                  ) : isEdit ? (
+                    'Update Stock Correction'
+                  ) : (
+                    'Create Stock Correction'
                   )}
-                </FormItem>
-              )}
-            />
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
 
-            <div className='flex justify-end gap-2'>
-              <Button
-                type='submit'
-                disabled={isLoading || loadingProducts}
-                className='min-w-24'
-              >
-                {isLoading ? (
-                  <div className='flex items-center gap-2'>
-                    <div className='h-4 w-4 animate-spin rounded-full border-b-2 border-white'></div>
-                    {isEdit ? 'Updating...' : 'Creating...'}
-                  </div>
-                ) : isEdit ? (
-                  'Update Stock Correction'
-                ) : (
-                  'Create Stock Correction'
-                )}
-              </Button>
+      {/* Image View Modal - Big Image Preview */}
+      <Modal
+        isOpen={showImageModal}
+        onClose={() => setShowImageModal(false)}
+        title={`Product: ${selectedProductName}`}
+        description='Click outside or press ESC to close'
+      >
+        <div className="relative w-full max-h-[70vh] flex items-center justify-center">
+          {selectedImageUrl ? (
+            <div className="relative w-full h-[60vh]">
+              <Image
+                src={selectedImageUrl}
+                alt={selectedProductName}
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, 80vw"
+                priority
+              />
             </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+          ) : (
+            <div className="flex items-center justify-center h-[60vh] w-full bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <div className="text-center">
+                <svg className="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-gray-500 dark:text-gray-400">No image available</p>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowImageModal(false)}
+          >
+            Close
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }

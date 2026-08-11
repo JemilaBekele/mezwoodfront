@@ -3,13 +3,14 @@ import { IMaterial } from "./material";
 import { IProductCategory, IProductType, ISize } from "./productConfiguration";
 
 export interface IItem {
+    imageUrl?: string;
+
   stockDetails: any;
   itemMaterials: boolean;
   id: string;
   name: string;
 
   price: number;
-  imageUrl?: string;
     itemImages?: IItemImage[];
 
   color?: string;
