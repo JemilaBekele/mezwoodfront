@@ -40,6 +40,17 @@ export const getDeliveryDateComparisonReport = async () => {
     throw error;
   }
 };
+export const getCompletedProjectsReport = async () => {
+  try {
+    const response = await axiosInstance.get(
+      `/reports/completed-projects`,
+    );
+
+    return response.data.data;
+  } catch (error) {
+    throw error;
+  }
+};
 export const getDetailedFinishedProductsReport = async (
   params?: {
     startDate?: string;

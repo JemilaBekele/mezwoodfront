@@ -25,9 +25,9 @@ export const navItems: NavItem[] = [
 
   {
     title: 'Report',
-    url: '/dashboard/CombinedReportDashboard',
+   url: '#',
     icon: 'fileText',
-    permission: 'VIEW_REPORT',
+    permission: 'VIEW_COMBINED_REPORT',
     items: [
       {
         title: 'Combined Report',
@@ -56,7 +56,14 @@ export const navItems: NavItem[] = [
         icon: 'package',
         shortcut: ['ps', 'ps'],
         permission: 'VIEW_DETAILED_FINISHED_PRODUCTS'
-      }
+      },
+            { 
+              title: 'Delivery Date Comparison', 
+              url: '/dashboard/deliverycomplete', 
+              icon: 'calendar', 
+              shortcut: ['d', 'c'], 
+              permission: 'VIEW_COMBINED_REPORT' 
+            },
     ]
   },
 
