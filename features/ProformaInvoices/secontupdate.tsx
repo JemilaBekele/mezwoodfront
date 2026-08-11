@@ -1804,68 +1804,7 @@ export default function ProformaInvoiceForm({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-3 pt-4 px-4">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-sm font-semibold">Attachments</CardTitle>
-                {isEditMode && (
-                  <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                    Read Only
-                  </Badge>
-                )}
-                {attachments.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px] h-5">
-                    {attachments.length}
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 px-4 pb-4">
-              <div
-                className={`flex cursor-pointer items-center justify-center gap-3 rounded-lg border-2 border-dashed bg-muted/20 px-6 py-5 transition-colors ${isEditMode ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/40 hover:bg-muted/40'}`}
-                onClick={() => {
-                  if (!isEditMode) {
-                    document.getElementById('attachments')?.click();
-                  } else {
-                    toast.info('Attachments cannot be added in edit mode');
-                  }
-                }}
-              >
-                <input
-                  type="file"
-                  id="attachments"
-                  multiple
-                  onChange={handleAttachmentChange}
-                  className="hidden"
-                  disabled={isEditMode}
-                />
-                <Upload className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">{isEditMode ? 'Attachments are read-only' : 'Click to upload files'}</p>
-                  <p className="text-xs text-muted-foreground">{isEditMode ? 'Add attachments during creation only' : 'Attach supporting documents'}</p>
-                </div>
-              </div>
-
-              {attachments.length > 0 && (
-                <div className="space-y-2">
-                  {attachments.map((file, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between rounded-lg border bg-card px-4 py-2.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Download className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{file.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({(file.size / 1024).toFixed(1)} KB)
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+     
 
           <div className="flex items-center justify-end gap-3">
             <Button

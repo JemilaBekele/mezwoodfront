@@ -137,7 +137,7 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
       variant: 'default',
       icon: FileCheck,
       color: 'text-emerald-500',
-      description: 'Design phase completed but awaiting final approval or stock check',
+      description: 'Design  completed ',
     },
     [DesignStatus.FINISHED]: {
        label: 'Proceed to Production',

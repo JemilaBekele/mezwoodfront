@@ -128,9 +128,8 @@ export const navItems: NavItem[] = [
       { title: 'View all Design', url: '/dashboard/Stage/Design', icon: 'penTool', shortcut: ['m', 'm'], permission: 'MANAGE_ALL_STAGES' },
       { title: 'Unassigned Design', url: '/dashboard/Stage/Design/unassigned', icon: 'userX', shortcut: ['m', 'm'], permission: 'VIEW_UNASSIGNED_DESIGN_PROJECTS' },
       { title: 'My Design', url: '/dashboard/Stage/Design/mydesign', icon: 'userCheck', shortcut: ['m', 'm'], permission: 'VIEW_DESIGN_PROJECTS_BY_DESIGNER' },
-      { title: 'Purchase', url: '/dashboard/Stage/Purchase', icon: 'shoppingCart', shortcut: ['m', 'm'],
+      { title: 'Stock Management', url: '/dashboard/Stage/Purchase', icon: 'shoppingCart', shortcut: ['m', 'm'],
          permission: 'VIEW_PURCHASING_PROJECTS' },
-      { title: 'Stock check Purchase', url: '/dashboard/Stage/Purchase/stockcheck', icon: 'search', shortcut: ['m', 'm'], permission: 'VIEW_PURCHASING_PROJECTS' },
       { title: 'Metal Works', url: '/dashboard/Stage/metalworks', icon: 'hammer', shortcut: ['m', 'm'],         countKey: 'METAL_WORKS',
 
          permission: 'VIEW_METAL_WORK_PROJECTS' },

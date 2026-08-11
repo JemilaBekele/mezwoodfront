@@ -228,14 +228,24 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     fetchBanksData();
   }, [paymentData.bankId, paymentDialogOpen, isStoreInvoice]);
 
-  // Handle status change
-  const handleStatusChange = (value: PIStatus) => {
-    setSelectedStatus(value);
-    if (value !== invoice?.status) {
-      setPendingStatus(value);
-      setShowStatusAlert(true);
-    }
-  };
+// Show warning when NO PAYMENT has been made (Amount Paid = 0)
+const showNoPaymentWarning = () => {
+  const amountPaid = invoice?.amountPaid || 0;
+  return amountPaid <= 0;
+};
+
+// Handle status change - SHOW WARNING BUT DON'T BLOCK
+const handleStatusChange = (value: PIStatus) => {
+  setSelectedStatus(value);
+  
+
+  
+  // Always proceed with status change
+  if (value !== invoice?.status) {
+    setPendingStatus(value);
+    setShowStatusAlert(true);
+  }
+};
 
   // Handle status update confirm
   const handleStatusUpdateConfirm = async () => {
@@ -340,58 +350,90 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     }
   }, [paymentDialogOpen]);
 
-  // Get status alert message
-  const getStatusAlertMessage = () => {
-    if (!pendingStatus || !invoice) return { title: '', description: '', variant: 'default' };
-    
-    const currentStatus = invoice.status;
-    const newStatus = pendingStatus;
-    const statusConfig = getStatusConfig(newStatus);
-    
-    if (newStatus === PIStatus.APPROVED_CREATE_PROJECT) {
+  // Get status alert message - SHOW WARNING BUT DON'T BLOCK
+const getStatusAlertMessage = () => {
+  if (!pendingStatus || !invoice) return { title: '', description: '', variant: 'default' };
+  
+  const currentStatus = invoice.status;
+  const newStatus = pendingStatus;
+  const statusConfig = getStatusConfig(newStatus);
+  const isNoPayment = showNoPaymentWarning();
+  
+  if (newStatus === PIStatus.APPROVED_CREATE_PROJECT) {
+    // If NO payment has been made, show a warning message
+    if (isNoPayment) {
       return {
-        title: 'Confirm Project Creation',
-        description: `Approve this invoice and proceed to create a new project? This will change status to "Approved - Create Project" and redirect to the project workflow.`,
-        variant: 'default'
-      };
-    } else if (newStatus === PIStatus.APPROVED_ST) {
-      return {
-        title: 'Confirm Approval',
-        description: `Approve this invoice? Status will update from ${currentStatus} to ${statusConfig.label}.`,
-        variant: 'default'
-      };
-    } else if (newStatus === PIStatus.SENT_TO_CLIENT) {
-      return {
-        title: 'Confirm Send to Client',
-        description: `Mark invoice as sent to client? Status will change from ${currentStatus} to ${statusConfig.label}.`,
-        variant: 'default'
-      };
-    } else if (newStatus === PIStatus.APPROVED_CLIENT) {
-      return {
-        title: 'Confirm Client Approval',
-        description: `Mark invoice as approved by client? Status will change from ${currentStatus} to ${statusConfig.label}.`,
-        variant: 'default'
-      };
-    } else if (newStatus === PIStatus.REVISION) {
-      return {
-        title: 'Confirm Revision Request',
-        description: `Request revisions for this invoice? Status will change from ${currentStatus} to ${statusConfig.label}.`,
-        variant: 'destructive'
-      };
-    } else if (newStatus === PIStatus.CANCELLED) {
-      return {
-        title: 'Confirm Cancellation',
-        description: `Cancel this invoice? This action is permanent.`,
-        variant: 'destructive'
+        title: '',
+        description: ``,
+        variant: 'destructive',
+        isBlocked: false, // NOT BLOCKED
+        balanceWarning: true
       };
     }
-    
     return {
-      title: 'Confirm Status Change',
-      description: `Change status from ${currentStatus} to ${statusConfig.label}?`,
-      variant: 'default'
+      title: 'Confirm Project Creation',
+      description: `Approve this invoice and proceed to create a new project? This will change status to "Approved - Create Project" and redirect to the project workflow.`,
+      variant: 'default',
+      isBlocked: false,
+      balanceWarning: false
     };
+  } else if (newStatus === PIStatus.APPROVED_ST) {
+    return {
+      title: 'Confirm Approval',
+      description: `Approve this invoice? Status will update from ${currentStatus} to ${statusConfig.label}.`,
+      variant: 'default',
+      isBlocked: false,
+      balanceWarning: false
+    };
+  } else if (newStatus === PIStatus.SENT_TO_CLIENT) {
+    return {
+      title: 'Confirm Send to Client',
+      description: `Mark invoice as sent to client? Status will change from ${currentStatus} to ${statusConfig.label}.`,
+      variant: 'default',
+      isBlocked: false,
+      balanceWarning: false
+    };
+  } else if (newStatus === PIStatus.APPROVED_CLIENT) {
+    return {
+      title: 'Confirm Client Approval',
+      description: `Mark invoice as approved by client? Status will change from ${currentStatus} to ${statusConfig.label}.`,
+      variant: 'default',
+      isBlocked: false,
+      balanceWarning: false
+    };
+  } else if (newStatus === PIStatus.REVISION) {
+    return {
+      title: 'Confirm Revision Request',
+      description: `Request revisions for this invoice? Status will change from ${currentStatus} to ${statusConfig.label}.`,
+      variant: 'destructive',
+      isBlocked: false,
+      balanceWarning: false
+    };
+  } else if (newStatus === PIStatus.CANCELLED) {
+    return {
+      title: 'Confirm Cancellation',
+      description: `Cancel this invoice? This action is permanent.`,
+      variant: 'destructive',
+      isBlocked: false,
+      balanceWarning: false
+    };
+  }
+  
+  return {
+    title: 'Confirm Status Change',
+    description: `Change status from ${currentStatus} to ${statusConfig.label}?`,
+    variant: 'default',
+    isBlocked: false,
+    balanceWarning: false
   };
+};
+
+// NEVER BLOCK - always return false
+const isStatusChangeBlocked = (status: PIStatus): boolean => {
+  // Show warning but NEVER block
+  return false;
+};
+
 
   // Get payment alert message
   const getPaymentAlertMessage = () => {
@@ -533,6 +575,7 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
     }).format(amount);
   };
 
+
   const handleCreateProject = () => {
     router.push(`/dashboard/ProformaInvoice/Project?id=${id}`);
   };
@@ -659,79 +702,120 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
         </div>
       </div>
 
-      {/* Status Update Alert Dialog */}
-      <AlertDialog open={showStatusAlert} onOpenChange={setShowStatusAlert}>
-        <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-slate-900">
-              {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && (
-                <ArrowRight className="h-5 w-5 text-emerald-600" />
-              )}
-              {pendingStatus === PIStatus.CANCELLED && (
-                <AlertTriangle className="h-5 w-5 text-rose-600" />
-              )}
-              {pendingStatus === PIStatus.REVISION && (
-                <RefreshCw className="h-5 w-5 text-orange-600" />
-              )}
-              {alertMessage.title}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600 text-sm mt-1">
-              {alertMessage.description}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          {pendingStatus === PIStatus.CANCELLED && (
-            <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-lg">
-              <p className="text-xs text-rose-700 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                Warning: Cancelling this invoice is permanent and cannot be undone.
-              </p>
+      {/* Status Update Alert Dialog - SHOW WARNING BUT ALLOW ACTION */}
+<AlertDialog open={showStatusAlert} onOpenChange={setShowStatusAlert}>
+  <AlertDialogContent className={`rounded-xl border border-slate-200 shadow-xl max-w-md ${alertMessage.balanceWarning ? 'border-red-500 border-4' : ''}`}>
+    <AlertDialogHeader>
+      <AlertDialogTitle className={`flex items-center gap-2 ${alertMessage.balanceWarning ? 'text-red-700' : 'text-slate-900'}`}>
+        {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && alertMessage.balanceWarning && (
+          <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />
+        )}
+        {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && !alertMessage.balanceWarning && (
+          <ArrowRight className="h-5 w-5 text-emerald-600" />
+        )}
+        {pendingStatus === PIStatus.CANCELLED && (
+          <AlertTriangle className="h-5 w-5 text-rose-600" />
+        )}
+        {pendingStatus === PIStatus.REVISION && (
+          <RefreshCw className="h-5 w-5 text-orange-600" />
+        )}
+        {alertMessage.title}
+      </AlertDialogTitle>
+      <AlertDialogDescription className={`${alertMessage.balanceWarning ? 'text-red-700 font-medium text-sm' : 'text-slate-600 text-sm'} mt-1`}>
+        {alertMessage.description}
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    
+    {/* BIG RED WARNING FOR NO PAYMENT */}
+    {alertMessage.balanceWarning && (
+      <div className="mt-3 p-4 bg-red-50 border-2 border-red-500 rounded-xl">
+        <div className="flex items-start gap-3">
+          <div className="bg-red-500 rounded-full p-2 shrink-0 animate-pulse">
+            <AlertTriangle className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-red-700">⚠️ NO PAYMENT RECEIVED!</h4>
+            <p className="text-xs text-red-600 font-medium mt-1">
+              Amount Paid: <strong>{formatCurrency(invoice.amountPaid)}</strong>
+            </p>
+            <p className="text-xs text-red-600 font-medium">
+              You are about to create a project without any payment received.
+            </p>
+            <div className="mt-2 p-2 bg-red-100 rounded-lg border border-red-300">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-red-700">Total Invoice:</span>
+                <span className="text-red-800 font-bold">{formatCurrency(invoice.total)}</span>
+              </div>
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-red-700">Amount Paid:</span>
+                <span className="text-red-800 font-bold">{formatCurrency(invoice.amountPaid)}</span>
+              </div>
+              <div className="flex justify-between text-xs font-mono border-t border-red-300 pt-1 mt-1">
+                <span className="text-red-700 font-bold">Balance Due:</span>
+                <span className="text-red-800 font-bold">{formatCurrency(invoice.balance)}</span>
+              </div>
             </div>
-          )}
-          
-          {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && (
-            <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <p className="text-xs text-emerald-700 flex items-center gap-2">
-                <Info className="h-4 w-4 shrink-0" />
-                You will be automatically redirected to project setup after confirmation.
-              </p>
-            </div>
-          )}
-          
-          <AlertDialogFooter className="mt-4">
-            <AlertDialogCancel 
-              className="rounded-lg border-slate-200"
-              onClick={() => {
-                setShowStatusAlert(false);
-                setPendingStatus(null);
-                setSelectedStatus(invoice.status);
-              }}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleStatusUpdateConfirm}
-              disabled={updatingStatus}
-              className={
-                pendingStatus === PIStatus.CANCELLED
-                  ? 'rounded-lg bg-rose-600 hover:bg-rose-700 text-white'
-                  : pendingStatus === PIStatus.APPROVED_CREATE_PROJECT
-                  ? 'rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'rounded-lg bg-slate-900 hover:bg-slate-800 text-white'
-              }
-            >
-              {updatingStatus ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                `Confirm ${pendingStatus ? getStatusConfig(pendingStatus).label : 'Update'}`
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <p className="text-xs text-red-700 font-bold mt-2">
+              Are you sure you want to proceed?
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+    
+    {pendingStatus === PIStatus.CANCELLED && !alertMessage.balanceWarning && (
+      <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+        <p className="text-xs text-rose-700 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Warning: Cancelling this invoice is permanent and cannot be undone.
+        </p>
+      </div>
+    )}
+    
+    {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && !alertMessage.balanceWarning && (
+      <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <p className="text-xs text-emerald-700 flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0" />
+          You will be automatically redirected to project setup after confirmation.
+        </p>
+      </div>
+    )}
+    
+    <AlertDialogFooter className="mt-4">
+      <AlertDialogCancel 
+        className="rounded-lg border-slate-200"
+        onClick={() => {
+          setShowStatusAlert(false);
+          setPendingStatus(null);
+          setSelectedStatus(invoice.status);
+        }}
+      >
+        Cancel
+      </AlertDialogCancel>
+      {/* ALWAYS SHOW THE CONFIRM BUTTON - even with warning */}
+      <AlertDialogAction
+        onClick={handleStatusUpdateConfirm}
+        disabled={updatingStatus}
+        className={
+          pendingStatus === PIStatus.CANCELLED
+            ? 'rounded-lg bg-rose-600 hover:bg-rose-700 text-white'
+            : pendingStatus === PIStatus.APPROVED_CREATE_PROJECT
+            ? 'rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white'
+            : 'rounded-lg bg-slate-900 hover:bg-slate-800 text-white'
+        }
+      >
+        {updatingStatus ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Updating...
+          </>
+        ) : (
+          `Confirm ${pendingStatus ? getStatusConfig(pendingStatus).label : 'Update'}`
+        )}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
 
       {/* Payment Confirmation Alert Dialog */}
       {!isStoreInvoice && (
@@ -805,18 +889,36 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
 
             <div className="pt-3 border-t border-slate-100 space-y-2">
               <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Change Status</label>
-              <Select value={selectedStatus} onValueChange={handleStatusChange} disabled={updatingStatus || invoice.status === PIStatus.APPROVED_CREATE_PROJECT}>
-                <SelectTrigger className="w-full h-9 rounded-lg border-slate-300 bg-white text-slate-900 text-xs font-medium focus:ring-slate-900">
+              
+         
+              
+              <Select 
+                value={selectedStatus} 
+                onValueChange={handleStatusChange} 
+                disabled={updatingStatus || invoice.status === PIStatus.APPROVED_CREATE_PROJECT}
+              >
+                <SelectTrigger className={`w-full h-9 rounded-lg border-slate-300 bg-white text-slate-900 text-xs font-medium focus:ring-slate-900 ${showNoPaymentWarning() ? 'border-red-500 border-2 bg-red-50' : ''}`}>
                   <SelectValue placeholder="Update status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg border-slate-200 bg-white text-slate-900">
-                  {Object.values(PIStatus).map((status) => (
-                    <SelectItem key={status} value={status} className="text-xs focus:bg-slate-50 focus:text-slate-900">
-                      {getStatusConfig(status).label}
-                    </SelectItem>
-                  ))}
+                  {Object.values(PIStatus).map((status) => {
+                    const isBlocked = isStatusChangeBlocked(status);
+                    return (
+                      <SelectItem 
+                        key={status} 
+                        value={status} 
+                        className={`text-xs focus:bg-slate-50 focus:text-slate-900 ${isBlocked ? 'text-red-600 bg-red-50 font-bold' : ''}`}
+                        // NOT DISABLED - always selectable
+                      >
+                        {isBlocked && '⚠️ '}
+                        {getStatusConfig(status).label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              
+          
             </div>
           </CardContent>
         </Card>
@@ -856,23 +958,25 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Payment Balance</p>
                 <div className="flex items-baseline space-x-2 mt-1">
-                  <span className="text-2xl font-black font-mono text-emerald-700">{formatCurrency(invoice.amountPaid)}</span>
+                  <span className={`text-2xl font-black font-mono ${showNoPaymentWarning() ? 'text-red-600' : 'text-emerald-700'}`}>
+                    {formatCurrency(invoice.amountPaid)}
+                  </span>
                   <span className="text-xs text-slate-400 font-mono">paid</span>
                 </div>
               </div>
-              <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
+              <div className={`rounded-xl p-2.5 ${showNoPaymentWarning() ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                 <CreditCard className="h-5 w-5" />
               </div>
             </div>
 
             <div className="space-y-2 pt-2 border-t border-slate-100">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 text-[11px] font-medium">Balance Due: <strong className="font-mono text-amber-700 font-bold">{formatCurrency(invoice.balance)}</strong></span>
+                <span className="text-slate-500 text-[11px] font-medium">Balance Due: <strong className={`font-mono font-bold ${showNoPaymentWarning() ? 'text-red-700' : 'text-amber-700'}`}>{formatCurrency(invoice.balance)}</strong></span>
                 <span className="font-mono font-bold text-emerald-700">{paidPercent.toFixed(0)}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                 <div 
-                  className="h-full bg-emerald-500 transition-all duration-500 rounded-full"
+                  className={`h-full transition-all duration-500 rounded-full ${showNoPaymentWarning() ? 'bg-red-500' : 'bg-emerald-500'}`}
                   style={{ width: `${paidPercent}%` }}
                 />
               </div>
@@ -1093,9 +1197,9 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                   <p className="text-xl font-bold font-mono text-white mt-1">{formatCurrency(invoice.total)}</p>
                 </div>
                 {!isStoreInvoice ? (
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Amount Paid</p>
-                    <p className="text-xl font-bold font-mono text-emerald-800 mt-1">{formatCurrency(invoice.amountPaid)}</p>
+                  <div className={`p-4 rounded-xl border ${showNoPaymentWarning() ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-100'}`}>
+                    <p className={`text-[10px] font-bold uppercase ${showNoPaymentWarning() ? 'text-red-700' : 'text-emerald-700'}`}>Amount Paid</p>
+                    <p className={`text-xl font-bold font-mono mt-1 ${showNoPaymentWarning() ? 'text-red-800' : 'text-emerald-800'}`}>{formatCurrency(invoice.amountPaid)}</p>
                   </div>
                 ) : (
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
@@ -1522,9 +1626,9 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
                     <p className="text-[10px] font-bold uppercase text-slate-400">Invoice Total</p>
                     <p className="text-lg font-bold font-mono text-slate-900 mt-0.5">{formatCurrency(invoice.total)}</p>
                   </div>
-                  <div className="p-4 text-center">
-                    <p className="text-[10px] font-bold uppercase text-emerald-700">Total Paid</p>
-                    <p className="text-lg font-bold font-mono text-emerald-800 mt-0.5">{formatCurrency(invoice.amountPaid)}</p>
+                  <div className={`p-4 text-center ${showNoPaymentWarning() ? 'bg-red-50' : ''}`}>
+                    <p className={`text-[10px] font-bold uppercase ${showNoPaymentWarning() ? 'text-red-700' : 'text-emerald-700'}`}>Total Paid</p>
+                    <p className={`text-lg font-bold font-mono mt-0.5 ${showNoPaymentWarning() ? 'text-red-800' : 'text-emerald-800'}`}>{formatCurrency(invoice.amountPaid)}</p>
                   </div>
                   <div className="p-4 text-center">
                     <p className="text-[10px] font-bold uppercase text-amber-700">Balance Remaining</p>

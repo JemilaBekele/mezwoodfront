@@ -978,7 +978,7 @@ export default function ItemForm({
       } else {
         const response = await createItem(formData);
         toast.success('Item created successfully');
-        router.push(`/dashboard/Item/initial?id=${response?.data?.id}`);
+        router.push('/dashboard/Item');
         router.refresh();
       }
 
