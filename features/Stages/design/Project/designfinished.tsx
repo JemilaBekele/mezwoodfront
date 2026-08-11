@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate, formatDateEth, formatMinutes, formatTimeEth, formatTimeGregorian } from '@/lib/format';
@@ -14,18 +14,15 @@ import {
   Loader2,
   TrendingUp,
   Settings,
-  Truck,
-  Home,
-  Hammer,
-  Paintbrush,
+
   Scissors,
   CalendarDays,
   User,
-  Award,
+
   BarChart3,
   Layers,
   Package,
-  Wrench,
+
   PenTool,
   Ruler,
   ListChecks,
@@ -39,6 +36,9 @@ import {
   CheckCircle,
   Package2,
   Plus,
+  Upload,
+  Paperclip,
+  X,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog, StageStatus, WorkShift } from '@/models/Projects';
 import { getProjectId, updateProjectDesignStatus } from '@/service/Project';
@@ -59,7 +59,19 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { normalizeImagePath } from '@/lib/norm';
 import { getStatusConfig } from '../../unifay';
-
+import { addProformaInvoiceAttachments } from '@/service/ProformaInvoice';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 // Helper function for image URLs
 
 
@@ -76,7 +88,12 @@ const FinDesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [updatingDesign, setUpdatingDesign] = useState(false);
   const [autoFinishTriggered, setAutoFinishTriggered] = useState(false);
   const router = useRouter();
-
+  // Attachment Modal State
+  const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Filter stages to only show DESIGN stage
   const getDesignStages = (stages?: IProjectStage[]) => {
     if (!stages) return [];
@@ -360,8 +377,81 @@ const calculateStageProgress = (stage: any) => {
     };
     return config[status];
   };
+ // Remove selected file
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const fileArray = Array.from(e.target.files);
+      setSelectedFiles(prev => [...prev, ...fileArray]);
+    }
+  };
 
+  // Handle file drop
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files) {
+      const fileArray = Array.from(e.dataTransfer.files);
+      setSelectedFiles(prev => [...prev, ...fileArray]);
+    }
+  };
 
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+ const handleUploadAttachments = async () => {
+    if (!proformaInvoice?.id) {
+      toast.error('No proforma invoice found');
+      return;
+    }
+
+    if (selectedFiles.length === 0) {
+      toast.error('Please select at least one file');
+      return;
+    }
+
+    try {
+      setUploadingAttachments(true);
+      setUploadProgress(0);
+
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      await addProformaInvoiceAttachments(proformaInvoice.id, selectedFiles);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      toast.success(`Successfully uploaded ${selectedFiles.length} attachment(s)`);
+      
+      // Refresh data
+      await fetchProjectData();
+      
+      // Close modal and reset
+      setTimeout(() => {
+        setIsAttachmentModalOpen(false);
+        setSelectedFiles([]);
+        setUploadProgress(0);
+        setUploadingAttachments(false);
+      }, 500);
+      
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload attachments');
+      setUploadingAttachments(false);
+      setUploadProgress(0);
+    }
+  };
+   
   // Loading state
   if (loading) {
     return (
@@ -383,6 +473,119 @@ const calculateStageProgress = (stage: any) => {
   return (
     <div className="space-y-6">
       {/* Project Overview Cards */}
+         <Dialog open={isAttachmentModalOpen} onOpenChange={setIsAttachmentModalOpen}>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Paperclip className="h-5 w-5" />
+                    Add Attachments
+                  </DialogTitle>
+                  <DialogDescription>
+                    Upload attachments for proforma invoice #{proformaInvoice?.piNumber || 'N/A'}
+                  </DialogDescription>
+                </DialogHeader>
+      
+                <div className="space-y-4">
+                  {/* Drag and Drop Area */}
+                  <div
+                    className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Drag and drop files here, or click to select files
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Supports any file type
+                    </p>
+                    <Input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                  </div>
+      
+                  {/* Selected Files List */}
+                  {selectedFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Selected Files ({selectedFiles.length})</Label>
+                      <div className="max-h-48 overflow-y-auto space-y-2">
+                        {selectedFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border"
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="text-sm truncate">{file.name}</span>
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {(file.size / 1024).toFixed(1)} KB
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFile(index);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+      
+                  {/* Upload Progress */}
+                  {uploadingAttachments && uploadProgress > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Uploading...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <Progress value={uploadProgress} className="h-2" />
+                    </div>
+                  )}
+                </div>
+      
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsAttachmentModalOpen(false);
+                      setSelectedFiles([]);
+                      setUploadProgress(0);
+                    }}
+                    disabled={uploadingAttachments}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUploadAttachments}
+                    disabled={selectedFiles.length === 0 || uploadingAttachments}
+                  >
+                    {uploadingAttachments ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Status Card */}
         <Card>

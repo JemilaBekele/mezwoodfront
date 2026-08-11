@@ -197,7 +197,27 @@ export const createProformaInvoice = async (
     throw error;
   }
 };
+export const addProformaInvoiceAttachments = async (
+  invoiceId: string,
+  files: File[]
+) => {
+  try {
+    const formData = new FormData();
 
+    files.forEach((file) => {
+      formData.append('attachments', file);
+    });
+
+    const response = await axiosInstance.post(
+      `/proforma-invoices/${invoiceId}/attachments`,
+      formData
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
 /* =========================
    UPDATE
 ========================= */ 
