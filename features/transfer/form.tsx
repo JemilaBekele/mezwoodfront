@@ -123,7 +123,7 @@ const CustomSingleValue = (props: any) => {
       {data.imageUrl ? (
         <div className="relative h-6 w-6 rounded overflow-hidden shrink-0 border border-gray-200 dark:border-gray-600">
           <Image
-            src={data.imageUrl || ''}
+            src={normalizeImagePath(data.imageUrl) || ''}
             alt={data.label}
             fill
             className="object-cover"
