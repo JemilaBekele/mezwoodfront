@@ -475,9 +475,8 @@ const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
       }
       dataToSend.newQuantity = stage.workUnits || 0;
     } else {
-      // For EDIT operations: send newQuantity as 0 or null to satisfy backend validation
-      // This tells the backend "don't update the quantity, keep the existing value"
-      dataToSend.newQuantity = 0;
+      // For EDIT operations: send the existing workUnits so the backend doesn't clear them
+      dataToSend.newQuantity = stage.workUnits || 0;
       // Also explicitly send the stage ID for edit operations
       if (stage.id) {
         dataToSend.stageId = stage.id;
@@ -577,9 +576,8 @@ const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
       toast.error('Cannot edit a finished/completed stage');
       return;
     }
-    // Remove workUnits from edit mode as they shouldn't be editable
-    const { workUnits, ...stageWithoutWorkUnits } = stage;
-    setForm({ ...stageWithoutWorkUnits, isNew: false });
+    // Keep workUnits so we can send the existing value when editing
+    setForm({ ...stage, isNew: false });
     setFormMode('edit');
     setFormOpen(true);
   };

@@ -1,7 +1,6 @@
 import { getProjectById } from '@/service/Project';
 import ProjectForm from './form';
 import { IProject } from '@/models/Projects';
-import { toast } from 'sonner';
 
 type TProjectViewPageProps = {
   projectId: string;
@@ -22,8 +21,7 @@ export default async function ProjectViewPage({
         pageTitle = `Edit Project`;
       }
     } catch (error) {
-      console.error('Error loading project:', error);
-      toast.error('Error loading project');
+      console.error('Error loading project:', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
