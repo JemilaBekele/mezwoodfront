@@ -251,10 +251,15 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
     return config[difficulty];
   };
 
-  // Calculate total materials for an item
+  // Calculate total materials for an item — only countable types
+  // (plainMDF/laminatedMDF/wood/metal) contribute; accessory/other don't.
   const getItemMaterialsTotal = (item: IProformaInvoiceItem) => {
     if (!item.materials || item.materials.length === 0) return 0;
-    return item.materials.reduce((total, material) => total + material.quantity, 0);
+    return item.materials.reduce((total, material) => {
+      const m = material.material;
+      const isCountable = m?.plainMDF || m?.laminatedMDF || m?.wood || m?.metal;
+      return isCountable ? total + material.quantity : total;
+    }, 0);
   };
 
   // Group project logs by date

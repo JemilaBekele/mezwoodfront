@@ -91,6 +91,7 @@ interface MaterialSummary {
   plainMDF: number;
   metal: number;
   wood: number;
+  accessory: number;
   other: number;
   total: number;
 }
@@ -305,13 +306,17 @@ export default function DeliveryEstimationForm({
     }
   };
 
-  // Calculate material totals from selected items
+  // Calculate material totals from selected items.
+  // Only laminatedMDF/plainMDF/wood/metal count toward `total` — accessory
+  // and other materials are tracked separately and excluded, matching the
+  // scheduling engine's rule (backend already excludes them from unit math).
   const calculateMaterialTotals = useCallback((): MaterialSummary => {
     const totals = {
       laminatedMDF: 0,
       plainMDF: 0,
       wood: 0,
       metal: 0,
+      accessory: 0,
       other: 0,
       total: 0
     };
@@ -320,7 +325,7 @@ export default function DeliveryEstimationForm({
       if (item.materials && Array.isArray(item.materials)) {
         item.materials.forEach(material => {
           const materialQuantity = (material.quantity || 0) * (item.quantity || 1);
-          
+
           // Check the boolean flags on the material object
           if (material.laminatedMDF) {
             totals.laminatedMDF += materialQuantity;
@@ -330,14 +335,16 @@ export default function DeliveryEstimationForm({
             totals.wood += materialQuantity;
           } else if (material.metal) {
             totals.metal += materialQuantity;
+          } else if (material.accessory) {
+            totals.accessory += materialQuantity;
           } else {
             totals.other += materialQuantity;
           }
-          
-          totals.total += materialQuantity;
         });
       }
     });
+
+    totals.total = totals.laminatedMDF + totals.plainMDF + totals.wood + totals.metal;
 
     return totals;
   }, [selectedItems]);

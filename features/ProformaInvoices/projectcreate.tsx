@@ -211,6 +211,8 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
             plainMDFUnits += materialQty * qty;
           } else if (m?.wood) {
             woodUnits += materialQty * qty;
+          } else if (m?.accessory) {
+            // Excluded from scheduling entirely — not folded into "other".
           } else {
             otherUnits += materialQty * qty;
           }

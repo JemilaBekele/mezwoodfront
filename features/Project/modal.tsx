@@ -592,18 +592,14 @@ const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
     });
   };
 
-// Also update the handleSaveForm function to ensure workUnits are only sent for new stages
+// For edit mode, workUnits stays untouched in the draft so the existing
+// value is resent unchanged (the dialog already prevents editing it directly)
 const handleSaveForm = async () => {
   const draft: StageFormData =
     formMode === 'add'
       ? { ...form, id: `temp-${stages.length}-${form.stage}`, isNew: true }
       : { ...form, isNew: false };
-  
-  // For edit mode, ensure workUnits is NOT sent
-  if (formMode === 'edit') {
-    delete draft.workUnits;
-  }
-  
+
   const ok = await handleUpdateStage(draft);
   if (ok) setFormOpen(false);
 };
