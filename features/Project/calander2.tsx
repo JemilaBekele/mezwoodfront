@@ -64,6 +64,8 @@ import { useRouter } from "next/navigation";
 // Ethiopian calendar rendering lives in lib/format.ts — the single copy shared
 // by every screen, so a fix to the conversion cannot reach only some of them.
 import { gregorianToEthiopian, formatDateEth as ethLabel } from '@/lib/format';
+// Working-hour fallbacks live in lib/workingTime.ts, mirroring the backend config.
+import { FALLBACK_SHIFT_HOURS, FALLBACK_WORKING_HOURS_PER_DAY } from '@/lib/workingTime';
 
 
 /* ------------------------------------------------------------------ *
@@ -78,7 +80,7 @@ const MONTHS = [
 // Mirrors backend config.SHIFT_TIMES hours — used to reconstruct the engine's
 // effective daily ceiling (capacity × shiftHours/workingHours × parallelSlots).
 const SHIFT_HOURS: Record<string, number> = {
-  MORNING: 4, AFTERNOON: 3.5, FULL_DAY: 7.5, CUSTOM: 7.5,
+  ...FALLBACK_SHIFT_HOURS,
 };
 
 const STAGE_ORDER: CapacityStage[] = [
@@ -120,7 +122,7 @@ const stageName = (s: string | undefined) => {
 const OVERCAPACITY_FACTOR = 1.25;
 const MAX_OC_BAND = OVERCAPACITY_FACTOR - 1.0; // 0.25 — the allowed 100→125% band
 
-const dayHoursOf = (r: any) => r.maxHours || r.workingHours || 7.5;
+const dayHoursOf = (r: any) => r.maxHours || r.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
 const dayFrac = (r: any) => (dayHoursOf(r) > 0 ? (r.usedHours || 0) / dayHoursOf(r) : 0);
 const rowOver = (r: any) =>
   (r.overCapacityUsed || 0) > 0 ||
@@ -514,7 +516,7 @@ const dragDataRef = useRef<any>(null);
       (lotRes?.capacitySlots || []).forEach((l: any) => {
         map[l.stage] = {
           parallelSlots: l.parallelSlots || 1,
-          workingHours: l.workingHours || 7.5,
+          workingHours: l.workingHours || FALLBACK_WORKING_HOURS_PER_DAY,
           capacity: l.capacity || 0,
         };
       });
@@ -807,10 +809,10 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
   // DESIGN's real 6/day ballooned to ~11. Only a genuine pre-slots legacy row
   // (stored well below the lot ceiling) is scaled up to the lot ceiling.
   const effMax = useCallback((r: any) => {
-    const lot = slots[r.stage] || { parallelSlots: 1, workingHours: 7.5, capacity: 0 };
+    const lot = slots[r.stage] || { parallelSlots: 1, workingHours: FALLBACK_WORKING_HOURS_PER_DAY, capacity: 0 };
     const stored = r.maxCapacity || 0;
     const slotsN = lot.parallelSlots || 1;
-    const whpd = r.workingHours || lot.workingHours || 7.5;
+    const whpd = r.workingHours || lot.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
     // CUSTOM stages run the whole working day, so their shift length IS whpd
     // (matches the engine's stageShiftHours); fixed shifts use their fixed length.
     const shift = r.shift || "CUSTOM";

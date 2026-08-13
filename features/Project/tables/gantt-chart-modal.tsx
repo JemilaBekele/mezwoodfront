@@ -111,7 +111,10 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
         const dateKey = new Date(capacity.date).toISOString().split('T')[0];
         const capacityLot = slots.find(lot => lot?.stage === capacity.stage);
         const maxCapacity = capacityLot?.capacity || 1;
-        const maxHours = 7.5;
+        // Prefer the day's own recorded hours; fall back to the configured day
+        // length rather than a hardcoded 7.5.
+        const maxHours =
+          capacity.maxHours || capacity.workingHours || workingHoursPerDay;
         const availableCapacity = maxCapacity - (capacity.usedCapacity || 0);
         const availableHours = maxHours - (capacity.usedHours || 0);
         

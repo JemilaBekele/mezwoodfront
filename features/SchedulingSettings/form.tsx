@@ -34,7 +34,7 @@ export default function SchedulingSettingsForm() {
   // window is now the input and the hours are the derived read-out.
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [shiftStart, setShiftStart] = useState('08:30');
-  const [shiftEnd, setShiftEnd] = useState('17:00');
+  const [shiftEnd, setShiftEnd] = useState('17:30');
   const [lunchStart, setLunchStart] = useState('12:30');
   const [lunchEnd, setLunchEnd] = useState('13:30');
   const [timezone, setTimezone] = useState('Africa/Addis_Ababa');
@@ -49,7 +49,7 @@ export default function SchedulingSettingsForm() {
         setHardPercent(String(Math.round((s.hardPercent ?? 0) * 100)));
         setWorkingDays(parseWorkingDays(s.workingDays ?? '1,2,3,4,5,6'));
         setShiftStart(decimalToTime(s.shiftStartHour ?? 8.5));
-        setShiftEnd(decimalToTime(s.shiftEndHour ?? 17));
+        setShiftEnd(decimalToTime(s.shiftEndHour ?? 17.5));
         setLunchStart(decimalToTime(s.lunchStartHour ?? 12.5));
         setLunchEnd(decimalToTime(s.lunchEndHour ?? 13.5));
         setTimezone(s.timezone ?? 'Africa/Addis_Ababa');

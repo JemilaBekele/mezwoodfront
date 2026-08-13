@@ -12,7 +12,7 @@
  * The model matches the server's: a working day is a list of SEGMENTS, not one
  * contiguous span:
  *
- *     [ 08:30 - 12:30 ]  lunch  [ 13:30 - 17:00 ]     = 7.5 working hours
+ *     [ 08:30 - 12:30 ]  lunch  [ 13:30 - 17:30 ]     = 8.0 working hours
  *
  * Durations are measured in WORKING time — never counting lunch, the night, a
  * non-working weekday or a holiday.
@@ -38,15 +38,44 @@ export interface WorkingTimeConfig {
   recurringHolidays: string[];
 }
 
-/** The shape the app falls back to before settings load, or if the call fails. */
+/**
+ * The shape the app falls back to before settings load, or if the call fails.
+ *
+ * Mirrors the backend defaults in services/scheduling/config.js: the workshop
+ * runs 08:30-12:30 and 13:30-17:30, Monday to Saturday, in East Africa Time —
+ * 8.0 working hours a day. Keep the two in step.
+ */
 export const DEFAULT_WORKING_TIME: WorkingTimeConfig = {
   workingDays: [1, 2, 3, 4, 5, 6],
   shiftStartHour: 8.5,
-  shiftEndHour: 17,
+  shiftEndHour: 17.5,
   lunchStartHour: 12.5,
   lunchEndHour: 13.5,
   holidays: [],
   recurringHolidays: [],
+};
+
+/**
+ * Day length to assume when a capacity row carries no `workingHours` of its own.
+ * Exported so the calendar views stop hardcoding it in nine separate places.
+ */
+export const FALLBACK_WORKING_HOURS_PER_DAY = workingHoursOf({
+  shiftStartHour: DEFAULT_WORKING_TIME.shiftStartHour,
+  shiftEndHour: DEFAULT_WORKING_TIME.shiftEndHour,
+  lunchStartHour: DEFAULT_WORKING_TIME.lunchStartHour,
+  lunchEndHour: DEFAULT_WORKING_TIME.lunchEndHour,
+});
+
+/**
+ * Legacy per-shift hour spans, mirroring the backend's SHIFT_TIMES. Every stage
+ * uses CUSTOM (the full working day); MORNING/AFTERNOON survive only so a stored
+ * WorkShift value can still be labelled.
+ */
+export const FALLBACK_SHIFT_HOURS: Record<string, number> = {
+  MORNING: DEFAULT_WORKING_TIME.lunchStartHour - DEFAULT_WORKING_TIME.shiftStartHour,
+  AFTERNOON: DEFAULT_WORKING_TIME.shiftEndHour - DEFAULT_WORKING_TIME.lunchEndHour,
+  FULL_DAY: FALLBACK_WORKING_HOURS_PER_DAY,
+  CUSTOM: FALLBACK_WORKING_HOURS_PER_DAY,
 };
 
 /** Build a config from a scheduling-settings row plus a holiday list. */

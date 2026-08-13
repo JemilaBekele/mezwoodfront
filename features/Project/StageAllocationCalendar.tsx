@@ -23,6 +23,8 @@ import { getAllCapacitySlots } from "@/service/CapacityLot";
 // Ethiopian calendar rendering lives in lib/format.ts — the single copy shared
 // by every screen, so a fix to the conversion cannot reach only some of them.
 import { gregorianToEthiopian, formatDateEth as ethLabel } from '@/lib/format';
+// Working-hour fallbacks live in lib/workingTime.ts, mirroring the backend config.
+import { FALLBACK_SHIFT_HOURS, FALLBACK_WORKING_HOURS_PER_DAY } from '@/lib/workingTime';
 
 /* ------------------------------------------------------------------ *
  * Constants & helpers (mirror calander.tsx)
@@ -33,7 +35,7 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 const SHIFT_HOURS: Record<string, number> = {
-  MORNING: 4, AFTERNOON: 3.5, FULL_DAY: 7.5, CUSTOM: 7.5,
+  ...FALLBACK_SHIFT_HOURS,
 };
 const OVERCAPACITY_FACTOR = 1.25;
 
@@ -60,7 +62,7 @@ const keyOf = (y: number, m: number, d: number) =>
   `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 const dateFromKey = (key: string) => new Date(`${key}T12:00:00`);
 
-const dayHoursOf = (r: any) => r.maxHours || r.workingHours || 7.5;
+const dayHoursOf = (r: any) => r.maxHours || r.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
 const dayFrac = (r: any) => (dayHoursOf(r) > 0 ? (r.usedHours || 0) / dayHoursOf(r) : 0);
 // True ratio vs the 100% base (uncapped).
 const rowFrac = (r: any, eff: number) => {
@@ -81,10 +83,10 @@ const heatColor = (frac: number) => {
 
 // Effective daily ceiling — identical logic to calander.tsx effMax.
 const effMaxOf = (r: any, slots: Record<string, any>) => {
-  const lot = slots[r.stage] || { parallelSlots: 1, workingHours: 7.5, capacity: 0 };
+  const lot = slots[r.stage] || { parallelSlots: 1, workingHours: FALLBACK_WORKING_HOURS_PER_DAY, capacity: 0 };
   const stored = r.maxCapacity || 0;
   const slotsN = lot.parallelSlots || 1;
-  const whpd = r.workingHours || lot.workingHours || 7.5;
+  const whpd = r.workingHours || lot.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
   const shift = r.shift || "CUSTOM";
   const sh = shift === "CUSTOM" ? whpd : SHIFT_HOURS[shift] || whpd;
   const lotEff = (lot.capacity || 0) * (sh / whpd) * slotsN;
@@ -127,7 +129,7 @@ const StageAllocationCalendar: React.FC<{ stage: string; title?: string }> = ({ 
         ((lotRes as any)?.capacitySlots || []).forEach((l: any) => {
           map[l.stage] = {
             parallelSlots: l.parallelSlots || 1,
-            workingHours: l.workingHours || 7.5,
+            workingHours: l.workingHours || FALLBACK_WORKING_HOURS_PER_DAY,
             capacity: l.capacity || 0,
           };
         });

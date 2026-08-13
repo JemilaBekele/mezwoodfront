@@ -63,6 +63,8 @@ import { useRouter } from "next/navigation";
 // Ethiopian calendar rendering lives in lib/format.ts — the single copy shared
 // by every screen, so a fix to the conversion cannot reach only some of them.
 import { gregorianToEthiopian, formatDateEth as ethLabel } from '@/lib/format';
+// Working-hour fallbacks live in lib/workingTime.ts, mirroring the backend config.
+import { FALLBACK_SHIFT_HOURS, FALLBACK_WORKING_HOURS_PER_DAY } from '@/lib/workingTime';
 
 
 /* ------------------------------------------------------------------ *
@@ -75,7 +77,7 @@ const MONTHS = [
 ];
 
 const SHIFT_HOURS: Record<string, number> = {
-  MORNING: 4, AFTERNOON: 3.5, FULL_DAY: 7.5, CUSTOM: 7.5,
+  ...FALLBACK_SHIFT_HOURS,
 };
 
 const STAGE_ORDER: CapacityStage[] = [
@@ -109,7 +111,7 @@ const stageName = (s: string) => s.replace(/_/g, " ");
 
 const OVERCAPACITY_FACTOR = 1.25;
 
-const dayHoursOf = (r: any) => r.maxHours || r.workingHours || 7.5;
+const dayHoursOf = (r: any) => r.maxHours || r.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
 const dayFrac = (r: any) => (dayHoursOf(r) > 0 ? (r.usedHours || 0) / dayHoursOf(r) : 0);
 const rowOver = (r: any) =>
   (r.overCapacityUsed || 0) > 0 ||
@@ -476,7 +478,7 @@ const router = useRouter();
       (lotRes?.capacitySlots || []).forEach((l: any) => {
         map[l.stage] = {
           parallelSlots: l.parallelSlots || 1,
-          workingHours: l.workingHours || 7.5,
+          workingHours: l.workingHours || FALLBACK_WORKING_HOURS_PER_DAY,
           capacity: l.capacity || 0,
         };
       });
@@ -563,10 +565,10 @@ const router = useRouter();
   }, []);
 
   const effMax = useCallback((r: any) => {
-    const lot = slots[r.stage] || { parallelSlots: 1, workingHours: 7.5, capacity: 0 };
+    const lot = slots[r.stage] || { parallelSlots: 1, workingHours: FALLBACK_WORKING_HOURS_PER_DAY, capacity: 0 };
     const stored = r.maxCapacity || 0;
     const slotsN = lot.parallelSlots || 1;
-    const whpd = r.workingHours || lot.workingHours || 7.5;
+    const whpd = r.workingHours || lot.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
     const shift = r.shift || "CUSTOM";
     const sh = shift === "CUSTOM" ? whpd : (SHIFT_HOURS[shift] || whpd);
     const lotEff = (lot.capacity || 0) * (sh / whpd) * slotsN;
