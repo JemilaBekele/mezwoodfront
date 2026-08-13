@@ -784,113 +784,133 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
       })}
     </div>
 
-    {/* Desktop Table View */}
+    {/* Desktop Div Table View */}
     <div className='hidden sm:block overflow-x-auto'>
-      <div className='inline-block min-w-full align-middle'>
-        <div className='overflow-hidden border rounded-lg'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>#</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Image</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className='text-center'>Quantity</TableHead>
-                <TableHead className='text-right'>Unit Price</TableHead>
-                <TableHead className='text-right'>Total Price</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sale.items.map((item: ISellItem, index: number) => {
-                // Get location display
-                const getLocationDisplay = () => {
-                  if (item.store && item.showroom) {
-                    return `${item.store.name} → ${item.showroom.name}`;
-                  } else if (item.store) {
-                    return item.store.name;
-                  } else if (item.showroom) {
-                    return item.showroom.name;
-                  }
-                  return 'No Location';
+      <div className='min-w-full border rounded-lg overflow-hidden'>
+        {/* Table Header */}
+        <div className='bg-muted/50 border-b'>
+          <div className='grid grid-cols-7 gap-2 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider'>
+            <div className='col-span-1'>#</div>
+            <div className='col-span-2'>Product</div>
+            <div className='col-span-1'>Image</div>
+            <div className='col-span-1'>Location</div>
+            <div className='col-span-1 text-center'>Qty</div>
+            <div className='col-span-1 text-right'>Unit Price</div>
+            <div className='col-span-1 text-right'>Total</div>
+          </div>
+        </div>
+
+        {/* Table Body */}
+        <div className='divide-y'>
+          {sale.items.map((item: ISellItem, index: number) => {
+            // Get location display
+            const getLocationDisplay = () => {
+              if (item.store && item.showroom) {
+                return `${item.store.name} → ${item.showroom.name}`;
+              } else if (item.store) {
+                return item.store.name;
+              } else if (item.showroom) {
+                return item.showroom.name;
+              }
+              return 'No Location';
+            };
+
+            // Get location icon and color
+            const getLocationStyle = () => {
+              if (item.store && item.showroom) {
+                return {
+                  icon: '🏪',
+                  bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                  textColor: 'text-purple-700 dark:text-purple-300',
+                  borderColor: 'border-purple-200 dark:border-purple-800'
                 };
-
-                // Get location icon and color
-                const getLocationStyle = () => {
-                  if (item.store && item.showroom) {
-                    return {
-                      icon: '🏪',
-                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-                      textColor: 'text-purple-700 dark:text-purple-300',
-                      borderColor: 'border-purple-200 dark:border-purple-800'
-                    };
-                  } else if (item.store) {
-                    return {
-                      icon: '🏬',
-                      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-                      textColor: 'text-blue-700 dark:text-blue-300',
-                      borderColor: 'border-blue-200 dark:border-blue-800'
-                    };
-                  } else if (item.showroom) {
-                    return {
-                      icon: '🏪',
-                      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-                      textColor: 'text-purple-700 dark:text-purple-300',
-                      borderColor: 'border-purple-200 dark:border-purple-800'
-                    };
-                  }
-                  return {
-                    icon: '📍',
-                    bgColor: 'bg-gray-50 dark:bg-gray-800',
-                    textColor: 'text-gray-500 dark:text-gray-400',
-                    borderColor: 'border-gray-200 dark:border-gray-700'
-                  };
+              } else if (item.store) {
+                return {
+                  icon: '🏬',
+                  bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+                  textColor: 'text-blue-700 dark:text-blue-300',
+                  borderColor: 'border-blue-200 dark:border-blue-800'
                 };
+              } else if (item.showroom) {
+                return {
+                  icon: '🏪',
+                  bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                  textColor: 'text-purple-700 dark:text-purple-300',
+                  borderColor: 'border-purple-200 dark:border-purple-800'
+                };
+              }
+              return {
+                icon: '📍',
+                bgColor: 'bg-gray-50 dark:bg-gray-800',
+                textColor: 'text-gray-500 dark:text-gray-400',
+                borderColor: 'border-gray-200 dark:border-gray-700'
+              };
+            };
 
-                const locationStyle = getLocationStyle();
-                const productImage = normalizeImagePath(item.item?.imageUrl);
+            const locationStyle = getLocationStyle();
+            const productImage = normalizeImagePath(item.item?.imageUrl);
 
-                return (
-                  <TableRow key={item.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className='font-medium'>
-                      {item.item?.name || 'Unknown Product'}
-                    </TableCell>
-                    <TableCell>
-                      {productImage ? (
-                        <div 
-                          className='relative cursor-pointer group w-12 h-12'
-                          onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
-                        >
-                          <img 
-                            src={productImage} 
-                            alt={item.item?.name || 'Product'}
-                            className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
-                            style={{ display: 'block' }}
-                          />
-                          <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
-                            <ZoomIn className='h-3 w-3 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className='w-12 h-12 flex items-center justify-center bg-gray-50 rounded border'>
-                          <Package className='h-6 w-6 text-gray-300' />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
-                        <span>{locationStyle.icon}</span>
-                        <span>{getLocationDisplay()}</span>
-                      </span>
-                    </TableCell>
-                    <TableCell className='text-center'>{item.quantity}</TableCell>
-                    <TableCell className='text-right'>{item.unitPrice.toFixed(2)}</TableCell>
-                    <TableCell className='text-right font-bold'>{item.totalPrice.toFixed(2)}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+            return (
+              <div key={item.id} className='grid grid-cols-7 gap-2 px-4 py-3 items-center hover:bg-muted/30 transition-colors'>
+                {/* # */}
+                <div className='col-span-1 text-sm text-muted-foreground'>
+                  {index + 1}
+                </div>
+
+                {/* Product Name */}
+                <div className='col-span-2 text-sm font-medium'>
+                  {item.item?.name || 'Unknown Product'}
+                </div>
+
+                {/* Image */}
+                <div className='col-span-1'>
+                  {productImage ? (
+                    <div 
+                      className='relative cursor-pointer group w-12 h-12'
+                      onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                    >
+                      <img 
+                        src={productImage} 
+                        alt={item.item?.name || 'Product'}
+                        className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                        style={{ display: 'block' }}
+                      />
+                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                        <ZoomIn className='h-3 w-3 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='w-12 h-12 flex items-center justify-center bg-gray-50 rounded border'>
+                      <Package className='h-6 w-6 text-gray-300' />
+                    </div>
+                  )}
+                </div>
+
+                {/* Location */}
+                <div className='col-span-1'>
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
+                    <span>{locationStyle.icon}</span>
+                    <span>{getLocationDisplay()}</span>
+                  </span>
+                </div>
+
+                {/* Quantity */}
+                <div className='col-span-1 text-center text-sm'>
+                  {item.quantity}
+                </div>
+
+                {/* Unit Price */}
+                <div className='col-span-1 text-right text-sm'>
+                  {item.unitPrice.toFixed(2)}
+                </div>
+
+                {/* Total Price */}
+                <div className='col-span-1 text-right text-sm font-bold'>
+                  {item.totalPrice.toFixed(2)}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

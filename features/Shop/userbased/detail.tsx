@@ -755,139 +755,231 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
 )}
 
 {/* Sale Payments Section */}
-{sale.sellPayments && sale.sellPayments.length > 0 ? (
-  <div className='space-y-4 mt-6'>
-    <div className='flex items-center justify-between'>
-      <h3 className='text-base font-semibold sm:text-lg'>Payment History</h3>
-      <Badge variant='outline' className='flex items-center gap-1'>
-        <CreditCard className='h-3 w-3' />
-        {sale.sellPayments.length} payment(s)
-      </Badge>
-    </div>
+{sale.items && sale.items.length > 0 ? (
+  <div className='space-y-4'>
+    <h3 className='text-base font-semibold sm:text-lg'>Sale Products</h3>
 
     {/* Mobile Card View */}
     <div className='space-y-3 sm:hidden'>
-      {sale.sellPayments.map((payment: ISellPayment) => (
-        <Card key={payment.id} className='overflow-hidden'>
-          <CardContent className='pt-4'>
-            <div className='flex justify-between items-start'>
-              <div>
-                <p className='font-medium text-lg text-green-600'>
-                  +{payment.amount.toFixed(2)}
-                </p>
-                {payment.bank && (
-                  <p className='text-sm text-muted-foreground'>
-                    🏦 {payment.bank.bankName}
-                  </p>
-                )}
+      {sale.items.map((item: ISellItem, index: number) => {
+        // Get location display
+        const getLocationDisplay = () => {
+          if (item.store && item.showroom) {
+            return `${item.store.name} → ${item.showroom.name}`;
+          } else if (item.store) {
+            return item.store.name;
+          } else if (item.showroom) {
+            return item.showroom.name;
+          }
+          return 'No Location';
+        };
+
+        // Get location icon
+        const getLocationIcon = () => {
+          if (item.store && item.showroom) return '🏪';
+          if (item.store) return '🏬';
+          if (item.showroom) return '🏪';
+          return '📍';
+        };
+
+        const productImage = normalizeImagePath(item.item?.imageUrl);
+
+        return (
+          <Card key={item.id} className='overflow-hidden'>
+            <CardContent className='pt-4'>
+              {/* Product Image */}
+              {productImage && (
+                <div className='flex justify-center mb-3'>
+                  <div 
+                    className='relative cursor-pointer group'
+                    onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                  >
+                    <div className='relative h-24 w-24'>
+                      <img 
+                        src={productImage} 
+                        alt={item.item?.name || 'Product'}
+                        className='w-full h-full object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                        style={{ display: 'block' }}
+                      />
+                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                        <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <h4 className='font-semibold text-center'>{item.item?.name || 'Unknown Product'}</h4>
+              
+              {/* Location Badge */}
+              <div className='mt-1 flex justify-center'>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  item.store 
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                    : item.showroom
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                    : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                }`}>
+                  <span>{getLocationIcon()}</span>
+                  <span>{getLocationDisplay()}</span>
+                </span>
               </div>
-              <div className='text-right'>
-                <p className='text-xs text-muted-foreground'>
-                  {formatDate(payment.createdAt)}
-                </p>
-                {payment.paidBy && (
-                  <p className='text-xs text-muted-foreground'>
-                    Paid by: {payment.paidBy}
-                  </p>
-                )}
-                {payment.createdBy && (
-                  <p className='text-xs text-muted-foreground'>
-                    Recorded by: {payment.createdBy.name}
-                  </p>
-                )}
+
+              <div className='mt-3 grid grid-cols-2 gap-2'>
+                <div>
+                  <p className='text-xs text-muted-foreground'>Quantity</p>
+                  <p className='font-medium'>{item.quantity}</p>
+                </div>
+                <div>
+                  <p className='text-xs text-muted-foreground'>Unit Price</p>
+                  <p className='font-medium'>{item.unitPrice.toFixed(2)}</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+              <div className='mt-2 flex justify-between items-center border-t pt-2'>
+                <span className='text-sm font-medium'>Total:</span>
+                <span className='font-bold'>{item.totalPrice.toFixed(2)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
 
-    {/* Desktop Table View */}
+    {/* Desktop Div Table View */}
     <div className='hidden sm:block overflow-x-auto'>
-      <div className='inline-block min-w-full align-middle'>
-        <div className='overflow-hidden border rounded-lg'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>#</TableHead>
-                <TableHead className='text-right'>Amount</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Paid By</TableHead>
-                <TableHead>Recorded By</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sale.sellPayments.map((payment: ISellPayment, index: number) => (
-                <TableRow key={payment.id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell className='text-right font-medium text-green-600'>
-                    +{payment.amount.toFixed(2)}
-                  </TableCell>
-                  <TableCell>
-                    <div className='flex items-center gap-2'>
-                      <CreditCard className='h-4 w-4 text-muted-foreground' />
-                      {payment.bank ? (
-                        <span>{payment.bank.bankName}</span>
-                      ) : (
-                        <span className='text-muted-foreground'>Cash</span>
-                      )}
+      <div className='min-w-full border rounded-lg overflow-hidden'>
+        {/* Table Header */}
+        <div className='bg-muted/50 border-b'>
+          <div className='grid grid-cols-7 gap-2 px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider'>
+            <div className='col-span-1'>#</div>
+            <div className='col-span-2'>Product</div>
+            <div className='col-span-1'>Image</div>
+            <div className='col-span-1'>Location</div>
+            <div className='col-span-1 text-center'>Qty</div>
+            <div className='col-span-1 text-right'>Unit Price</div>
+            <div className='col-span-1 text-right'>Total</div>
+          </div>
+        </div>
+
+        {/* Table Body */}
+        <div className='divide-y'>
+          {sale.items.map((item: ISellItem, index: number) => {
+            // Get location display
+            const getLocationDisplay = () => {
+              if (item.store && item.showroom) {
+                return `${item.store.name} → ${item.showroom.name}`;
+              } else if (item.store) {
+                return item.store.name;
+              } else if (item.showroom) {
+                return item.showroom.name;
+              }
+              return 'No Location';
+            };
+
+            // Get location icon and color
+            const getLocationStyle = () => {
+              if (item.store && item.showroom) {
+                return {
+                  icon: '🏪',
+                  bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                  textColor: 'text-purple-700 dark:text-purple-300',
+                  borderColor: 'border-purple-200 dark:border-purple-800'
+                };
+              } else if (item.store) {
+                return {
+                  icon: '🏬',
+                  bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+                  textColor: 'text-blue-700 dark:text-blue-300',
+                  borderColor: 'border-blue-200 dark:border-blue-800'
+                };
+              } else if (item.showroom) {
+                return {
+                  icon: '🏪',
+                  bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+                  textColor: 'text-purple-700 dark:text-purple-300',
+                  borderColor: 'border-purple-200 dark:border-purple-800'
+                };
+              }
+              return {
+                icon: '📍',
+                bgColor: 'bg-gray-50 dark:bg-gray-800',
+                textColor: 'text-gray-500 dark:text-gray-400',
+                borderColor: 'border-gray-200 dark:border-gray-700'
+              };
+            };
+
+            const locationStyle = getLocationStyle();
+            const productImage = normalizeImagePath(item.item?.imageUrl);
+
+            return (
+              <div key={item.id} className='grid grid-cols-7 gap-2 px-4 py-3 items-center hover:bg-muted/30 transition-colors'>
+                {/* # */}
+                <div className='col-span-1 text-sm text-muted-foreground'>
+                  {index + 1}
+                </div>
+
+                {/* Product Name */}
+                <div className='col-span-2 text-sm font-medium'>
+                  {item.item?.name || 'Unknown Product'}
+                </div>
+
+                {/* Image */}
+                <div className='col-span-1'>
+                  {productImage ? (
+                    <div 
+                      className='relative cursor-pointer group w-12 h-12'
+                      onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                    >
+                      <img 
+                        src={productImage} 
+                        alt={item.item?.name || 'Product'}
+                        className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                        style={{ display: 'block' }}
+                      />
+                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                        <ZoomIn className='h-3 w-3 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {payment.paidBy || (
-                      <span className='text-muted-foreground'>—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {payment.createdBy?.name || (
-                      <span className='text-muted-foreground'>—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {formatDate(payment.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  ) : (
+                    <div className='w-12 h-12 flex items-center justify-center bg-gray-50 rounded border'>
+                      <Package className='h-6 w-6 text-gray-300' />
+                    </div>
+                  )}
+                </div>
+
+                {/* Location */}
+                <div className='col-span-1'>
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
+                    <span>{locationStyle.icon}</span>
+                    <span>{getLocationDisplay()}</span>
+                  </span>
+                </div>
+
+                {/* Quantity */}
+                <div className='col-span-1 text-center text-sm'>
+                  {item.quantity}
+                </div>
+
+                {/* Unit Price */}
+                <div className='col-span-1 text-right text-sm'>
+                  {item.unitPrice.toFixed(2)}
+                </div>
+
+                {/* Total Price */}
+                <div className='col-span-1 text-right text-sm font-bold'>
+                  {item.totalPrice.toFixed(2)}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
-
-    {/* Payment Summary */}
-    <Card className='bg-muted/30'>
-      <CardContent className='pt-4'>
-        <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
-          <div className='flex flex-col'>
-            <span className='text-sm text-muted-foreground'>Total Payments</span>
-            <span className='text-lg font-bold text-green-600'>
-              {sale.sellPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
-            </span>
-          </div>
-          <div className='flex flex-col'>
-            <span className='text-sm text-muted-foreground'>Number of Payments</span>
-            <span className='text-lg font-bold'>
-              {sale.sellPayments.length}
-            </span>
-          </div>
-          <div className='flex flex-col'>
-            <span className='text-sm text-muted-foreground'>Last Payment</span>
-            <span className='text-lg font-medium'>
-              {sale.sellPayments.length > 0
-                ? formatDate(sale.sellPayments[sale.sellPayments.length - 1].createdAt)
-                : '—'}
-            </span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   </div>
 ) : (
-  <div className='text-muted-foreground py-4 text-center border-t pt-6'>
-    <CreditCard className='mx-auto h-8 w-8 opacity-20' />
-    <p className='mt-2 text-sm'>No payments recorded for this sale</p>
-    <p className='text-xs'>Payment status: {sale.paymentStatus}</p>
+  <div className='text-muted-foreground py-8 text-center'>
+    <Package className='mx-auto h-12 w-12 opacity-20' />
+    <p className='mt-2'>No items found in this sale</p>
   </div>
 )}
         </CardContent>
