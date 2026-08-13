@@ -61,14 +61,14 @@ import { getAllCapacitySlots } from "@/service/CapacityLot";
 import { rescheduleProjectFromCalendar } from "@/service/Project";
 import { ProjectStatus } from "@/models/Projects";
 import { useRouter } from "next/navigation";
+// Ethiopian calendar rendering lives in lib/format.ts — the single copy shared
+// by every screen, so a fix to the conversion cannot reach only some of them.
+import { gregorianToEthiopian, formatDateEth as ethLabel } from '@/lib/format';
+
 
 /* ------------------------------------------------------------------ *
  * Constants & Ethiopian calendar helpers
  * ------------------------------------------------------------------ */
-const ETHIOPIAN_MONTHS = [
-  "Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir", "Yekatit",
-  "Megabit", "Miazia", "Ginbot", "Sene", "Hamle", "Nehase", "Pagume",
-];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -107,36 +107,6 @@ const STAGE_META: Record<CapacityStage, { color: string; abbr: string }> = {
 
 const STAGE_SORT = new Map<string, number>(STAGE_ORDER.map((s, i) => [s, i]));
 
-const gregorianToEthiopian = (g: Date) => {
-  if (!g || Number.isNaN(g.getTime())) return { year: 2018, month: 1, date: 1 };
-  const gy = g.getFullYear();
-  const gm = g.getMonth() + 1;
-  const gd = g.getDate();
-  const afterNewYear = gm > 9 || (gm === 9 && gd > 10);
-  const months = [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 5];
-  let ny = new Date(gy, 8, 11);
-  let doy = Math.floor((g.getTime() - ny.getTime()) / 86400000) + 1;
-  let year = gy - 7;
-  if (doy < 1) {
-    ny = new Date(gy - 1, 8, 11);
-    doy = Math.floor((g.getTime() - ny.getTime()) / 86400000) + 1;
-    year = gy - 8;
-  } else if (!afterNewYear) {
-    year = gy - 8;
-  }
-  let m = 1;
-  let d = doy;
-  for (let i = 0; i < months.length; i += 1) {
-    if (d <= months[i]) { m = i + 1; break; }
-    d -= months[i];
-  }
-  return { year, month: m, date: d };
-};
-
-const ethLabel = (g: Date) => {
-  const e = gregorianToEthiopian(g);
-  return `${e.date} ${ETHIOPIAN_MONTHS[e.month - 1]} ${e.year}`;
-};
 
 // FIX: Add safe stageName function with error handling
 const stageName = (s: string | undefined) => {

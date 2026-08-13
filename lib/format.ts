@@ -91,39 +91,44 @@ export function formatDateEth(date: Date | string | number | undefined) {
 }
 
 /**
- * Display a scheduling time that is stored in Ethiopian format.
+ * Display a scheduling time in Ethiopian (local) time.
  *
- * The backend scheduling engine stores times in Ethiopian time (offset -6h
- * from Gregorian), e.g. 2:30 stored = 2:30 ጧት = 8:30 AM Gregorian.
+ * The backend scheduling engine (services/scheduling/calendar.js) stores plain
+ * GREGORIAN instants in the factory timezone — a stage that opens at 08:30 is
+ * stored as 08:30. Ethiopian clock time runs 6 hours behind that, counting from
+ * dawn, so the conversion is Gregorian − 6h:
+ *   08:30 AM → 2:30 ጧት
+ *   4:21 PM  → 10:21 ከሰዓት
  *
- * This function reads the stored hour directly and adds the correct
- * Ethiopian period label:
- *   Hours 0-5   → ጧት      (morning:   6:00 AM – 11:59 AM Gregorian)
- *   Hours 6-11  → ከሰዓት    (afternoon: 12:00 PM – 5:59 PM Gregorian)
- *   Hours 12-17 → ሌሊት     (evening:   6:00 PM – 11:59 PM Gregorian)
- *   Hours 18-23 → ንጋት     (dawn:      12:00 AM – 5:59 AM Gregorian)
+ * The period label is derived from the GREGORIAN hour, which is what actually
+ * says whether the instant is morning, afternoon, evening or the small hours:
+ *   Gregorian 6-11  → ጧት     (morning)
+ *   Gregorian 12-17 → ከሰዓት   (afternoon)
+ *   Gregorian 18-23 → ሌሊት    (evening / night)
+ *   Gregorian 0-5   → ንጋት    (dawn / late night)
  */
 export function formatTimeEth(date: Date | string | number | undefined) {
   if (!date) return '';
   try {
     const g = new Date(date);
-    const storedHour = g.getHours(); // already Ethiopian
+    if (Number.isNaN(g.getTime())) return '';
+    const gregHour = g.getHours();
     const minutes = g.getMinutes();
 
-    // 12-hour display
-    let displayHour = storedHour % 12;
-    if (displayHour === 0) displayHour = 12;
+    // Ethiopian clock runs 6 hours behind the Gregorian wall clock.
+    const ethHour24 = (gregHour - 6 + 24) % 24;
+    const displayHour = ethHour24 % 12 || 12;
 
-    // Ethiopian period
+    // Period comes from the Gregorian hour, not the Ethiopian one.
     let period: string;
-    if (storedHour < 6) {
-      period = 'ጧት';       // morning
-    } else if (storedHour < 12) {
-      period = 'ከሰዓት';     // afternoon
-    } else if (storedHour < 18) {
-      period = 'ሌሊት';      // evening / night
+    if (gregHour < 6) {
+      period = 'ንጋት';       // dawn / late night
+    } else if (gregHour < 12) {
+      period = 'ጧት';        // morning
+    } else if (gregHour < 18) {
+      period = 'ከሰዓት';      // afternoon
     } else {
-      period = 'ንጋት';      // dawn / late night
+      period = 'ሌሊት';       // evening / night
     }
 
     return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
@@ -133,27 +138,34 @@ export function formatTimeEth(date: Date | string | number | undefined) {
 }
 
 /**
- * Convert a scheduling time stored in Ethiopian format to Gregorian AM/PM.
+ * Display a scheduling time as Gregorian AM/PM.
  *
- * Ethiopian time + 6 hours = Gregorian time.
- *   Stored 2:30  → 8:30 AM   (2:30 ጧት)
- *   Stored 10:30 → 4:30 PM   (10:30 ከሰዓት)
- *   Stored 11:30 → 5:30 PM   (11:30 ከሰዓት)
+ * Stored instants are already Gregorian factory-local time, so this is a
+ * straight render with no offset applied.
+ *   Stored 08:30 → 8:30 AM
+ *   Stored 16:21 → 4:21 PM
  */
 export function formatTimeGregorian(date: Date | string | number | undefined) {
   if (!date) return '';
   try {
     const g = new Date(date);
-    const storedHour = g.getHours(); // Ethiopian hour
+    if (Number.isNaN(g.getTime())) return '';
+    const hour24 = g.getHours();
     const minutes = g.getMinutes();
 
-    // Convert to Gregorian by adding 6 hours
-    const gregHour24 = (storedHour + 6) % 24;
-    const gregHour12 = gregHour24 % 12 || 12;
-    const ampm = gregHour24 < 12 ? 'AM' : 'PM';
+    const hour12 = hour24 % 12 || 12;
+    const ampm = hour24 < 12 ? 'AM' : 'PM';
 
-    return `${gregHour12}:${String(minutes).padStart(2, '0')} ${ampm}`;
+    return `${hour12}:${String(minutes).padStart(2, '0')} ${ampm}`;
   } catch {
     return '';
   }
+}
+
+/** Ethiopian date + Ethiopian time on one line, e.g. "2 Nehase 2018 10:21 ከሰዓት". */
+export function formatDateTimeEth(date: Date | string | number | undefined) {
+  if (!date) return '';
+  const d = formatDateEth(date);
+  const t = formatTimeEth(date);
+  return [d, t].filter(Boolean).join(' ');
 }

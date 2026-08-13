@@ -22,8 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getAllDailyStageCapacities } from '@/service/Category';
 import { IDailyStageCapacity, ICapacityLot } from '@/models/CapacityLot';
 import { getCapacitySlots } from '@/service/CapacityLot';
-
-const WORKING_HOURS_PER_DAY = 7.5;
+import { useWorkingTime } from '@/hooks/useWorkingTime';
 
 interface GanttChartPageProps {
   projectId: string;
@@ -58,6 +57,8 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
   projectData,
 }) => {
   const router = useRouter();
+  // Working hours come from Scheduling Settings, not a hardcoded 7.5.
+  const { workingHoursPerDay } = useWorkingTime();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Month);
@@ -226,8 +227,10 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
       return Math.min(100, Math.round((actualWorkUnits / stage.workUnits) * 100));
     }
     if (stage.timeTaken && stage.timeTaken > 0 && stage.capacityDays) {
-      const capacityHours = stage.capacityDays * WORKING_HOURS_PER_DAY;
-      return Math.min(100, Math.round((stage.timeTaken / capacityHours) * 100));
+      // timeTaken is in MINUTES — comparing it against a figure in hours (as this
+      // used to) inflated the ratio 60x and pinned every stage at 100%.
+      const capacityMinutes = stage.capacityDays * workingHoursPerDay * 60;
+      return Math.min(100, Math.round((stage.timeTaken / capacityMinutes) * 100));
     }
     if (stage.startDate && stage.endDate) {
       const start = parseISO(stage.startDate);
@@ -241,7 +244,7 @@ export const GanttChartPage: React.FC<GanttChartPageProps> = ({
     }
     if (stage.finished || stage.status === StageStatus.COMPLETED) return 100;
     return 0;
-  }, []);
+  }, [workingHoursPerDay]);
 
   const calculateStageWorkProgress = useCallback((stage: IProjectStage): WorkProgress => {
     const totalWorkUnits = stage.workUnits || 0;

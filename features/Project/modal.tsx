@@ -65,6 +65,16 @@ import { getProjectId, updateProjectStage, deleteProjectStage } from '@/service/
 import { CapacityStage, ICapacityLot, IDailyStageCapacity } from '@/models/CapacityLot';
 import { getCapacitySlots } from '@/service/CapacityLot';
 import { getAllDailyStageCapacities } from '@/service/Category';
+import { useWorkingTime } from '@/hooks/useWorkingTime';
+import {
+  WorkingTimeConfig,
+  addWorkingMinutes,
+  atDecimalHour,
+  isWorkingDay,
+  outOfWorkingHoursReason,
+  workingDaysBetween,
+} from '@/lib/workingTime';
+import { decimalToTime } from '@/models/SchedulingSettings';
 
 interface StageFormData {
   id?: string;
@@ -99,9 +109,6 @@ type StageUpdatePageProps = {
   embedded?: boolean;
 };
 
-// Working hours per day
-const WORKING_HOURS_PER_DAY = 7.5;
-
 // Helper function to format minutes to readable time
 const formatMinutes = (minutes?: number) => {
   if (!minutes && minutes !== 0) return '0 min';
@@ -112,13 +119,12 @@ const formatMinutes = (minutes?: number) => {
   return `${hours} hr ${mins} min`;
 };
 
-// Set default working hours (8:00 AM to 5:00 PM)
-const setDefaultWorkingHours = (date: Date | null): Date | null => {
-  if (!date) return null;
-  const newDate = new Date(date);
-  newDate.setHours(8, 0, 0, 0);
-  return newDate;
-};
+// Anchor a date at the configured shift start rather than a hardcoded 08:00 —
+// the default window opens at 08:30, so the old default was itself out of hours.
+const setDefaultWorkingHours = (
+  date: Date | null,
+  wt: WorkingTimeConfig,
+): Date | null => (date ? atDecimalHour(date, wt.shiftStartHour) : null);
 
 const safeFormatDateTime = (date: Date | string | null | undefined): string => {
   if (!date) return 'Not set';
@@ -130,30 +136,53 @@ const safeFormatDateTime = (date: Date | string | null | undefined): string => {
   })}`;
 };
 
-const timeInputValue = (date: Date | null | undefined): string => {
-  if (!date || isNaN(date.getTime())) return '08:00';
+const timeInputValue = (
+  date: Date | null | undefined,
+  wt: WorkingTimeConfig,
+): string => {
+  if (!date || isNaN(date.getTime())) return decimalToTime(wt.shiftStartHour);
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-const withDatePart = (current: Date | null, nextDate?: Date): Date | null => {
+const withDatePart = (
+  current: Date | null,
+  wt: WorkingTimeConfig,
+  nextDate?: Date,
+): Date | null => {
   if (!nextDate) return current;
   const next = new Date(nextDate);
-  const base = current && !isNaN(current.getTime()) ? current : setDefaultWorkingHours(next);
+  const base = current && !isNaN(current.getTime()) ? current : setDefaultWorkingHours(next, wt);
   next.setHours(base?.getHours() ?? 8, base?.getMinutes() ?? 0, 0, 0);
   return next;
 };
 
-const withTimePart = (current: Date | null, value: string): Date | null => {
+const withTimePart = (
+  current: Date | null,
+  wt: WorkingTimeConfig,
+  value: string,
+): Date | null => {
   const [hours, minutes] = value.split(':').map(Number);
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return current;
-  const next = current ? new Date(current) : setDefaultWorkingHours(new Date());
+  const next = current ? new Date(current) : setDefaultWorkingHours(new Date(), wt);
   next?.setHours(hours, minutes, 0, 0);
   return next;
 };
 
-const approximateEndDate = (stage: StageFormData): Date | null => {
-  if (!stage.startDate) return null;
-  return new Date(stage.startDate.getTime() + (stage.timeTaken || 0) * 60000);
+/**
+ * Where a duration actually lands, in WORKING time.
+ *
+ * This used to be `start + timeTaken` in raw wall-clock milliseconds, which
+ * produced ends past closing (16:21 + 1h19 shown as 17:40 on a factory that
+ * shuts at 17:00) and ends that ran straight through the lunch break. It now
+ * walks the same segments the backend scheduler does, so the preview matches
+ * what will be persisted.
+ */
+const projectedEndDate = (
+  stage: StageFormData,
+  wt: WorkingTimeConfig,
+): Date | null => {
+  if (!stage.startDate || isNaN(stage.startDate.getTime())) return null;
+  return addWorkingMinutes(stage.startDate, stage.timeTaken || 0, wt);
 };
 
 const timeParts = (minutes?: number) => ({
@@ -173,8 +202,10 @@ const toCapacityStage = (stage: ProjectStatus): CapacityStage => {
   return stage as unknown as CapacityStage;
 };
 
-const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded = false }) => { 
-  const router = useRouter();  
+const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded = false }) => {
+  const router = useRouter();
+  // The configured shift/lunch/working-days, shared with the backend scheduler.
+  const { workingTime, workingHoursPerDay } = useWorkingTime();
   const [project, setProject] = useState<IProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [stages, setStages] = useState<StageFormData[]>([]);
@@ -310,7 +341,7 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
     const capacityLot = capacityLots.find(lot => lot.stage === capacityStage);
     
     const maxCapacity = capacityLot?.capacity || 1;
-    const maxHours = WORKING_HOURS_PER_DAY;
+    const maxHours = workingHoursPerDay;
     
     const warnings: DateCapacityInfo[] = [];
     let hasOverCapacity = false;
@@ -355,12 +386,12 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
       
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return {
       valid: !hasOverCapacity,
       warnings
     };
-  }, [dailyCapacities, capacityLots]);
+  }, [dailyCapacities, capacityLots, workingHoursPerDay]);
 
   // Validate dates when they change
   const validateAndShowWarnings = useCallback(async (
@@ -420,23 +451,11 @@ const ProjectStageUpdatePage: React.FC<StageUpdatePageProps> = ({ id, embedded =
     return Math.round((actualUnits / stage.workUnits) * 100);
   };
 
-  // Calculate efficiency (actual time vs planned time)
-  const calculateEfficiency = (stage: StageFormData) => {
-    if (!stage.timeTaken || !stage.capacityDays) return null;
-    const plannedMinutes = stage.capacityDays * WORKING_HOURS_PER_DAY * 60;
-    const efficiency = (plannedMinutes / stage.timeTaken) * 100;
-    return Math.min(Math.round(efficiency), 200);
-  };
-
-  // Calculate capacity days from dates
+  // Calculate capacity days from dates. Counts WORKING days only — a stage that
+  // spans a weekend does not consume weekend capacity.
   const calculateCapacityDays = (startDate: Date | null, endDate: Date | null): number => {
     if (!startDate || !endDate) return 1;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
-    const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    return Math.max(1, diffDays);
+    return Math.max(1, workingDaysBetween(startDate, endDate, workingTime));
   };
 
   // Perform actual stage update
@@ -452,7 +471,7 @@ const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
     const startDateTime = stage.startDate;
     
     const isTempStage = !stage.id || stage.isNew || stage.id.startsWith('temp-');
-    
+
     // Prepare data based on whether it's a new stage or update
     const dataToSend: any = {
       projectId: project.id,
@@ -473,11 +492,14 @@ const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
         toast.error('Work units are required for new stages');
         return false;
       }
-      dataToSend.newQuantity = stage.workUnits || 0;
+      dataToSend.newQuantity = stage.workUnits;
     } else {
-      // For EDIT operations: send the existing workUnits so the backend doesn't clear them
-      dataToSend.newQuantity = stage.workUnits || 0;
-      // Also explicitly send the stage ID for edit operations
+      // For EDIT operations: OMIT newQuantity entirely. The backend preserves the
+      // stage's current workUnits when the field is absent, but treats an explicit
+      // 0 as "clear this stage's work" — which is what was wiping the unit count
+      // (and, for a stage that already had none, silently discarding the date
+      // change along with it). The dialog cannot edit units, so it must not
+      // claim to know them.
       if (stage.id) {
         dataToSend.stageId = stage.id;
       }
@@ -531,7 +553,20 @@ const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
       return false;
     }
 
-    const endDateTime = approximateEndDate(stage);
+    // Refuse an out-of-hours start rather than letting the server silently move
+    // it — the user should see where the work is really going before saving.
+    const offHours = outOfWorkingHoursReason(startDateTime, workingTime);
+    if (offHours) {
+      const proceed = window.confirm(
+        `⚠️ ${offHours}\n\n` +
+          'Work cannot be scheduled outside the factory\'s working hours, so this ' +
+          'stage will be moved to the next available working time.\n\n' +
+          'Continue?'
+      );
+      if (!proceed) return false;
+    }
+
+    const endDateTime = projectedEndDate(stage, workingTime);
 
     // Validate capacity before updating
     const isValid = await validateAndShowWarnings(
@@ -586,7 +621,7 @@ const performStageUpdate = async (stage: StageFormData): Promise<boolean> => {
   const updateForm = (patch: Partial<StageFormData>) => {
     setForm(prev => {
       const next = { ...prev, ...patch };
-      next.endDate = approximateEndDate(next);
+      next.endDate = projectedEndDate(next, workingTime);
       next.capacityDays = calculateCapacityDays(next.startDate, next.endDate);
       return next;
     });
@@ -688,7 +723,6 @@ const handleSaveForm = async () => {
   const renderStageRow = (
     stage: StageFormData,
     isFinished: boolean,
-    efficiency: number | null,
     hasOverCapacity: boolean
   ) => {
     const progress = calculateStageProgress(stage);
@@ -717,9 +751,9 @@ const handleSaveForm = async () => {
           {safeFormatDateTime(stage.startDate)}
         </TableCell>
 
-        {/* Calc. End */}
+        {/* End — the scheduler's own value, already walked across lunch/nights */}
         <TableCell className="whitespace-nowrap py-1.5 text-xs tabular-nums text-muted-foreground">
-          {safeFormatDateTime(approximateEndDate(stage) || stage.endDate)}
+          {safeFormatDateTime(stage.endDate)}
         </TableCell>
 
         {/* Time Took */}
@@ -735,22 +769,11 @@ const handleSaveForm = async () => {
             </div>
             <span className="text-[10px] tabular-nums text-muted-foreground">{progress}%</span>
           </div>
-          {stage.actualWorkUnits !== undefined && stage.workUnits ? (
+          {stage.workUnits != null ? (
             <div className="mt-0.5 text-[10px] text-muted-foreground tabular-nums">
-              {stage.actualWorkUnits} / {stage.workUnits} units
+              {stage.actualWorkUnits ?? 0} / {stage.workUnits} units
             </div>
           ) : null}
-        </TableCell>
-
-        {/* Efficiency */}
-        <TableCell className="py-1.5">
-          {efficiency ? (
-            <Badge variant={efficiency >= 100 ? 'default' : 'destructive'} className="h-5 px-1.5 text-[10px] tabular-nums">
-              {efficiency}%
-            </Badge>
-          ) : (
-            <span className="text-[10px] text-muted-foreground">—</span>
-          )}
         </TableCell>
 
         {/* Status */}
@@ -804,7 +827,11 @@ const handleSaveForm = async () => {
   // Shared form fields for the add/edit dialog
   const renderStageFormFields = () => {
     const isAddMode = formMode === 'add';
-    
+    const offHoursReason = form.startDate
+      ? outOfWorkingHoursReason(form.startDate, workingTime)
+      : null;
+    const projectedEnd = projectedEndDate(form, workingTime);
+
     return (
       <div className="space-y-3">
         <div className="space-y-1.5">
@@ -875,7 +902,8 @@ const handleSaveForm = async () => {
                 <Calendar
                   mode="single"
                   selected={form.startDate || undefined}
-                  onSelect={(date) => updateForm({ startDate: withDatePart(form.startDate, date) })}
+                  onSelect={(date) => updateForm({ startDate: withDatePart(form.startDate, workingTime, date) })}
+                  disabled={(date) => !isWorkingDay(date, workingTime)}
                   initialFocus
                 />
               </PopoverContent>
@@ -886,12 +914,28 @@ const handleSaveForm = async () => {
             <Label className="text-xs">Start Time</Label>
             <Input
               type="time"
-              value={timeInputValue(form.startDate)}
-              onChange={(e) => updateForm({ startDate: withTimePart(form.startDate, e.target.value) })}
-              className="h-9"
+              min={decimalToTime(workingTime.shiftStartHour)}
+              max={decimalToTime(workingTime.shiftEndHour)}
+              value={timeInputValue(form.startDate, workingTime)}
+              onChange={(e) => updateForm({ startDate: withTimePart(form.startDate, workingTime, e.target.value) })}
+              className={cn('h-9', offHoursReason && 'border-yellow-500')}
             />
           </div>
         </div>
+
+        {offHoursReason && (
+          <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2 text-[11px]">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-600" />
+            <span className="text-yellow-800 dark:text-yellow-300">
+              {offHoursReason} Work only runs{' '}
+              {decimalToTime(workingTime.shiftStartHour)}–{decimalToTime(workingTime.shiftEndHour)}
+              {workingTime.lunchEndHour > workingTime.lunchStartHour && (
+                <> (lunch {decimalToTime(workingTime.lunchStartHour)}–{decimalToTime(workingTime.lunchEndHour)})</>
+              )}
+              , so this stage will be moved to the next available working time.
+            </span>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label className="text-xs">Time Took</Label>
@@ -922,9 +966,15 @@ const handleSaveForm = async () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-xs">
-          <span className="text-muted-foreground">Calculated end</span>
-          <span className="font-medium tabular-nums">{safeFormatDateTime(approximateEndDate(form))}</span>
+        <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Estimated end (working time)</span>
+            <span className="font-medium tabular-nums">{safeFormatDateTime(projectedEnd)}</span>
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Skips lunch, nights, weekends and holidays. The scheduler confirms the
+            final time on save.
+          </p>
         </div>
       </div>
     );
@@ -969,7 +1019,6 @@ const stagesTable = (
       ) : (
         stages.map((stage) => {
           const isFinished = isStageFinished(stage);
-          const efficiency = calculateEfficiency(stage);
           const warnings = dateValidationWarnings.get(stage.id || '');
           const hasOverCapacity = warnings?.some((w) => w.isOverCapacity) || false;
           const progress = calculateStageProgress(stage);
@@ -1012,19 +1061,13 @@ const stagesTable = (
                 <div>
                   <span className="text-muted-foreground">End:</span>
                   <span className="ml-1 font-mono text-[10px]">
-                    {safeFormatDateTime(approximateEndDate(stage) || stage.endDate)}
+                    {safeFormatDateTime(stage.endDate)}
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Time:</span>
                   <span className="ml-1 font-mono text-[10px]">
                     {formatMinutes(stage.timeTaken)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Eff.:</span>
-                  <span className="ml-1 font-mono text-[10px]">
-                    {efficiency ? `${efficiency}%` : '—'}
                   </span>
                 </div>
               </div>
@@ -1089,10 +1132,9 @@ const stagesTable = (
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead className="h-8 py-0 text-xs font-semibold">Stage</TableHead>
             <TableHead className="h-8 py-0 text-xs font-semibold">Start</TableHead>
-            <TableHead className="h-8 py-0 text-xs font-semibold">Calc. End</TableHead>
+            <TableHead className="h-8 py-0 text-xs font-semibold">End</TableHead>
             <TableHead className="h-8 py-0 text-xs font-semibold">Time</TableHead>
             <TableHead className="h-8 py-0 text-xs font-semibold">Progress</TableHead>
-            <TableHead className="h-8 py-0 text-xs font-semibold">Eff.</TableHead>
             <TableHead className="h-8 py-0 text-xs font-semibold">Status</TableHead>
             <TableHead className="h-8 py-0 text-right text-xs font-semibold">Actions</TableHead>
           </TableRow>
@@ -1100,18 +1142,17 @@ const stagesTable = (
         <TableBody>
           {stages.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+              <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                 No stages found for this project
               </TableCell>
             </TableRow>
           ) : (
             stages.map((stage) => {
               const isFinished = isStageFinished(stage);
-              const efficiency = calculateEfficiency(stage);
               const warnings = dateValidationWarnings.get(stage.id || '');
               const hasOverCapacity = warnings?.some((w) => w.isOverCapacity) || false;
 
-              return renderStageRow(stage, isFinished, efficiency, hasOverCapacity);
+              return renderStageRow(stage, isFinished, hasOverCapacity);
             })
           )}
         </TableBody>

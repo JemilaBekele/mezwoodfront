@@ -18,13 +18,12 @@ import { getAllCapacitySlots } from "@/service/CapacityLot";
 import PageContainer from "@/components/layout/page-container";
 import { Heading } from "@/components/ui/heading";
 import { Separator } from "@/components/ui/separator";
+// Ethiopian calendar rendering lives in lib/format.ts — the single copy shared
+// by every screen, so a fix to the conversion cannot reach only some of them.
+import { formatDateEth as ethLabel } from '@/lib/format';
+
 
 // Helper functions
-const ETHIOPIAN_MONTHS = [
-  "Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir", "Yekatit",
-  "Megabit", "Miazia", "Ginbot", "Sene", "Hamle", "Nehase", "Pagume",
-];
-
 const STAGE_ORDER: CapacityStage[] = [
   CapacityStage.DESIGN,
   CapacityStage.METAL_WORKS,
@@ -53,36 +52,6 @@ const SHIFT_HOURS: Record<string, number> = {
   MORNING: 4, AFTERNOON: 3.5, FULL_DAY: 7.5, CUSTOM: 7.5,
 };
 
-const gregorianToEthiopian = (g: Date) => {
-  if (!g || Number.isNaN(g.getTime())) return { year: 2018, month: 1, date: 1 };
-  const gy = g.getFullYear();
-  const gm = g.getMonth() + 1;
-  const gd = g.getDate();
-  const afterNewYear = gm > 9 || (gm === 9 && gd > 10);
-  const months = [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 5];
-  let ny = new Date(gy, 8, 11);
-  let doy = Math.floor((g.getTime() - ny.getTime()) / 86400000) + 1;
-  let year = gy - 7;
-  if (doy < 1) {
-    ny = new Date(gy - 1, 8, 11);
-    doy = Math.floor((g.getTime() - ny.getTime()) / 86400000) + 1;
-    year = gy - 8;
-  } else if (!afterNewYear) {
-    year = gy - 8;
-  }
-  let m = 1;
-  let d = doy;
-  for (let i = 0; i < months.length; i += 1) {
-    if (d <= months[i]) { m = i + 1; break; }
-    d -= months[i];
-  }
-  return { year, month: m, date: d };
-};
-
-const ethLabel = (g: Date) => {
-  const e = gregorianToEthiopian(g);
-  return `${e.date} ${ETHIOPIAN_MONTHS[e.month - 1]} ${e.year}`;
-};
 
 const stageName = (s: string) => s.replace(/_/g, " ");
 
