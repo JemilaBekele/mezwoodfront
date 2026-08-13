@@ -35,7 +35,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 
-import { ISell, ISellItem, SaleStatus } from '@/models/Sell';
+import { ISell, ISellItem, ISellPayment, SaleStatus } from '@/models/Sell';
 import {  getSellById } from '@/service/Sell';
 import { normalizeImagePath } from '@/lib/norm';
 
@@ -690,6 +690,143 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
   <div className='text-muted-foreground py-8 text-center'>
     <Package className='mx-auto h-12 w-12 opacity-20' />
     <p className='mt-2'>No items found in this sale</p>
+  </div>
+)}
+
+{/* Sale Payments Section */}
+{sale.sellPayments && sale.sellPayments.length > 0 ? (
+  <div className='space-y-4 mt-6'>
+    <div className='flex items-center justify-between'>
+      <h3 className='text-base font-semibold sm:text-lg'>Payment History</h3>
+      <Badge variant='outline' className='flex items-center gap-1'>
+        <CreditCard className='h-3 w-3' />
+        {sale.sellPayments.length} payment(s)
+      </Badge>
+    </div>
+
+    {/* Mobile Card View */}
+    <div className='space-y-3 sm:hidden'>
+      {sale.sellPayments.map((payment: ISellPayment) => (
+        <Card key={payment.id} className='overflow-hidden'>
+          <CardContent className='pt-4'>
+            <div className='flex justify-between items-start'>
+              <div>
+                <p className='font-medium text-lg text-green-600'>
+                  +{payment.amount.toFixed(2)}
+                </p>
+                {payment.bank && (
+                  <p className='text-sm text-muted-foreground'>
+                    🏦 {payment.bank.bankName}
+                  </p>
+                )}
+              </div>
+              <div className='text-right'>
+                <p className='text-xs text-muted-foreground'>
+                  {formatDate(payment.createdAt)}
+                </p>
+                {payment.paidBy && (
+                  <p className='text-xs text-muted-foreground'>
+                    Paid by: {payment.paidBy}
+                  </p>
+                )}
+                {payment.createdBy && (
+                  <p className='text-xs text-muted-foreground'>
+                    Recorded by: {payment.createdBy.name}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+
+    {/* Desktop Table View */}
+    <div className='hidden sm:block overflow-x-auto'>
+      <div className='inline-block min-w-full align-middle'>
+        <div className='overflow-hidden border rounded-lg'>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>#</TableHead>
+                <TableHead className='text-right'>Amount</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Paid By</TableHead>
+                <TableHead>Recorded By</TableHead>
+                <TableHead>Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sale.sellPayments.map((payment: ISellPayment, index: number) => (
+                <TableRow key={payment.id}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell className='text-right font-medium text-green-600'>
+                    +{payment.amount.toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    <div className='flex items-center gap-2'>
+                      <CreditCard className='h-4 w-4 text-muted-foreground' />
+                      {payment.bank ? (
+                        <span>{payment.bank.bankName}</span>
+                      ) : (
+                        <span className='text-muted-foreground'>Cash</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {payment.paidBy || (
+                      <span className='text-muted-foreground'>—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {payment.createdBy?.name || (
+                      <span className='text-muted-foreground'>—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {formatDate(payment.createdAt)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+
+    {/* Payment Summary */}
+    <Card className='bg-muted/30'>
+      <CardContent className='pt-4'>
+        <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
+          <div className='flex flex-col'>
+            <span className='text-sm text-muted-foreground'>Total Payments</span>
+            <span className='text-lg font-bold text-green-600'>
+              {sale.sellPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
+            </span>
+          </div>
+          <div className='flex flex-col'>
+            <span className='text-sm text-muted-foreground'>Number of Payments</span>
+            <span className='text-lg font-bold'>
+              {sale.sellPayments.length}
+            </span>
+          </div>
+          <div className='flex flex-col'>
+            <span className='text-sm text-muted-foreground'>Last Payment</span>
+            <span className='text-lg font-medium'>
+              {sale.sellPayments.length > 0
+                ? formatDate(sale.sellPayments[sale.sellPayments.length - 1].createdAt)
+                : '—'}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+) : (
+  <div className='text-muted-foreground py-4 text-center border-t pt-6'>
+    <CreditCard className='mx-auto h-8 w-8 opacity-20' />
+    <p className='mt-2 text-sm'>No payments recorded for this sale</p>
+    <p className='text-xs'>Payment status: {sale.paymentStatus}</p>
   </div>
 )}
         </CardContent>

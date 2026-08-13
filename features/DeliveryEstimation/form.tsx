@@ -716,7 +716,7 @@ export default function DeliveryEstimationForm({
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[400px] p-0" align="start">
+        <PopoverContent className="w-100 p-0" align="start">
           <div className="p-2 border-b">
             <div className="flex items-center border rounded-md px-2 py-1">
               <Search className="h-4 w-4 text-gray-400 mr-2" />
@@ -735,7 +735,7 @@ export default function DeliveryEstimationForm({
               )}
             </div>
           </div>
-          <div className="max-h-[300px] overflow-y-auto">
+          <div className="max-h-75 overflow-y-auto">
             {isLoadingItems ? (
               <div className="p-4 text-center text-sm text-gray-500">Loading items...</div>
             ) : filteredItems.length === 0 ? (
