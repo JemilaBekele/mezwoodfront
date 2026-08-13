@@ -52,6 +52,7 @@ interface Material {
   plainMDF?: boolean;
   wood?: boolean;
   metal?: boolean;
+  accessory: number;
   other?: boolean;
   color?: string;
   size?: string;
