@@ -36,6 +36,8 @@ import { getShowroomsAll } from '@/service/showroom';
 import { getProducts } from '@/service/transfer';
 import { Modal } from '@/components/ui/modal';
 import { normalizeImagePath } from '@/lib/norm';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
 
 // Define types for form data
 interface FormItemType {
@@ -588,8 +590,17 @@ export default function StockCorrectionForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value='items'>Items (Products)</SelectItem>
-                          <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
+                           <PermissionGuard
+              requiredPermission={PERMISSIONS.PRODUCT.CREATE.name}
+            >
+            
+             <SelectItem value='items'>Products</SelectItem>
+           </PermissionGuard>
+             <PermissionGuard
+              requiredPermission={PERMISSIONS.MATERIAL.CREATE.name}
+            >    
+            <SelectItem value='materials'>Materials </SelectItem>
+            </PermissionGuard>
                         </SelectContent>
                       </ShadcnSelect>
                       <FormMessage />

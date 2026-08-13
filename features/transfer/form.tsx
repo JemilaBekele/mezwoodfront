@@ -32,6 +32,8 @@ import { getStoresAll } from '@/service/store';
 import { getShowroomsAll, getShowroomsByUser, getStoresByUser } from '@/service/showroom';
 import { Modal } from '@/components/ui/modal';
 import { normalizeImagePath } from '@/lib/norm';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { PERMISSIONS } from '@/stores/permissions';
 
 interface FormData {
   reference?: string;
@@ -508,9 +510,18 @@ export default function TransferForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value='items'>Items (Products)</SelectItem>
-                          <SelectItem value='materials'>Materials (Raw Materials)</SelectItem>
-                        </SelectContent>
+                                                <PermissionGuard
+                                   requiredPermission={PERMISSIONS.PRODUCT.CREATE.name}
+                                 >
+                                 
+                                  <SelectItem value='items'>Products</SelectItem>
+                                </PermissionGuard>
+                                  <PermissionGuard
+                                   requiredPermission={PERMISSIONS.MATERIAL.CREATE.name}
+                                 >    
+                                 <SelectItem value='materials'>Materials </SelectItem>
+                                 </PermissionGuard>
+                                             </SelectContent>
                       </ShadcnSelect>
                       <FormMessage />
                     </FormItem>
