@@ -24,6 +24,7 @@ import {
   ImageIcon,
   ChevronDown,
   ChevronUp,
+  ZoomIn,
 
 } from 'lucide-react';
 import {
@@ -34,7 +35,13 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
 
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ISell, ISellItem, ISellPayment, SaleStatus } from '@/models/Sell';
 import {  getSellById } from '@/service/Sell';
 import { normalizeImagePath } from '@/lib/norm';
@@ -58,7 +65,9 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
  const [, setImageError] = useState(false);
   const [showAttachedFiles, setShowAttachedFiles] = useState(false);
 
-
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedProductName, setSelectedProductName] = useState<string>('');
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   // Normalize image and document URLs
   const normalizedImageUrl = normalizeImagePath(sale?.imageUrl);
   const normalizedDocumentUrl = normalizeImagePath(sale?.documentUrl);
@@ -99,7 +108,11 @@ const SaleDetailPage: React.FC<SaleViewProps> = ({ id }) => {
     printDocument(printHTML);
   };
 
-
+  const handleImageClick = (normalizedUrl: string, productName: string) => {
+    setSelectedImage(normalizedUrl);
+    setSelectedProductName(productName);
+    setIsImageModalOpen(true);
+  };
 
   const printDocument = (html: string) => {
     const printContainer = document.createElement('div');
@@ -533,7 +546,7 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
             </div>
           )}
           {/* Sale Items Table */}
-       {sale.items && sale.items.length > 0 ? (
+{sale.items && sale.items.length > 0 ? (
   <div className='space-y-4'>
     <h3 className='text-base font-semibold sm:text-lg'>Sale Products</h3>
 
@@ -560,13 +573,37 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
           return '📍';
         };
 
+        const productImage = normalizeImagePath(item.item?.imageUrl);
+
         return (
           <Card key={item.id} className='overflow-hidden'>
             <CardContent className='pt-4'>
-              <h4 className='font-semibold'>{item.item?.name || 'Unknown Product'}</h4>
+              {/* Product Image */}
+              {productImage && (
+                <div className='flex justify-center mb-3'>
+                  <div 
+                    className='relative cursor-pointer group'
+                    onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                  >
+                    <div className='relative h-24 w-24'>
+                      <img 
+                        src={productImage} 
+                        alt={item.item?.name || 'Product'}
+                        className='w-full h-full object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                        style={{ display: 'block' }}
+                      />
+                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                        <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <h4 className='font-semibold text-center'>{item.item?.name || 'Unknown Product'}</h4>
               
               {/* Location Badge */}
-              <div className='mt-1'>
+              <div className='mt-1 flex justify-center'>
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                   item.store 
                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
@@ -608,6 +645,7 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
               <TableRow>
                 <TableHead>#</TableHead>
                 <TableHead>Product</TableHead>
+                <TableHead>Image</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className='text-center'>Quantity</TableHead>
                 <TableHead className='text-right'>Unit Price</TableHead>
@@ -661,12 +699,35 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
                 };
 
                 const locationStyle = getLocationStyle();
+                const productImage = normalizeImagePath(item.item?.imageUrl);
 
                 return (
                   <TableRow key={item.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className='font-medium'>
                       {item.item?.name || 'Unknown Product'}
+                    </TableCell>
+                    <TableCell>
+                      {productImage ? (
+                        <div 
+                          className='relative cursor-pointer group w-12 h-12'
+                          onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                        >
+                          <img 
+                            src={productImage} 
+                            alt={item.item?.name || 'Product'}
+                            className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                            style={{ display: 'block' }}
+                          />
+                          <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                            <ZoomIn className='h-3 w-3 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className='w-12 h-12 flex items-center justify-center bg-gray-50 rounded border'>
+                          <Package className='h-6 w-6 text-gray-300' />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
@@ -831,6 +892,28 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
 )}
         </CardContent>
       </Card>
+          <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] w-auto h-auto p-0 overflow-hidden bg-black/95">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Product Image: {selectedProductName}</DialogTitle>
+          </DialogHeader>
+          <div className="relative flex items-center justify-center min-h-100">
+            {selectedImage && (
+              <div className="relative w-full h-[85vh] min-h-100">
+                <img
+                  src={selectedImage}
+                  alt={selectedProductName}
+                  className="object-contain w-full h-full"
+                />
+              </div>
+            )}
+            {/* Lightweight overlay for product name */}
+            <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/60 to-transparent text-white p-4 text-center">
+              <p className="text-sm font-medium">{selectedProductName}</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
