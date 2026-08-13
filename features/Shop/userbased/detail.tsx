@@ -790,27 +790,29 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
           <Card key={item.id} className='overflow-hidden'>
             <CardContent className='pt-4'>
               {/* Product Image */}
-              {productImage && (
-                <div className='mt-3 flex justify-center'>
-                  <div 
-                    className='relative cursor-pointer group'
-                    onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
-                  >
-                    <div className='relative h-32 w-32'>
-                      <Image 
-                        src={productImage} 
-                        alt={item.item?.name || 'Product'}
-                        fill
-                        className='object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
-                        sizes="(max-width: 640px) 128px, 128px"
-                      />
-                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
-                        <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+          {productImage && (
+  <div className='mt-3 flex justify-center'>
+    <div 
+      className='relative cursor-pointer group'
+      onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+    >
+      <div className='relative h-32 w-32'>
+        <Image 
+          src={productImage} 
+          alt={item.item?.name || 'Product'}
+          fill
+          className='object-contain rounded border shadow-sm hover:shadow-md transition-shadow'
+          sizes="(max-width: 640px) 128px, 128px"
+          priority={index < 3} // Only load first 3 images with priority
+        />
+        {/* Remove or modify the overlay */}
+        <div className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+          <ZoomIn className='h-4 w-4 text-white drop-shadow-lg' />
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
               <h4 className='font-semibold text-center'>{item.item?.name || 'Unknown Product'}</h4>
               
@@ -920,27 +922,29 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
                       {item.item?.name || 'Unknown Product'}
                     </TableCell>
                     <TableCell>
-                      {productImage && (
-                        <div className='flex justify-center'>
-                          <div 
-                            className='relative cursor-pointer group'
-                            onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
-                          >
-                            <div className='relative h-12 w-12'>
-                              <Image 
-                                src={productImage} 
-                                alt={item.item?.name || 'Product'}
-                                fill
-                                className='object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
-                                sizes="48px"
-                              />
-                              <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
-                                <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                  {productImage && (
+  <div className='mt-3 flex justify-center'>
+    <div 
+      className='relative cursor-pointer group'
+      onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+    >
+      <div className='relative h-32 w-32'>
+        <Image 
+          src={productImage} 
+          alt={item.item?.name || 'Product'}
+          fill
+          className='object-contain rounded border shadow-sm hover:shadow-md transition-shadow'
+          sizes="(max-width: 640px) 128px, 128px"
+          priority={index < 3} // Only load first 3 images with priority
+        />
+        {/* Remove or modify the overlay */}
+        <div className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+          <ZoomIn className='h-4 w-4 text-white drop-shadow-lg' />
+        </div>
+      </div>
+    </div>
+  </div>
+)}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
