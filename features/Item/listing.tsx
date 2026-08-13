@@ -370,7 +370,7 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
                   router.push(`/dashboard/Item/view?id=${item.id}`);
                 }}
               >
-                <IconEye className="mr-1 h-4 w-4" /> View
+                <IconEye className="mr-1 h-4 w-4" /> 
               </button>
             </PermissionGuard>
             
@@ -395,6 +395,17 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
                 }}
               >
                 <IconTrash className="h-4 w-4" />
+              </button>
+            </PermissionGuard>
+             <PermissionGuard requiredPermission={PERMISSIONS.PRODUCT.VIEW.name}>
+              <button
+                className="flex flex-1 items-center justify-center rounded-lg bg-gray-100 px-2 py-1.5 text-[12px] font-medium text-gray-900 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/dashboard/Item/initial?id=${item.id}`);
+                }}
+              >
+               Initial
               </button>
             </PermissionGuard>
           </div>

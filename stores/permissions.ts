@@ -321,6 +321,9 @@ export const PERMISSIONS = {
     VIEW: {
       name: 'VIEW_PRODUCT',
     },
+      INITIAL: {
+          name: 'Initial Product',
+        },
   },
   MATERIAL: {
     CREATE: {
@@ -341,7 +344,9 @@ export const PERMISSIONS = {
     DELETE: {
       name: 'DELETE_MATERIAL',
     },
-  
+   INITIAL: {
+      name: 'Initial MATERIAL',
+    },
   },
   MATERIAL_CATEGORY: {
     CREATE: {

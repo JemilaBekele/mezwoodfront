@@ -214,7 +214,7 @@ export const MaterialCard = ({ material, onSelectMaterial }: MaterialCardProps) 
                 router.push(`/dashboard/Material/view?id=${material.id}`);
               }}
             >
-              <IconEye className="mr-1 h-4 w-4" /> View
+              <IconEye className="mr-1 h-4 w-4" /> 
             </button>          </PermissionGuard>
 
                                 <PermissionGuard requiredPermission={PERMISSIONS.MATERIAL.VIEW.name}>
@@ -241,6 +241,17 @@ export const MaterialCard = ({ material, onSelectMaterial }: MaterialCardProps) 
             </button>
 
                       </PermissionGuard>
+                                                        <PermissionGuard requiredPermission={PERMISSIONS.MATERIAL.INITIAL.name}>
+
+            <button
+              className="flex flex-1 items-center justify-center rounded-lg bg-gray-100 px-2 py-1.5 text-[12px] font-medium text-gray-900 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/dashboard/Material/initial?id=${material.id}`);
+              }}
+            >
+               Initial
+            </button>          </PermissionGuard>
 
           </div>
         </CardFooter>
