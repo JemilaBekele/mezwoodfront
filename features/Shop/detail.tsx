@@ -694,6 +694,8 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
             </div>
           )}
           {/* Sale Items Table */}
+
+
 {sale.items && sale.items.length > 0 ? (
   <div className='space-y-4'>
     <h3 className='text-base font-semibold sm:text-lg'>Sale Products</h3>
@@ -727,26 +729,27 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
           <Card key={item.id} className='overflow-hidden'>
             <CardContent className='pt-4'>
               {/* Product Image */}
-                  {productImage && (
-                                      <div className='mt-3 flex justify-center'>
-                                        <div 
-                                          className='relative cursor-pointer group'
-                                          onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
-                                        >
-                                          <div className='relative h-32 w-32'>
-                                            <img 
-                                              src={productImage} 
-                                              alt={item.item?.name || 'Product'}
-                                              className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
-                                              style={{ display: 'block' }}
-                                            />
-                                            <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
-                                              <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
+              {productImage && (
+                <div className='mt-3 flex justify-center'>
+                  <div 
+                    className='relative cursor-pointer group'
+                    onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                  >
+                    <div className='relative h-32 w-32'>
+                      <Image 
+                        src={productImage} 
+                        alt={item.item?.name || 'Product'}
+                        fill
+                        className='object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                        sizes="(max-width: 640px) 128px, 128px"
+                      />
+                      <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                        <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <h4 className='font-semibold text-center'>{item.item?.name || 'Unknown Product'}</h4>
               
@@ -857,25 +860,26 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
                     </TableCell>
                     <TableCell>
                       {productImage && (
-                                          <div className='mt-3 flex justify-center'>
-                                            <div 
-                                              className='relative cursor-pointer group'
-                                              onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
-                                            >
-                                              <div className='relative h-32 w-32'>
-                                                <img 
-                                                  src={productImage} 
-                                                  alt={item.item?.name || 'Product'}
-                                                  className='w-12 h-12 object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
-                                                  style={{ display: 'block' }}
-                                                />
-                                                <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
-                                                  <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
+                        <div className='flex justify-center'>
+                          <div 
+                            className='relative cursor-pointer group'
+                            onClick={() => handleImageClick(productImage, item.item?.name || 'Product')}
+                          >
+                            <div className='relative h-12 w-12'>
+                              <Image 
+                                src={productImage} 
+                                alt={item.item?.name || 'Product'}
+                                fill
+                                className='object-contain rounded border shadow-sm hover:shadow-md transition-shadow bg-white'
+                                sizes="48px"
+                              />
+                              <div className='absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded flex items-center justify-center'>
+                                <ZoomIn className='h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity' />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${locationStyle.bgColor} ${locationStyle.textColor} border ${locationStyle.borderColor}`}>
