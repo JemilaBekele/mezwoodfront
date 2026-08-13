@@ -729,7 +729,7 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
           <Card key={item.id} className='overflow-hidden'>
             <CardContent className='pt-4'>
               {/* Product Image */}
-            {productImage && (
+          {productImage && (
   <div className='mt-3 flex justify-center'>
     <div 
       className='relative cursor-pointer group'
@@ -861,7 +861,7 @@ const balance = sale?.balance !== undefined && sale?.balance !== null
                       {item.item?.name || 'Unknown Product'}
                     </TableCell>
                     <TableCell>
-                   {productImage && (
+                  {productImage && (
   <div className='mt-3 flex justify-center'>
     <div 
       className='relative cursor-pointer group'

@@ -108,6 +108,9 @@ export const PurchaseCellAction: React.FC<CellActionProps> = ({ data }) => {
               </DropdownMenuItem>
             </PermissionGuard>
           )}
+             <DropdownMenuItem onClick={() => setOpen(true)}>
+              <IconTrash className='mr-2 h-4 w-4' /> Delete
+            </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </>
