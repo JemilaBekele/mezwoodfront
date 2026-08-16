@@ -196,84 +196,109 @@ export default function ProformaInvoiceForm({
     }
   }, [materials, materialImageMap]);
 
-  useEffect(() => {
-    if (initialData?.items && initialData.items.length > 0) {
-      const newItemImages = new Map<number, ImageFileWithPreview[]>();
-      
-      initialData.items.forEach((item, index) => {
-        if (item.images && item.images.length > 0) {
-          const imagePreviews = item.images
-            .map((img: any) => {
-              const normalizedUrl = normalizeImagePath(img.imageUrl);
-              if (!normalizedUrl) {
-                return null;
-              }
-              return {
-                preview: normalizedUrl,
-                isExisting: true,
-                existingUrl: img.imageUrl,
-                id: img.id
-              } as ImageFileWithPreview;
-            })
-            .filter((img): img is ImageFileWithPreview => img !== null);
-          
-          if (imagePreviews.length > 0) {
-            newItemImages.set(index, imagePreviews);
-          }
-        }
-      });
-      
-      setItemImages(newItemImages);
-    }
-  }, [initialData]);
-
-  useEffect(() => {
-    if (initialData?.items && initialData.items.length > 0 && items.length > 0) {
-      const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
-      
-      initialData.items.forEach((item, index) => {
-        let fullItem = item.item;
-        
-        if (!fullItem && item.itemId) {
-          fullItem = items.find(i => i.id === item.itemId);
-        }
-        
-        if (fullItem) {
-          newHierarchicalSelections.set(index, {
-            categoryId: fullItem.categoryId || '',
-            sizeId: fullItem.sizeId || '',
-            typeId: fullItem.typeId || '',
-            selectedItem: fullItem
-          });
-          
-          setSelectedItemIds(prev => {
-            const newMap = new Map(prev);
-            newMap.set(index, fullItem.id);
-            return newMap;
-          });
-          
-          if (fullItem.price && fullItem.price > 0) {
-            setPriceAutoFilled(prev => {
-              const newMap = new Map(prev);
-              newMap.set(index, true);
-              return newMap;
-            });
-          }
-
-          if (fullItem.size) {
-            setSizeAutoFilled(prev => {
-              const newMap = new Map(prev);
-              newMap.set(index, true);
-              return newMap;
-            });
-          }
-        }
-      });
-      
-      setHierarchicalSelections(newHierarchicalSelections);
-    }
-  }, [initialData, items, form]);
-
+   const calculateTotals = useCallback(() => {
+     const itemsList = form.getValues('items');
+     const subtotal = itemsList.reduce((sum, item) => sum + (item.amount || 0), 0);
+ 
+     const vatApplied = form.getValues('vatApplied');
+     const vatPercent = form.getValues('vatPercent') || 15;
+ 
+     const vat = vatApplied ? subtotal * (vatPercent / 100) : 0;
+     const total = subtotal + vat;
+ 
+     form.setValue('subtotal', subtotal);
+     form.setValue('vat', vat);
+     form.setValue('total', total);
+ 
+     if (vatApplied) {
+       form.setValue('vatPercent', 15);
+     }
+   }, [form]);
+   const calculateItemAmount = useCallback((index: number) => {
+     const quantity = form.getValues(`items.${index}.quantity`);
+     const unitPrice = form.getValues(`items.${index}.unitPrice`);
+     const amount = quantity * unitPrice;
+     form.setValue(`items.${index}.amount`, amount);
+     calculateTotals();
+   }, [calculateTotals, form]);
+ 
+   // Initialize item images from initial data
+ // Initialize hierarchical selections from existing items when editing
+ // Initialize hierarchical selections from existing items when editing
+ useEffect(() => {
+   // Check if we have both the items data and the hierarchical data loaded
+   if (initialData?.items && initialData.items.length > 0 && items.length > 0 && categories.length > 0) {
+     const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
+     
+     initialData.items.forEach((item, index) => {
+       let fullItem = item.item;
+       
+       if (!fullItem && item.itemId) {
+         fullItem = items.find(i => i.id === item.itemId);
+       }
+       
+       // Get category ID from the item data (not from fullItem)
+       // The item data should have categoryId directly
+       const categoryId = item.categoryId || fullItem?.categoryId || '';
+       
+       // Get size from the item data
+       const sizeId = fullItem?.sizeId || '';
+       
+       // Get type from the item data
+       const typeId = fullItem?.typeId || '';
+       
+       if (categoryId) {
+         newHierarchicalSelections.set(index, {
+           categoryId: categoryId,
+           sizeId: sizeId,
+           typeId: typeId,
+           selectedItem: fullItem || null
+         });
+         
+         if (fullItem) {
+           setSelectedItemIds(prev => {
+             const newMap = new Map(prev);
+             newMap.set(index, fullItem.id);
+             return newMap;
+           });
+           
+           // Set description from the item
+           const itemName = safeString(fullItem.name);
+           form.setValue(`items.${index}.description`, itemName);
+           
+           // Set size from the item
+           if (fullItem.size) {
+             const sizeValue = safeString(fullItem.size);
+             form.setValue(`items.${index}.size`, sizeValue);
+             setSizeAutoFilled(prev => {
+               const newMap = new Map(prev);
+               newMap.set(index, true);
+               return newMap;
+             });
+           }
+           
+           // Set price
+           if (fullItem.price && fullItem.price > 0) {
+             form.setValue(`items.${index}.unitPrice`, fullItem.price);
+             setPriceAutoFilled(prev => {
+               const newMap = new Map(prev);
+               newMap.set(index, true);
+               return newMap;
+             });
+             calculateItemAmount(index);
+           }
+         }
+       } else {
+         // If no category, check if we have it from the selection
+         // But the category should be in the item data
+         console.warn('No category found for item', index);
+       }
+     });
+     
+     setHierarchicalSelections(newHierarchicalSelections);
+   }
+ }, [initialData, items, categories, form, calculateItemAmount]); // Add categories to dependencies
+ 
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -739,36 +764,8 @@ export default function ProformaInvoiceForm({
     });
   };
 
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
 
-  const calculateItemAmount = (index: number) => {
-    const quantity = form.getValues(`items.${index}.quantity`);
-    const unitPrice = form.getValues(`items.${index}.unitPrice`);
-    const amount = quantity * unitPrice;
-    form.setValue(`items.${index}.amount`, amount);
-    calculateTotals();
-  };
 
-  const calculateTotals = () => {
-    const itemsList = form.getValues('items');
-    const subtotal = itemsList.reduce((sum, item) => sum + item.amount, 0);
-    
-    const vatApplied = form.getValues('vatApplied');
-    const vatPercent = form.getValues('vatPercent') || 15;
-    
-    const vat = vatApplied ? subtotal * (vatPercent / 100) : 0;
-    const total = subtotal + vat;
-
-    form.setValue('subtotal', subtotal);
-    form.setValue('vat', vat);
-    form.setValue('total', total);
-    
-    if (vatApplied) {
-      form.setValue('vatPercent', 15);
-    }
-  };
 
   const handleVatAppliedChange = (checked: boolean) => {
     form.setValue('vatApplied', checked);
