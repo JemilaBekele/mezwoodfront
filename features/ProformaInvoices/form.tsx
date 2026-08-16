@@ -389,6 +389,52 @@ useEffect(() => {
     setHierarchicalSelections(newHierarchicalSelections);
   }
 }, [initialData, items, categories, form, calculateItemAmount]); // Add categories to dependencies
+  useEffect(() => {
+    if (initialData?.items && initialData.items.length > 0 && items.length > 0) {
+      const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
+      
+      initialData.items.forEach((item, index) => {
+        let fullItem = item.item;
+        
+        if (!fullItem && item.itemId) {
+          fullItem = items.find(i => i.id === item.itemId);
+        }
+        
+        if (fullItem) {
+          newHierarchicalSelections.set(index, {
+            categoryId: fullItem.categoryId || '',
+            sizeId: fullItem.sizeId || '',
+            typeId: fullItem.typeId || '',
+            selectedItem: fullItem
+          });
+          
+          setSelectedItemIds(prev => {
+            const newMap = new Map(prev);
+            newMap.set(index, fullItem.id);
+            return newMap;
+          });
+          
+          if (fullItem.price && fullItem.price > 0) {
+            setPriceAutoFilled(prev => {
+              const newMap = new Map(prev);
+              newMap.set(index, true);
+              return newMap;
+            });
+          }
+
+          if (fullItem.size) {
+            setSizeAutoFilled(prev => {
+              const newMap = new Map(prev);
+              newMap.set(index, true);
+              return newMap;
+            });
+          }
+        }
+      });
+      
+      setHierarchicalSelections(newHierarchicalSelections);
+    }
+  }, [initialData, items, form]);
 
 // ❌ REMOVE THIS ENTIRE SECOND useEffect (lines 211-264)
 // It's overriding the first one
