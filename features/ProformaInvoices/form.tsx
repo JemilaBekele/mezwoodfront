@@ -390,10 +390,7 @@ useEffect(() => {
   }
 }, [initialData, items, categories, form, calculateItemAmount]); // Add categories to dependencies
 
-// ❌ REMOVE THIS ENTIRE SECOND useEffect (lines 211-264)
-// It's overriding the first one
-  // Initialize hierarchical selections from existing items when editing
- 
+
   // Fetch data on mount
   useEffect(() => {
     const fetchData = async () => {
