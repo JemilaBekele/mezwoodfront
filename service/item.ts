@@ -237,6 +237,7 @@ export const deleteItem = async (
   id: string,
   
 ) => {
+  console.log("jemu",id)
   try {
     const response = await axiosInstance.delete<DeleteItemResponse>(
       `/items/${id}`,

@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getItems } from '@/service/item';
+import { deleteItem, getItems } from '@/service/item';
 import { getCategories, getSizes, getTypes } from '@/service/productConfiguration';
 import { IItem } from '@/models/item';
 import { IProductCategory, ISize, IProductType } from '@/models/productConfiguration';
@@ -150,7 +150,7 @@ export const ItemCard = ({ item, onSelectItem }: ItemCardProps) => {
     try {
       setLoading(true);
       // Add your API delete call here:
-      // await axios.delete(`/api/items/${item.id}`);
+      await deleteItem(item.id);
       setOpenDeleteModal(false);
     } catch (error) {
       console.error('Failed to delete item', error);
