@@ -21,6 +21,7 @@ import {
   CalendarDays,
   User,
   Award,
+  Lock,
   BarChart3,
   Layers,
   Package,
@@ -41,6 +42,7 @@ import {
   Download,
   XCircle,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, IProjectStageWorkLog, StageStatus } from '@/models/Projects';
 import { getProjectId } from '@/service/Project';
@@ -65,6 +67,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { createProjectStageWorkLog, deleteProjectStageWorkLog } from '@/service/projectStageWorkLogService';
 import Image from 'next/image';
 import { normalizeImagePath } from '@/lib/norm';
+import { SellPaymentStatus } from '@/models/Sell';
 // Helper function for image URLs
 
 
@@ -459,6 +462,7 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
         if (projectData.invoice?.id) {
           try {
             const invoice = await getProformaInvoiceById(projectData.invoice.id);
+            console.log(invoice)
             setProformaInvoice(invoice);
           } catch (error) {
             console.error('Error fetching proforma invoice:', error);
@@ -515,7 +519,40 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
     }
     return true;
   };
+// Update the isProjectFullyPaid function to accept proformaInvoice
+// Update the isProjectFullyPaid function
+function isProjectFullyPaid(project: any, proformaInvoice: any): boolean {
+  // Return true if project is null or undefined
+  if (!project) return true;
+  
+  // Check payment status from proformaInvoice first, then fallback to project.invoice or project.paymentStatus
+  const paymentStatus = proformaInvoice?.paymentStatus || 
+                        project.invoice?.paymentStatus || 
+                        project.paymentStatus;
+  
+  // Strictly check if payment status is PAID
+  return paymentStatus === 'PAID' || 
+         paymentStatus === SellPaymentStatus.PAID;
+}
 
+// Helper to check if project should show payment restriction
+function shouldShowPaymentRestriction(project: any, proformaInvoice: any, stageType?: ProjectStatus): boolean {
+  // Return false if project is null or undefined
+  if (!project) return false;
+  
+  // Only apply payment restriction for Delivery and Installation stages
+  if (stageType !== ProjectStatus.DELIVERY ) {
+    return false;
+  }
+  
+  // If allowToDeliverWithBalance is true, don't show payment restriction
+  if (project.allowToDeliverWithBalance) return false;
+  
+  // Check if payment is not fully paid
+  return !isProjectFullyPaid(project, proformaInvoice);
+}
+// Inside the UnifiedProjectDetailPage component, add this after loading check:
+const isPaymentRestricted = project ? shouldShowPaymentRestriction(project, proformaInvoice) : false;
   // Handle add work log submission
   const handleAddWorkLog = async (stageId: string, stage: IProjectStage) => {
     const formData = workLogFormData[stageId];
@@ -982,7 +1019,7 @@ const formatDescription = (text: string, limit = 80) => {
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Start Date</p>
+                                  <p className="text-xs text-muted-foreground">Planned Start Date</p>
                                   <p className="font-medium text-sm md:text-base">{formatDate(stage.startDate)}</p>
                                 </div>
                               </div>
@@ -992,9 +1029,9 @@ const formatDescription = (text: string, limit = 80) => {
                             
                             {stage.endDate ? (
                               <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <div>
-                                  <p className="text-xs text-muted-foreground">End Date</p>
+                                  <p className="text-xs text-muted-foreground">Planned End Date</p>
                                   <p className="font-medium text-sm md:text-base">{formatDate(stage.endDate)}</p>
                                 </div>
                               </div>
@@ -1012,6 +1049,31 @@ const formatDescription = (text: string, limit = 80) => {
                             ) : (
                               <p className="text-sm text-muted-foreground">Time taken not recorded</p>
                             )}
+  
+     {stage.projectstartDate ? (
+                                                              <div className="flex items-center gap-2">
+                                                                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                                <div>
+                                                                  <p className="text-xs text-muted-foreground">Actual Start Date</p>
+                                                                  <p className="font-medium text-sm md:text-base">{formatDate(stage.projectstartDate)}</p>
+                                                                </div>
+                                                              </div>
+                                                            ) : (
+                                                              <></>
+                                                            )}
+                                                            
+                                                            {stage.projectendDate ? (
+                                                              <div className="flex items-center gap-2">
+                                                                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                                <div>
+                                                                  <p className="text-xs text-muted-foreground">Actual End Date</p>
+                                                                  <p className="font-medium text-sm md:text-base">{formatDate(stage.projectendDate)}</p>
+                                                                </div>
+                                                              </div>
+                                                            ) : (
+                                                              <></>
+                                                            )}
+
                           </div>
                         </div>
                       </div>
@@ -1122,161 +1184,207 @@ const formatDescription = (text: string, limit = 80) => {
                         )}
 
                         {/* Add Work Log Form - Inline with Units/Percentage Toggle */}
-                        {!completed && (
-                          <div className="p-4 rounded-lg border bg-white">
-                            <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center gap-2">
-                              <Plus className="h-4 w-4" />
-                              Add Work Log
-                            </h4>
-                            <div className="space-y-3">
-                              {/* Complete All Units Button - Now triggers confirmation dialog */}
-                              {remainingUnits > 0.000001 && (
-                                <Button
-                                  onClick={() => handleCompleteAll(stage)}
-                                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                                  disabled={addingWorkLog === stage.id}
-                                >
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                  Complete All Remaining Units ({remainingUnits.toFixed(4)} units / {remainingPercentage.toFixed(2)}%)
-                                </Button>
-                              )}
+                      {!completed && (
+  <div className="p-4 rounded-lg border ">
+    <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center gap-2">
+      <Plus className="h-4 w-4" />
+      Add Work Log
+    </h4>
+    
+    {/* Payment Restriction Warning */}
+    {isPaymentRestricted && (
+      <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-700">Payment Required</p>
+            <p className="text-sm text-red-600">
+              Work logs cannot be added until the project payment is fully paid. 
+              Please settle the outstanding balance to proceed.
+            </p>
+            {(project.invoice?.balance ?? 0) > 0 && (
+              <>
+              <p className="text-xs text-red-500 mt-1">
+                Remaining balance: {((project.invoice?.balance ?? 0)).toFixed(2)}
+              </p>
+              <p className="text-xs  mt-1">
+                Total Paid: {((project.invoice?.amountPaid ?? 0)).toFixed(2)}
+              </p>
+               <p className="text-xs mt-1">
+                Total Amount: {((project.invoice?.total ?? 0)).toFixed(2)}
+              </p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    
+    <div className="space-y-3">
+      {/* Complete All Units Button - Disabled if payment restricted */}
+      <Button
+        onClick={() => handleCompleteAll(stage)}
+        className="w-full bg-green-600 hover:bg-green-700 text-white"
+        disabled={addingWorkLog === stage.id || isPaymentRestricted}
+      >
+        <CheckCircle className="mr-2 h-4 w-4" />
+        Complete All Remaining Units ({remainingUnits.toFixed(4)} units / {remainingPercentage.toFixed(2)}%)
+      </Button>
 
-                              <Separator className="my-2" />
+      <Separator className="my-2" />
 
-                              {/* Input Type Toggle */}
-                              <div>
-                                <Label className="text-sm font-medium mb-2 block">
-                                  Input Method
-                                </Label>
-                                <ToggleGroup
-                                  type="single"
-                                  value={workLogFormData[stage.id]?.inputType || 'units'}
-                                  onValueChange={(value) => {
-                                    if (value) handleWorkLogInputChange(stage.id, 'inputType', value);
-                                  }}
-                                  className="justify-start flex-wrap"
-                                >
-                                  <ToggleGroupItem value="units" aria-label="Units" className="text-xs md:text-sm">
-                                    <Package className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-                                    Units
-                                  </ToggleGroupItem>
-                                  <ToggleGroupItem value="percentage" aria-label="Percentage" className="text-xs md:text-sm">
-                                    <Percent className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-                                    Percentage
-                                  </ToggleGroupItem>
-                                </ToggleGroup>
-                              </div>
+      {/* Input Type Toggle - Disabled if payment restricted */}
+      <div>
+        <Label className="text-sm font-medium mb-2 block">
+          Input Method
+        </Label>
+        <ToggleGroup
+          type="single"
+          value={workLogFormData[stage.id]?.inputType || 'units'}
+          onValueChange={(value) => {
+            if (value && !isPaymentRestricted) {
+              handleWorkLogInputChange(stage.id, 'inputType', value);
+            }
+          }}
+          className="justify-start flex-wrap"
+        >
+          <ToggleGroupItem value="units" aria-label="Units" className="text-xs md:text-sm" disabled={isPaymentRestricted}>
+            <Package className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+            Units
+          </ToggleGroupItem>
+          <ToggleGroupItem value="percentage" aria-label="Percentage" className="text-xs md:text-sm" disabled={isPaymentRestricted}>
+            <Percent className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+            Percentage
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
 
-                              {/* Units Input */}
-                              {(workLogFormData[stage.id]?.inputType || 'units') === 'units' && (
-                                <div>
-                                  <Label htmlFor={`doneUnits-${stage.id}`} className="text-sm font-medium">
-                                    Done Units *
-                                  </Label>
-                                  <Input
-                                    id={`doneUnits-${stage.id}`}
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Enter number of units completed"
-                                    value={workLogFormData[stage.id]?.doneUnits || ''}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      // Validate max value doesn't exceed remaining units
-                                      if (value) {
-                                        const numValue = Number(value);
-                                        if (numValue > remainingUnits + 0.000001) {
-                                          toast.error(`Maximum ${remainingUnits.toFixed(4)} units remaining.`);
-                                          return;
-                                        }
-                                      }
-                                      handleWorkLogInputChange(stage.id, 'doneUnits', value);
-                                    }}
-                                    className="mt-1"
-                                    disabled={addingWorkLog === stage.id}
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Remaining: {remainingUnits.toFixed(4)} units ({remainingPercentage.toFixed(2)}%)
-                                  </p>
-                                </div>
-                              )}
+      {/* Units Input - Disabled if payment restricted */}
+      {(workLogFormData[stage.id]?.inputType || 'units') === 'units' && (
+        <div>
+          <Label htmlFor={`doneUnits-${stage.id}`} className="text-sm font-medium">
+            Done Units *
+          </Label>
+          <Input
+            id={`doneUnits-${stage.id}`}
+            type="number"
+            step="0.01"
+            placeholder={isPaymentRestricted ? "Payment required to add work logs" : "Enter number of units completed"}
+            value={workLogFormData[stage.id]?.doneUnits || ''}
+            onChange={(e) => {
+              if (isPaymentRestricted) return;
+              const value = e.target.value;
+              // Validate max value doesn't exceed remaining units
+              if (value) {
+                const numValue = Number(value);
+                if (numValue > remainingUnits + 0.000001) {
+                  toast.error(`Maximum ${remainingUnits.toFixed(4)} units remaining.`);
+                  return;
+                }
+              }
+              handleWorkLogInputChange(stage.id, 'doneUnits', value);
+            }}
+            className="mt-1"
+            disabled={addingWorkLog === stage.id || isPaymentRestricted}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Remaining: {remainingUnits.toFixed(4)} units ({remainingPercentage.toFixed(2)}%)
+          </p>
+        </div>
+      )}
 
-                              {/* Percentage Input */}
-                              {(workLogFormData[stage.id]?.inputType || 'units') === 'percentage' && (
-                                <div>
-                                  <Label htmlFor={`percentage-${stage.id}`} className="text-sm font-medium">
-                                    Percentage Complete (%) *
-                                  </Label>
-                                  <Input
-                                    id={`percentage-${stage.id}`}
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Enter percentage completed (e.g., 25.5)"
-                                    value={workLogFormData[stage.id]?.percentage || ''}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      if (value) {
-                                        const numValue = Number(value);
-                                        if (numValue > remainingPercentage + 0.01) {
-                                          toast.error(`Maximum ${remainingPercentage.toFixed(2)}% remaining.`);
-                                          return;
-                                        }
-                                      }
-                                      handleWorkLogInputChange(stage.id, 'percentage', value);
-                                    }}
-                                    className="mt-1"
-                                    disabled={addingWorkLog === stage.id}
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    This will add {workLogFormData[stage.id]?.percentage ? 
-                                      calculateUnitsFromPercentage(stage, Number(workLogFormData[stage.id].percentage)).toFixed(4) : 0} units
-                                  </p>
-                                  <p className={`text-xs ${stageConfig.remainingTextColor} mt-1`}>
-                                    Remaining: {remainingPercentage.toFixed(2)}%
-                                  </p>
-                                </div>
-                              )}
+      {/* Percentage Input - Disabled if payment restricted */}
+      {(workLogFormData[stage.id]?.inputType || 'units') === 'percentage' && (
+        <div>
+          <Label htmlFor={`percentage-${stage.id}`} className="text-sm font-medium">
+            Percentage Complete (%) *
+          </Label>
+          <Input
+            id={`percentage-${stage.id}`}
+            type="number"
+            step="0.01"
+            placeholder={isPaymentRestricted ? "Payment required to add work logs" : "Enter percentage completed (e.g., 25.5)"}
+            value={workLogFormData[stage.id]?.percentage || ''}
+            onChange={(e) => {
+              if (isPaymentRestricted) return;
+              const value = e.target.value;
+              if (value) {
+                const numValue = Number(value);
+                if (numValue > remainingPercentage + 0.01) {
+                  toast.error(`Maximum ${remainingPercentage.toFixed(2)}% remaining.`);
+                  return;
+                }
+              }
+              handleWorkLogInputChange(stage.id, 'percentage', value);
+            }}
+            className="mt-1"
+            disabled={addingWorkLog === stage.id || isPaymentRestricted}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            This will add {workLogFormData[stage.id]?.percentage ? 
+              calculateUnitsFromPercentage(stage, Number(workLogFormData[stage.id].percentage)).toFixed(4) : 0} units
+          </p>
+          <p className={`text-xs ${stageConfig.remainingTextColor} mt-1`}>
+            Remaining: {remainingPercentage.toFixed(2)}%
+          </p>
+        </div>
+      )}
 
-                              {/* Note Input */}
-                              <div>
-                                <Label htmlFor={`note-${stage.id}`} className="text-sm font-medium">
-                                  Note (Optional)
-                                </Label>
-                                <Textarea
-                                  id={`note-${stage.id}`}
-                                  placeholder="Add any remarks or notes about this work log..."
-                                  value={workLogFormData[stage.id]?.note || ''}
-                                  onChange={(e) => handleWorkLogInputChange(stage.id, 'note', e.target.value)}
-                                  className="mt-1"
-                                  rows={3}
-                                  disabled={addingWorkLog === stage.id}
-                                />
-                              </div>
+      {/* Note Input - Disabled if payment restricted */}
+      <div>
+        <Label htmlFor={`note-${stage.id}`} className="text-sm font-medium">
+          Note (Optional)
+        </Label>
+        <Textarea
+          id={`note-${stage.id}`}
+          placeholder={isPaymentRestricted ? "Payment required to add work logs" : "Add any remarks or notes about this work log..."}
+          value={workLogFormData[stage.id]?.note || ''}
+          onChange={(e) => handleWorkLogInputChange(stage.id, 'note', e.target.value)}
+          className="mt-1"
+          rows={3}
+          disabled={addingWorkLog === stage.id || isPaymentRestricted}
+        />
+      </div>
 
-                              <Button
-                                onClick={() => handleAddWorkLog(stage.id, stage)}
-                                disabled={addingWorkLog === stage.id || 
-                                  ((workLogFormData[stage.id]?.inputType || 'units') === 'units' 
-                                    ? !workLogFormData[stage.id]?.doneUnits 
-                                    : !workLogFormData[stage.id]?.percentage) ||
-                                  remainingUnits <= 0.000001
-                                }
-                                className="w-full"
-                              >
-                                {addingWorkLog === stage.id ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Adding...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add Work Log
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+      {/* Add Work Log Button - Disabled if payment restricted */}
+      <Button
+        onClick={() => handleAddWorkLog(stage.id, stage)}
+        disabled={addingWorkLog === stage.id || 
+          isPaymentRestricted ||
+          ((workLogFormData[stage.id]?.inputType || 'units') === 'units' 
+            ? !workLogFormData[stage.id]?.doneUnits 
+            : !workLogFormData[stage.id]?.percentage) ||
+          remainingUnits <= 0.000001
+        }
+        className="w-full"
+      >
+        {addingWorkLog === stage.id ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Adding...
+          </>
+        ) : isPaymentRestricted ? (
+          <>
+            <Lock className="mr-2 h-4 w-4" />
+            Payment Required
+          </>
+        ) : (
+          <>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Work Log
+          </>
+        )}
+      </Button>
+      
+      {/* Additional payment restriction message for the button */}
+      {isPaymentRestricted && (
+        <p className="text-xs text-red-500 text-center mt-2">
+          Please complete the payment to add work logs
+        </p>
+      )}
+    </div>
+  </div>
+)}
                       </div>
                     </div>
                   </div>
@@ -1477,7 +1585,7 @@ const formatDescription = (text: string, limit = 80) => {
                             )}
                           </div>
                           <div className="p-3 w-full overflow-x-auto">
-                            <div className="min-w-[500px] md:min-w-full">
+                            <div className="min-w-125 md:min-w-full">
                               <Table>
                                 <TableHeader>
                                   <TableRow>

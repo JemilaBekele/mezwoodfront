@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -124,6 +124,27 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
     defaultValues
   });
 
+  const calculateEstimation = useCallback(async (invoiceData: IProformaInvoice): Promise<void> => {
+    if (!invoiceData) return;
+
+    setIsCalculating(true);
+    try {
+      const stageQuantities = await prepareStageQuantities(invoiceData);
+      
+      const payload = {
+        difficulty: form.getValues('difficulty') || DifficultyLevel.EASY,
+        stageQuantities: stageQuantities,
+      };
+
+      const result = await calculateDeliveryEstimation(payload);
+      setCalculationResult(result.data);
+    } catch (error) {
+      console.error('Error calculating delivery estimation:', error);
+    } finally {
+      setIsCalculating(false);
+    }
+  }, [form]);
+
   // Fetch invoice details and calculate delivery estimation
   useEffect(() => {
     const fetchInvoiceAndCalculate = async () => {
@@ -141,7 +162,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
 
         await calculateEstimation(invoiceData);
         toast.success('Invoice details loaded & estimation calculated');
-      } catch (error: any) {
+      } catch (error) {
         toast.error('Failed to load invoice details');
         console.error('Error fetching invoice:', error);
       } finally {
@@ -150,29 +171,23 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
     };
 
     fetchInvoiceAndCalculate();
-  }, [id, form]);
+  }, [id, form, calculateEstimation]);
 
   // Calculate delivery estimation
-  const calculateEstimation = async (invoiceData: IProformaInvoice) => {
-    if (!invoiceData) return;
 
-    setIsCalculating(true);
-    try {
-      const stageQuantities = await prepareStageQuantities(invoiceData);
-      
-      const payload = {
-        difficulty: form.getValues('difficulty') || DifficultyLevel.EASY,
-        stageQuantities: stageQuantities,
-      };
-
-      const result = await calculateDeliveryEstimation(payload);
-      setCalculationResult(result.data);
-    } catch (error: any) {
-      console.error('Error calculating delivery estimation:', error);
-    } finally {
-      setIsCalculating(false);
+// Helper function to format date from YYYY-MM-DD to MM/DD/YYYY
+const formatDisplayDate = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+      return `${parts[1]}/${parts[2]}/${parts[0]}`;
     }
-  };
+    return dateString;
+  } catch {
+    return dateString;
+  }
+};
 
   // Prepare stage quantities from invoice items
   const prepareStageQuantities = async (invoiceData: IProformaInvoice) => {
@@ -319,7 +334,7 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
       await createProject(projectData);
       toast.success('Project created successfully with delivery estimation');
 
-      router.push('/dashboard/Project');
+      router.push('/dashboard/ProformaInvoice/my');
       router.refresh();
     } catch (error: any) {
       toast.error(error?.message || 'Failed to create project');
@@ -480,18 +495,40 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
               </div>
 
               {/* Financial Balance Status */}
-              <div className="flex items-start space-x-3.5 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <DollarSign className="h-5 w-5" />
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Financial Ledger</p>
-                  <p className="text-sm font-bold font-mono text-emerald-700">{formatCurrency(invoice.amountPaid)} paid</p>
-                  <p className="text-xs font-mono text-slate-500">
-                    Balance: <strong className="text-amber-700 font-bold">{formatCurrency(invoice.balance)}</strong>
-                  </p>
-                </div>
-              </div>
+              {/* Financial Balance Status */}
+<div className="flex items-start space-x-3.5 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+    invoice.amountPaid === 0 || !invoice.amountPaid 
+      ? 'bg-rose-50 text-rose-600' 
+      : 'bg-emerald-50 text-emerald-600'
+  }`}>
+    <DollarSign className="h-5 w-5" />
+  </div>
+  <div className="space-y-0.5">
+    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Financial Ledger</p>
+    <p className={`text-sm font-bold font-mono ${
+      invoice.amountPaid === 0 || !invoice.amountPaid 
+        ? 'text-rose-700' 
+        : 'text-emerald-700'
+    }`}>
+      {invoice.amountPaid === 0 || !invoice.amountPaid ? (
+        <span className="flex items-center gap-1.5">
+          <AlertCircle className="h-3.5 w-3.5 text-rose-500" />
+          No payment received
+        </span>
+      ) : (
+        `${formatCurrency(invoice.amountPaid)} paid`
+      )}
+    </p>
+    <p className="text-xs font-mono text-slate-500">
+      Balance: <strong className={`font-bold ${
+        invoice.balance === 0 || !invoice.balance
+          ? 'text-emerald-700'
+          : 'text-amber-700'
+      }`}>{formatCurrency(invoice.balance)}</strong>
+    </p>
+  </div>
+</div>
 
             </div>
           </CardContent>
@@ -658,43 +695,53 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
                 />
 
                 {/* Target Requested Delivery Date */}
-                <FormField
-                  control={form.control}
-                  name="requestedDelivery"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <FormLabel className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                          <Calendar className="h-4 w-4 text-slate-500" />
-                          Requested Delivery Date <span className="text-rose-500">*</span>
-                        </FormLabel>
-                        {calculationResult?.timeline?.estimatedDeliveryDate && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleCopyCalculatedDate}
-                            className="h-6 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 px-2"
-                          >
-                            <Copy className="h-3 w-3 mr-1" /> Use Calculated Date
-                          </Button>
-                        )}
-                      </div>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          value={field.value || ''}
-                          min={new Date().toISOString().split('T')[0]}
-                          className="h-10 rounded-lg border-slate-300 text-xs font-mono"
-                          required
-                        />
-                      </FormControl>
-                 
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+{/* Target Requested Delivery Date */}
+<FormField
+  control={form.control}
+  name="requestedDelivery"
+  render={({ field }) => (
+    <FormItem className="space-y-2">
+      <div className="flex items-center justify-between">
+        <FormLabel className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+          <Calendar className="h-4 w-4 text-slate-500" />
+          Requested Delivery Date <span className="text-rose-500">*</span>
+        </FormLabel>
+        {calculationResult?.timeline?.estimatedDeliveryDate && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleCopyCalculatedDate}
+            className="h-6 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 px-2"
+          >
+            <Copy className="h-3 w-3 mr-1" /> Use Calculated Date
+          </Button>
+        )}
+      </div>
+      <FormControl>
+        <Input
+          type="date"
+          {...field}
+          value={field.value || ''}
+          min={new Date().toISOString().split('T')[0]}
+          className="h-10 rounded-lg border-slate-300 text-xs font-mono"
+          required
+          onChange={(e) => {
+            // Store in YYYY-MM-DD format for the form state
+            field.onChange(e.target.value);
+          }}
+        />
+      </FormControl>
+      {/* Display formatted date if value exists */}
+      {field.value && (
+        <p className="text-xs text-slate-500 mt-1">
+          Selected: {formatDisplayDate(field.value)}
+        </p>
+      )}
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 
               </div>
 

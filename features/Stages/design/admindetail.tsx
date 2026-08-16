@@ -587,17 +587,34 @@ const getDesignStatusConfig = (status?: DesignStatus) => {
                         {/* Schedule */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <p className="text-xs text-muted-foreground">Start Date</p>
+                            <p className="text-xs text-muted-foreground">Planned Start Date</p>
                             <p className="font-medium">{stage.startDate ? formatDate(stage.startDate) : 'Not scheduled'}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">End Date</p>
+                            <p className="text-xs text-muted-foreground">Planned End Date</p>
                             <p className="font-medium">{stage.endDate ? formatDate(stage.endDate) : 'Not scheduled'}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Duration</p>
                             <p className="font-medium">{stage.capacityDays} days</p>
                           </div>
+
+                        {stage.projectendDate ? (
+                              <div>
+                            <p className="text-xs text-muted-foreground">Actual Start Date</p>
+                            <p className="font-medium">{stage.projectstartDate ? formatDate(stage.projectstartDate) : ''}</p>
+                          </div>
+                        ) : (
+                         <></>
+                         )}
+                         {stage.projectendDate ? (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Actual End Date</p>
+                            <p className="font-medium">{stage.projectendDate ? formatDate(stage.projectendDate) : ''}</p>
+                          </div>
+                           ) : (
+                         <></>
+                         )}
                         </div>
 
                         {/* Work Logs */}

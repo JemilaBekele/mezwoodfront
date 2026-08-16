@@ -132,6 +132,9 @@ export interface IProjectStage {
   startDate?: string | null;
   endDate?: string | null;
 
+projectstartDate ?: string | null;
+projectendDate  ?: string | null;
+
   // Shift scheduling
   startDateTime?: string | null;
   endDateTime?: string | null;

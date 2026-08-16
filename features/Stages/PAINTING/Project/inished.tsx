@@ -12,7 +12,7 @@ import { IProject } from "@/models/Projects";
 
 type ProjectListingPageProps = object;
 
-export default function PaintingProjectListingPage(
+export default function FinPaintingProjectListingPage(
   {}: ProjectListingPageProps
 ) {
   const { page, search, limit } = useTableQueryParams();

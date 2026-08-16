@@ -756,7 +756,7 @@ const calculateStageProgress = (stage: any) => {
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4 text-muted-foreground" />
                                   <div>
-                                    <p className="text-xs text-muted-foreground">Start Date</p>
+                                    <p className="text-xs text-muted-foreground">Planned Start Date</p>
                                     <p className="font-medium">{formatDate(stage.startDate)}</p>
                                   </div>
                                 </div>
@@ -768,7 +768,7 @@ const calculateStageProgress = (stage: any) => {
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4 text-muted-foreground" />
                                   <div>
-                                    <p className="text-xs text-muted-foreground">End Date</p>
+                                    <p className="text-xs text-muted-foreground">Planned End Date</p>
                                     <p className="font-medium">{formatDate(stage.endDate)}</p>
                                   </div>
                                 </div>
@@ -789,6 +789,30 @@ const calculateStageProgress = (stage: any) => {
                                   </div>
                                 </div>
                               )}
+
+                                 {stage.projectstartDate ? (
+                                                                                          <div className="flex items-center gap-2">
+                                                                                            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                                                            <div>
+                                                                                              <p className="text-xs text-muted-foreground">Actual Start Date</p>
+                                                                                              <p className="font-medium text-sm md:text-base">{formatDate(stage.projectstartDate)}</p>
+                                                                                            </div>
+                                                                                          </div>
+                                                                                        ) : (
+                                                                                          <></>
+                                                                                        )}
+                                                                                        
+                                                                                        {stage.projectendDate ? (
+                                                                                          <div className="flex items-center gap-2">
+                                                                                            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                                                            <div>
+                                                                                              <p className="text-xs text-muted-foreground">Actual End Date</p>
+                                                                                              <p className="font-medium text-sm md:text-base">{formatDate(stage.projectendDate)}</p>
+                                                                                            </div>
+                                                                                          </div>
+                                                                                        ) : (
+                                                                                          <></>
+                                                                                        )}
                             </div>
                           </div>
                         </div>

@@ -13,20 +13,11 @@ import {
   Loader2,
   TrendingUp,
   Settings,
-  Truck,
-  Home,
-  Hammer,
-  Paintbrush,
-  Scissors,
   Package2,
   CheckCircle,
   CalendarDays,
   User,
-  Award,
   BarChart3,
-  Layers,
-  Package,
-  Wrench,
   Timer,
   Lock,
   History,
@@ -40,7 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { IProject, ProjectStatus, DifficultyLevel, StageStatus, WorkShift, ScheduleMode, IScheduleHistory } from '@/models/Projects';
+import { IProject, DifficultyLevel, StageStatus, WorkShift, ScheduleMode, IScheduleHistory } from '@/models/Projects';
 import { getProjectId, setProjectScheduleMode, getProjectScheduleHistory } from '@/service/Project';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
@@ -831,7 +822,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                               </TableCell>
                               <TableCell className="py-1.5">
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-xs">{stage.startDate ? formatDate(stage.startDate) : '—'}</span>
+                                  <span className="text-xs">Planned: {stage.startDate ? formatDate(stage.startDate) : '—'}</span>
                                   {stage.startDate && (
                                     <span className="text-[10px] text-muted-foreground italic">{formatDateEth(stage.startDate)}</span>
                                   )}
@@ -841,11 +832,14 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                                       <span className="text-[10px] text-emerald-600 dark:text-emerald-400">{formatTimeEth(stage.startDateTime)}</span>
                                     </div>
                                   )}
+                                    {stage.projectstartDate && (
+                                 <span className="text-xs">Actual: {stage.projectstartDate ? formatDate(stage.projectstartDate) : '—'}</span>
+   )}
                                 </div>
                               </TableCell>
                               <TableCell className="py-1.5">
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-xs">{stage.endDate ? formatDate(stage.endDate) : '—'}</span>
+                                  <span className="text-xs">Planned: {stage.endDate ? formatDate(stage.endDate) : '—'}</span>
                                   {stage.endDate && (
                                     <span className="text-[10px] text-muted-foreground italic">{formatDateEth(stage.endDate)}</span>
                                   )}
@@ -855,6 +849,9 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
                                       <span className="text-[10px] text-emerald-600 dark:text-emerald-400">{formatTimeEth(stage.endDateTime)}</span>
                                     </div>
                                   )}
+                                                                      {stage.projectendDate && (
+                                 <span className="text-xs">Actual: {stage.projectendDate ? formatDate(stage.projectendDate) : '—'}</span>
+   )}
                                 </div>
                               </TableCell>
                             </TableRow>

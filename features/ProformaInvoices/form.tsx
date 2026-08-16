@@ -287,74 +287,80 @@ const getMaterialImage = useCallback(async (materialId: string) => {
     console.error('Failed to load material image:', error);
   }
 }, [materials, materialImageMap]);
-  // Initialize item images from initial data
-  useEffect(() => {
-    if (initialData?.items && initialData.items.length > 0) {
-      const newItemImages = new Map<number, ImageFileWithPreview[]>();
-      
-      initialData.items.forEach((item, index) => {
-        if (item.images && item.images.length > 0) {
-          const imagePreviews = item.images
-            .map((img: any) => {
-              const normalizedUrl = normalizeImagePath(img.imageUrl);
-              if (!normalizedUrl) {
-                return null;
-              }
-              return {
-                preview: normalizedUrl,
-                isExisting: true,
-                existingUrl: img.imageUrl,
-                id: img.id
-              } as ImageFileWithPreview;
-            })
-            .filter((img): img is ImageFileWithPreview => img !== null);
-          
-          if (imagePreviews.length > 0) {
-            newItemImages.set(index, imagePreviews);
-          }
-        }
-      });
-      
-      setItemImages(newItemImages);
-    }
-  }, [initialData]);
+  const calculateTotals = useCallback(() => {
+    const itemsList = form.getValues('items');
+    const subtotal = itemsList.reduce((sum, item) => sum + (item.amount || 0), 0);
 
-  // Initialize hierarchical selections from existing items when editing
-  useEffect(() => {
-    if (initialData?.items && initialData.items.length > 0 && items.length > 0) {
-      const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
+    const vatApplied = form.getValues('vatApplied');
+    const vatPercent = form.getValues('vatPercent') || 15;
+
+    const vat = vatApplied ? subtotal * (vatPercent / 100) : 0;
+    const total = subtotal + vat;
+
+    form.setValue('subtotal', subtotal);
+    form.setValue('vat', vat);
+    form.setValue('total', total);
+
+    if (vatApplied) {
+      form.setValue('vatPercent', 15);
+    }
+  }, [form]);
+  const calculateItemAmount = useCallback((index: number) => {
+    const quantity = form.getValues(`items.${index}.quantity`);
+    const unitPrice = form.getValues(`items.${index}.unitPrice`);
+    const amount = quantity * unitPrice;
+    form.setValue(`items.${index}.amount`, amount);
+    calculateTotals();
+  }, [calculateTotals, form]);
+
+  // Initialize item images from initial data
+// Initialize hierarchical selections from existing items when editing
+// Initialize hierarchical selections from existing items when editing
+useEffect(() => {
+  // Check if we have both the items data and the hierarchical data loaded
+  if (initialData?.items && initialData.items.length > 0 && items.length > 0 && categories.length > 0) {
+    const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
+    
+    initialData.items.forEach((item, index) => {
+      let fullItem = item.item;
       
-      initialData.items.forEach((item, index) => {
-        let fullItem = item.item;
-        
-        if (!fullItem && item.itemId) {
-          fullItem = items.find(i => i.id === item.itemId);
-        }
+      if (!fullItem && item.itemId) {
+        fullItem = items.find(i => i.id === item.itemId);
+      }
+      
+      // Get category ID from the item data (not from fullItem)
+      // The item data should have categoryId directly
+      const categoryId = item.categoryId || fullItem?.categoryId || '';
+      
+      // Get size from the item data
+      const sizeId = fullItem?.sizeId || '';
+      
+      // Get type from the item data
+      const typeId = fullItem?.typeId || '';
+      
+      if (categoryId) {
+        newHierarchicalSelections.set(index, {
+          categoryId: categoryId,
+          sizeId: sizeId,
+          typeId: typeId,
+          selectedItem: fullItem || null
+        });
         
         if (fullItem) {
-          newHierarchicalSelections.set(index, {
-            categoryId: fullItem.categoryId || '',
-            sizeId: fullItem.sizeId || '',
-            typeId: fullItem.typeId || '',
-            selectedItem: fullItem
-          });
-          
           setSelectedItemIds(prev => {
             const newMap = new Map(prev);
             newMap.set(index, fullItem.id);
             return newMap;
           });
           
-          if (fullItem.price && fullItem.price > 0) {
-            setPriceAutoFilled(prev => {
-              const newMap = new Map(prev);
-              newMap.set(index, true);
-              return newMap;
-            });
-          }
-
-          // Track if size was auto-filled
+          // Set description from the item
+          const itemName = safeString(fullItem.name);
+          form.setValue(`items.${index}.description`, itemName);
+          
+          // Set size from the item
           if (fullItem.size) {
+            const sizeValue = safeString(fullItem.size);
+            form.setValue(`items.${index}.size`, sizeValue);
             setSizeAutoFilled(prev => {
               const newMap = new Map(prev);
               newMap.set(index, true);
@@ -362,30 +368,32 @@ const getMaterialImage = useCallback(async (materialId: string) => {
             });
           }
           
-          const currentMaterials = form.getValues(`items.${index}.materials`);
-          if (!currentMaterials?.length) {
-            const materialsList = Array.isArray(fullItem.itemMaterials)
-              ? fullItem.itemMaterials.map((im: any) => ({
-                  id: '',
-                  itemId: item.id || '',
-                  materialId: im.materialId,
-                  quantity: im.quantity ?? 1,
-                  note: im.note ?? '',
-                  materialIssues: [],
-                }))
-              : [];
-
-            if (materialsList.length > 0) {
-              form.setValue(`items.${index}.materials`, materialsList);
-            }
+          // Set price
+          if (fullItem.price && fullItem.price > 0) {
+            form.setValue(`items.${index}.unitPrice`, fullItem.price);
+            setPriceAutoFilled(prev => {
+              const newMap = new Map(prev);
+              newMap.set(index, true);
+              return newMap;
+            });
+            calculateItemAmount(index);
           }
         }
-      });
-      
-      setHierarchicalSelections(newHierarchicalSelections);
-    }
-  }, [initialData, items, form]);
+      } else {
+        // If no category, check if we have it from the selection
+        // But the category should be in the item data
+        console.warn('No category found for item', index);
+      }
+    });
+    
+    setHierarchicalSelections(newHierarchicalSelections);
+  }
+}, [initialData, items, categories, form, calculateItemAmount]); // Add categories to dependencies
 
+// ❌ REMOVE THIS ENTIRE SECOND useEffect (lines 211-264)
+// It's overriding the first one
+  // Initialize hierarchical selections from existing items when editing
+ 
   // Fetch data on mount
   useEffect(() => {
     const fetchData = async () => {
@@ -874,36 +882,10 @@ const removeNewAttachment = (index: number) => {
     });
   };
 
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
 
-  const calculateItemAmount = (index: number) => {
-    const quantity = form.getValues(`items.${index}.quantity`);
-    const unitPrice = form.getValues(`items.${index}.unitPrice`);
-    const amount = quantity * unitPrice;
-    form.setValue(`items.${index}.amount`, amount);
-    calculateTotals();
-  };
 
-  const calculateTotals = () => {
-    const itemsList = form.getValues('items');
-    const subtotal = itemsList.reduce((sum, item) => sum + item.amount, 0);
-    
-    const vatApplied = form.getValues('vatApplied');
-    const vatPercent = form.getValues('vatPercent') || 15;
-    
-    const vat = vatApplied ? subtotal * (vatPercent / 100) : 0;
-    const total = subtotal + vat;
 
-    form.setValue('subtotal', subtotal);
-    form.setValue('vat', vat);
-    form.setValue('total', total);
-    
-    if (vatApplied) {
-      form.setValue('vatPercent', 15);
-    }
-  };
+
 
   const handleVatAppliedChange = (checked: boolean) => {
     form.setValue('vatApplied', checked);

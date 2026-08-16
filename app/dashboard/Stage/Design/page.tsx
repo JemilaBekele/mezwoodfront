@@ -31,7 +31,7 @@ export default async function PurchasePage(props: pageProps) {
     <PageContainer scrollable={true}>
       <div className='flex flex-1 flex-col space-y-4'>
         <div className='flex items-start justify-between'>
-          <Heading title='Project Design stage' description='Manage Project ' />
+          <Heading title='All Project stage mangment' description='Manage Project ' />
        
         </div>
         <Separator />

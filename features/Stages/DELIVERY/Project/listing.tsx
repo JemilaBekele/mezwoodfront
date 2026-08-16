@@ -42,7 +42,7 @@ export default function DeliveryProjectListingPage() {
 
   useEffect(() => {
     fetchProjects('not-finished');
-  }, []);
+  }, [fetchProjects]);
 
   if (loading) {
     return (

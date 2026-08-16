@@ -14,8 +14,7 @@ import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
-import FinishedCncProjectListingPage from '@/features/Stages/CNC/finish';
-import FinishedPaintingProjectListingPage from '@/features/Stages/PAINTING/Project/listing';
+import FinPaintingProjectListingPage from '@/features/Stages/PAINTING/Project/inished';
 
 export const metadata = {
   title: 'Dashboard: Project'
@@ -34,7 +33,7 @@ export default async function PurchasePage(props: pageProps) {
   // const key = serialize({ ...searchParams });
 
   return (
-    <PageContainer scrollable={false}>
+    <PageContainer scrollable={true}>
       <div className='flex flex-1 flex-col space-y-4'>
         <div className='flex items-start justify-between'>
 <Heading 
@@ -51,7 +50,7 @@ export default async function PurchasePage(props: pageProps) {
             <DataTableSkeleton columnCount={5} rowCount={8} filterCount={2} />
           }
         >
-          <FinishedPaintingProjectListingPage />
+          <FinPaintingProjectListingPage />
         </Suspense>
       </div>
     </PageContainer>
