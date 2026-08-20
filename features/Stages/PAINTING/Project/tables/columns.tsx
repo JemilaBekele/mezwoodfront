@@ -97,6 +97,24 @@ export const projectColumns: ColumnDef<IProject>[] = [
     ),
     enableColumnFilter: true
   },
+    {
+    accessorKey: 'requestedDelivery',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Requested' />
+    ),
+    cell: ({ cell }) => {
+      const date = cell.getValue<Date | null>();
+      if (!date) return <span className='text-muted-foreground'>-</span>;
+      const d = new Date(date);
+      return (
+        <div className='flex items-center gap-1.5 text-sm text-muted-foreground'>
+          <CalendarDays className='h-3.5 w-3.5' />
+          <span>{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        </div>
+      );
+    },
+    enableColumnFilter: false
+  },
   {
     accessorKey: 'status',
     header: ({ column }) => (
