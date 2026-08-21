@@ -1037,10 +1037,7 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
     const confirmed = window.confirm(
       "Are you sure you want to create this Proforma Invoice?"
     );
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
   }
   
   try {
@@ -1048,8 +1045,10 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
 
     const formData = new FormData();
     
+    // Store flag
     formData.append('store', isStore.toString());
     
+    // Add all non-item fields
     Object.entries(data).forEach(([key, value]) => {
       if (key !== 'items' && key !== 'attachments' && key !== 'store') {
         if (value !== undefined && value !== null) {
@@ -1062,14 +1061,14 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
       }
     });
 
+    // ✅ FIX: Prepare items WITH itemIndex and include image data
     const itemsWithData = data.items.map((item, index) => {
       const itemImagesData = itemImages.get(index) || [];
       const selectedItemId = selectedItemIds.get(index);
       const selection = hierarchicalSelections.get(index);
-      
-      // Get categoryId from hierarchical selection
       const categoryId = selection?.categoryId || '';
       
+      // Process existing images
       const existingImages = itemImagesData
         .filter(img => img.isExisting && img.existingUrl)
         .map(img => ({
@@ -1079,6 +1078,7 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
           createdAt: new Date().toISOString()
         }));
       
+      // Process new images (these will be uploaded as files)
       const newImages = itemImagesData
         .filter(img => !img.isExisting && img.file)
         .map(img => ({
@@ -1092,7 +1092,7 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
         ...item,
         itemId: selectedItemId || item.itemId || '',
         categoryId: categoryId,
-        itemIndex: index,
+        itemIndex: index, // ✅ CRITICAL: Include itemIndex for backend to match files
         materials: item.materials?.map(material => ({
           materialId: material.materialId,
           quantity: material.quantity,
@@ -1102,23 +1102,26 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
       };
     });
 
+    // ✅ Send items as JSON string
     formData.append('items', JSON.stringify(itemsWithData));
 
-    // ✅ Add images to form data
+    // ✅ FIX: Append images with the correct field name format
+    // The backend expects: items[${itemIndex}].images[${imageIndex}]
     itemImages.forEach((images, itemIndex) => {
       images.forEach((img, imgIndex) => {
         if (!img.isExisting && img.file) {
+          // ✅ Use the EXACT format the backend expects
           formData.append(`items[${itemIndex}].images[${imgIndex}]`, img.file);
         }
       });
     });
 
-    // ✅ Add attachments to delete (MOVED OUTSIDE the map function)
+    // ✅ Handle attachments to delete
     if (attachmentsToDelete.length > 0) {
       formData.append('attachmentsToDelete', JSON.stringify(attachmentsToDelete));
     }
 
-    // ✅ Add NEW attachments (not the old attachments state)
+    // ✅ Add NEW attachments
     newAttachments.forEach((file) => {
       formData.append('attachments', file);
     });
