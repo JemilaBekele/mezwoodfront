@@ -390,7 +390,26 @@ useEffect(() => {
   }
 }, [initialData, items, categories, form, calculateItemAmount]); // Add categories to dependencies
 
-
+// Initialize item images from existing data
+useEffect(() => {
+  if (initialData?.items) {
+    const newItemImages = new Map<number, ImageFileWithPreview[]>();
+    
+    initialData.items.forEach((item, index) => {
+      if (item.images && item.images.length > 0) {
+        const existingImages: ImageFileWithPreview[] = item.images.map(img => ({
+          preview: normalizeImagePath(img.imageUrl) || img.imageUrl,
+          isExisting: true,
+          existingUrl: img.imageUrl,
+          id: img.id
+        }));
+        newItemImages.set(index, existingImages);
+      }
+    });
+    
+    setItemImages(newItemImages);
+  }
+}, [initialData]);
   // Fetch data on mount
   useEffect(() => {
     const fetchData = async () => {
