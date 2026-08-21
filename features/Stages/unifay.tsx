@@ -519,41 +519,72 @@ const UnifiedProjectDetailPage: React.FC<ProjectDetailProps> = ({ id, stageType 
     }
     return true;
   };
-// Update the isProjectFullyPaid function to accept proformaInvoice
-// Update the isProjectFullyPaid function
 function isProjectFullyPaid(project: any, proformaInvoice: any): boolean {
   // Return true if project is null or undefined
   if (!project) return true;
   
-  // Check payment status from proformaInvoice first, then fallback to project.invoice or project.paymentStatus
+  // Get payment status from proformaInvoice first
   const paymentStatus = proformaInvoice?.paymentStatus || 
                         project.invoice?.paymentStatus || 
                         project.paymentStatus;
   
-  // Strictly check if payment status is PAID
+  // Log the actual payment status for debugging
+  console.log('🔍 Payment Status Check:', {
+    paymentStatus,
+    proformaInvoicePaymentStatus: proformaInvoice?.paymentStatus,
+    projectInvoicePaymentStatus: project.invoice?.paymentStatus,
+    projectPaymentStatus: project.paymentStatus,
+    invoiceBalance: project.invoice?.balance,
+    invoiceTotal: project.invoice?.total,
+    invoiceAmountPaid: project.invoice?.amountPaid
+  });
+  
+  // Check if payment status is PAID
+  // Returns true ONLY if status is PAID
   return paymentStatus === 'PAID' || 
          paymentStatus === SellPaymentStatus.PAID;
 }
-
-// Helper to check if project should show payment restriction
 function shouldShowPaymentRestriction(project: any, proformaInvoice: any, stageType?: ProjectStatus): boolean {
   // Return false if project is null or undefined
   if (!project) return false;
   
-  // Only apply payment restriction for Delivery and Installation stages
-  if (stageType !== ProjectStatus.DELIVERY ) {
+  // Debug logging
+  console.log('🔍 shouldShowPaymentRestriction called with:', {
+    stageType,
+    projectStatus: project.status,
+    projectAllowToDeliverWithBalance: project.allowToDeliverWithBalance,
+    proformaInvoicePaymentStatus: proformaInvoice?.paymentStatus,
+    projectPaymentStatus: project.paymentStatus,
+    isFullyPaid: isProjectFullyPaid(project, proformaInvoice)
+  });
+  
+  // ✅ Check the stageType parameter
+  const restrictedStages = [
+    ProjectStatus.DELIVERY, 
+    ProjectStatus.INSTALLATION
+  ];
+  
+  // If stageType is not provided or not in restricted list, no restriction
+  if (!stageType || !restrictedStages.includes(stageType)) {
+    console.log('✅ No restriction: Stage is not DELIVERY or INSTALLATION');
     return false;
   }
   
   // If allowToDeliverWithBalance is true, don't show payment restriction
-  if (project.allowToDeliverWithBalance) return false;
+  if (project.allowToDeliverWithBalance) {
+    console.log('✅ No restriction: allowToDeliverWithBalance is true');
+    return false;
+  }
   
   // Check if payment is not fully paid
-  return !isProjectFullyPaid(project, proformaInvoice);
+  const isPaid = isProjectFullyPaid(project, proformaInvoice);
+  console.log('🔍 Final result:', { isPaid, showRestriction: !isPaid });
+  
+  return !isPaid;
 }
 // Inside the UnifiedProjectDetailPage component, add this after loading check:
-const isPaymentRestricted = project ? shouldShowPaymentRestriction(project, proformaInvoice) : false;
-  // Handle add work log submission
+const isPaymentRestricted = project ? shouldShowPaymentRestriction(project, proformaInvoice, stageType) : false;
+console.log('🚫 Final isPaymentRestricted:', isPaymentRestricted);  // Handle add work log submission
   const handleAddWorkLog = async (stageId: string, stage: IProjectStage) => {
     const formData = workLogFormData[stageId];
     if (!formData) {
