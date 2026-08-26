@@ -34,38 +34,19 @@ import { getMonthlyBreakdown } from '@/service/dashboard';
 interface MonthlyBreakdownItem {
   month: number;
   monthName: string;
-  proforma: {
-    gain: number;
-    paid: number;
-    outstanding: number;
-    collectionRate: string | number;
-  };
-  sales: {
-    gain: number;
-    paid: number;
-    outstanding: number;
-    collectionRate: string | number;
-  };
-  combined: {
-    gain: number;
-    paid: number;
-    outstanding: number;
-    collectionRate: string | number;
-  };
+  proformaPaid: number;
+  sellPaid: number;
+  totalPaid: number;
 }
 
 const chartConfig = {
-  sales: {
-    label: 'Sales',
+  sellPaid: {
+    label: 'Sell Payments',
     color: '#2563eb'
   },
-  proforma: {
-    label: 'Proforma',
+  proformaPaid: {
+    label: 'Proforma Payments',
     color: '#f97316'
-  },
-  total: {
-    label: 'Total (Sales + PI)',
-    color: '#10b981'
   }
 } satisfies ChartConfig;
 
@@ -73,8 +54,8 @@ export function MonthlySalesPIBarChart() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [totalSales, setTotalSales] = useState(0);
-  const [totalPI, setTotalPI] = useState(0);
+  const [totalSellPaid, setTotalSellPaid] = useState(0);
+  const [totalProformaPaid, setTotalProformaPaid] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -84,32 +65,30 @@ export function MonthlySalesPIBarChart() {
 
         const formattedData = data.map((item) => ({
           month: item.monthName.slice(0, 3),
-          sales: item.sales.gain,
-          proforma: item.proforma.gain,
-          total: item.sales.gain + item.proforma.gain, // Add total bar
-          salesPaid: item.sales.paid,
-          proformaPaid: item.proforma.paid
+          sellPaid: item.sellPaid,
+          proformaPaid: item.proformaPaid,
+          totalPaid: item.totalPaid
         }));
 
         setChartData(formattedData);
 
-        const salesTotal = data.reduce(
-          (sum, item) => sum + item.sales.gain,
+        const sellTotal = data.reduce(
+          (sum, item) => sum + item.sellPaid,
           0
         );
 
-        const piTotal = data.reduce(
-          (sum, item) => sum + item.proforma.gain,
+        const proformaTotal = data.reduce(
+          (sum, item) => sum + item.proformaPaid,
           0
         );
 
-        setTotalSales(salesTotal);
-        setTotalPI(piTotal);
+        setTotalSellPaid(sellTotal);
+        setTotalProformaPaid(proformaTotal);
       } catch (error) {
         console.error(error);
 
         toast.error(
-          'Failed to load monthly sales and proforma chart'
+          'Failed to load monthly payments chart'
         );
       } finally {
         setLoading(false);
@@ -123,7 +102,7 @@ export function MonthlySalesPIBarChart() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Monthly Sales vs Proforma</CardTitle>
+          <CardTitle>Monthly Payments Overview</CardTitle>
           <CardDescription>
             Loading chart data...
           </CardDescription>
@@ -141,10 +120,10 @@ export function MonthlySalesPIBarChart() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Monthly Sales vs Proforma</CardTitle>
+        <CardTitle>Monthly Payments Overview</CardTitle>
 
         <CardDescription>
-          Comparison of monthly sales, PI revenue, and total
+          Monthly payments received from Sell and Proforma invoices
         </CardDescription>
       </CardHeader>
 
@@ -170,26 +149,19 @@ export function MonthlySalesPIBarChart() {
               content={<ChartTooltipContent />}
             />
 
-            <Legend />
+       
 
-            {/* Bar for Sales */}
+            {/* Bar for Sell Payments */}
             <Bar
-              dataKey='sales'
-              fill='var(--color-sales)'
+              dataKey='sellPaid'
+              fill='var(--color-sellPaid)'
               radius={4}
             />
 
-            {/* Bar for Proforma */}
+            {/* Bar for Proforma Payments */}
             <Bar
-              dataKey='proforma'
-              fill='var(--color-proforma)'
-              radius={4}
-            />
-
-            {/* Bar for Total (Sales + PI) */}
-            <Bar
-              dataKey='total'
-              fill='var(--color-total)'
+              dataKey='proformaPaid'
+              fill='var(--color-proformaPaid)'
               radius={4}
             />
           </BarChart>
@@ -198,12 +170,12 @@ export function MonthlySalesPIBarChart() {
 
       <CardFooter className='flex-col items-start gap-2 text-sm'>
         <div className='flex items-center gap-2 font-medium leading-none'>
-          Revenue overview for the year
+          Payments received for the year
           <TrendingUp className='h-4 w-4' />
         </div>
 
         <div className='text-muted-foreground leading-none'>
-          Total Sales: {totalSales.toLocaleString()} | Total PI: {totalPI.toLocaleString()}
+          Total Sell Payments: {totalSellPaid.toLocaleString()} | Total Proforma Payments: {totalProformaPaid.toLocaleString()}
         </div>
       </CardFooter>
     </Card>
