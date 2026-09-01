@@ -2071,7 +2071,15 @@ const ConfirmationModal = ({
     }`}
   />
 
-
+  <p className="mt-1 text-xs text-muted-foreground">
+    Format:{' '}
+    <span className="font-mono">
+      {Number(field.value || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}
+    </span>
+  </p>
 </div>
             </FormControl>
             <FormMessage />
