@@ -107,8 +107,7 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
         setError(null);
 
         const { proformaInvoices } = await getAllProformaInvoices({
-          page,
-          limit,
+        
           search,
         });
 

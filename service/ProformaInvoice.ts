@@ -79,8 +79,7 @@ export const getAllProformaInvoicesmy = async ({
   }
 };
 export const getAllProformaInvoices = async ({
-  page = 1,
-  limit = 10,
+
   search = '',
   status,
   customerId,
@@ -93,8 +92,7 @@ export const getAllProformaInvoices = async ({
       `/proforma-invoices`,
       {
         params: {
-          page,
-          limit,
+        
           search,
           status,
           customerId,
