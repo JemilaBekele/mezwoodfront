@@ -1258,7 +1258,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                             {index + 1}
                           </TableCell>
                           <TableCell className="font-semibold text-sm text-slate-900">
-                            {item.item?.name || item.category?.name || 'Item'}
+                            {item.item?.name || item.itemname|| item.category?.name || ''}
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-600">
                             {item.size ? (

@@ -45,6 +45,7 @@ interface DataTableProps<TData, TValue> {
   designStatusFilter?: string | number;
   difficultyFilter?: string | number;
   employeeFilter?: string | number;
+  designerFilter?: string | number;
   paymentStatusFilter?: string | number;
   startDate?: string;
   endDate?: string;
@@ -65,7 +66,7 @@ export function DataTable<TData, TValue>({
     'limit',
     parseAsInteger
       .withOptions({ shallow: false, history: 'push' })
-      .withDefault(10)
+      .withDefault(20)
   );
 
   const paginationState = {

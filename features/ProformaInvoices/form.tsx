@@ -13,7 +13,7 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { createProformaInvoice, updateProformaInvoice } from '@/service/ProformaInvoice';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -52,6 +52,14 @@ interface SelectOption {
   label: string;
 }
 
+
+const formatDecimal = (value: number | undefined, decimals: number = 2): string => {
+    if (value === undefined || value === null) return '';
+    return value.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+};
 interface ProformaInvoiceFormProps {
   initialData: IProformaInvoice | null;
   pageTitle: string;
@@ -119,7 +127,8 @@ const [newAttachments, setNewAttachments] = useState<File[]>([]);
   const [types, setTypes] = useState<IProductType[]>([]);
   const [filteredItems, setFilteredItems] = useState<Map<number, any[]>>(new Map());
   const [showCustomerModal, setShowCustomerModal] = useState(false);
-
+const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+const [confirmationData, setConfirmationData] = useState<ProformaInvoiceFormValues | null>(null);
 
   const [selectedMaterialImage, setSelectedMaterialImage] = useState<string | null>(null);
 const [showMaterialImageModal, setShowMaterialImageModal] = useState(false);
@@ -149,6 +158,7 @@ const [materialImageMap, setMaterialImageMap] = useState<Map<string, string>>(ne
           itemId: item.itemId || '',
                     categoryId: item.categoryId || '',
           description: description,
+          itemname: item.itemname || '',
           size: size,
           quantity: item.quantity || 1,
           unitPrice: item.unitPrice || 0,
@@ -170,6 +180,7 @@ const [materialImageMap, setMaterialImageMap] = useState<Map<string, string>>(ne
           invoiceId: '',
           itemId: '',
           categoryId: '',
+          itemname: '',
           description: '',
           size: '',
           quantity: 1,
@@ -287,31 +298,35 @@ const getMaterialImage = useCallback(async (materialId: string) => {
     console.error('Failed to load material image:', error);
   }
 }, [materials, materialImageMap]);
-  const calculateTotals = useCallback(() => {
+const calculateTotals = useCallback(() => {
     const itemsList = form.getValues('items');
-    const subtotal = itemsList.reduce((sum, item) => sum + (item.amount || 0), 0);
+    // Use toFixed(2) to maintain 2 decimal precision
+    const subtotal = parseFloat(
+        itemsList.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)
+    );
 
     const vatApplied = form.getValues('vatApplied');
-    const vatPercent = form.getValues('vatPercent') || 15;
+    const vatPercent = parseFloat((form.getValues('vatPercent') || 15).toString());
 
-    const vat = vatApplied ? subtotal * (vatPercent / 100) : 0;
-    const total = subtotal + vat;
+    const vat = vatApplied ? parseFloat((subtotal * (vatPercent / 100)).toFixed(2)) : 0;
+    const total = parseFloat((subtotal + vat).toFixed(2));
 
     form.setValue('subtotal', subtotal);
     form.setValue('vat', vat);
     form.setValue('total', total);
 
     if (vatApplied) {
-      form.setValue('vatPercent', 15);
+        form.setValue('vatPercent', 15);
     }
-  }, [form]);
-  const calculateItemAmount = useCallback((index: number) => {
-    const quantity = form.getValues(`items.${index}.quantity`);
-    const unitPrice = form.getValues(`items.${index}.unitPrice`);
-    const amount = quantity * unitPrice;
+}, [form]);
+const calculateItemAmount = useCallback((index: number) => {
+    const quantity = form.getValues(`items.${index}.quantity`) || 0;
+    const unitPrice = form.getValues(`items.${index}.unitPrice`) || 0;
+    // Round to 2 decimal places
+    const amount = parseFloat((quantity * unitPrice).toFixed(2));
     form.setValue(`items.${index}.amount`, amount);
     calculateTotals();
-  }, [calculateTotals, form]);
+}, [calculateTotals, form]);
 
   // Initialize item images from initial data
 // Initialize hierarchical selections from existing items when editing
@@ -1031,14 +1046,29 @@ const handleMaterialImageClick = (imageUrl: string | null) => {
   const allItemsHaveMaterials = watchedItems.every(item => 
     item.materials && item.materials.some(m => m.materialId && m.materialId !== '')
   );
+  const handleFormSubmit = (data: ProformaInvoiceFormValues) => {
+  // Show confirmation modal
+  setConfirmationData(data);
+  setShowConfirmationModal(true);
+};
+
+// Actual submission after confirmation
+const confirmAndSubmit = async () => {
+  if (!confirmationData) return;
+  
+  try {
+    await onSubmit(confirmationData);
+    // Close the modal after successful submission
+    setShowConfirmationModal(false);
+    setConfirmationData(null);
+  } catch (error) {
+    // Keep modal open on error so user can retry
+    console.error('Submission failed:', error);
+  }
+};
 // Complete onSubmit function
 const onSubmit = async (data: ProformaInvoiceFormValues) => {
-  if (!initialData?.id) {
-    const confirmed = window.confirm(
-      "Are you sure you want to create this Proforma Invoice?"
-    );
-    if (!confirmed) return;
-  }
+ 
   
   try {
     setIsLoading(true);
@@ -1050,14 +1080,29 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
     
     // Add all non-item fields
     Object.entries(data).forEach(([key, value]) => {
-      if (key !== 'items' && key !== 'attachments' && key !== 'store') {
+       if (key !== 'items' && key !== 'attachments' && key !== 'store') {
         if (value !== undefined && value !== null) {
-          if (value instanceof Date) {
-            formData.append(key, value.toISOString());
+          // ✅ Skip VAT fields when VAT is not applied
+          if (key === 'vat' || key === 'vatPercent' || key === 'vatApplied') {
+            // Only include VAT fields if VAT is actually applied
+            if (data.vatApplied === true) {
+              if (value instanceof Date) {
+                formData.append(key, value.toISOString());
+              } else {
+                formData.append(key, value.toString());
+              }
+            }
+            // Skip these fields when VAT is not applied
           } else {
-            formData.append(key, value.toString());
+            // Include all other fields normally
+            if (value instanceof Date) {
+              formData.append(key, value.toISOString());
+            } else {
+              formData.append(key, value.toString());
+            }
           }
-        }
+        
+       }
       }
     });
 
@@ -1214,7 +1259,29 @@ const onSubmit = async (data: ProformaInvoiceFormValues) => {
       backgroundColor: '#374151',
     }),
   };
+const getItemColor = (index: number) => {
+  const colors = [
+    'border-l-4 border-l-red-500 bg-red-50/20 dark:bg-red-950/10',
+    'border-l-4 border-l-orange-500 bg-orange-50/20 dark:bg-orange-950/10',
+    'border-l-4 border-l-yellow-500 bg-yellow-50/20 dark:bg-yellow-950/10',
+    'border-l-4 border-l-green-500 bg-green-50/20 dark:bg-green-950/10',
+    'border-l-4 border-l-blue-500 bg-blue-50/20 dark:bg-blue-950/10',
+    'border-l-4 border-l-purple-500 bg-purple-50/20 dark:bg-purple-950/10',
+  ];
+  return colors[index % colors.length];
+};
 
+const getHeaderColor = (index: number) => {
+  const colors = [
+    'bg-red-100/50 dark:bg-red-950/40 border-red-200/50 dark:border-red-800/30',
+    'bg-orange-100/50 dark:bg-orange-950/40 border-orange-200/50 dark:border-orange-800/30',
+    'bg-yellow-100/50 dark:bg-yellow-950/40 border-yellow-200/50 dark:border-yellow-800/30',
+    'bg-green-100/50 dark:bg-green-950/40 border-green-200/50 dark:border-green-800/30',
+    'bg-blue-100/50 dark:bg-blue-950/40 border-blue-200/50 dark:border-blue-800/30',
+    'bg-purple-100/50 dark:bg-purple-950/40 border-purple-200/50 dark:border-purple-800/30',
+  ];
+  return colors[index % colors.length];
+};
   // Light mode styles with higher z-index
   const lightStyles = {
     menu: (base: any) => ({
@@ -1296,6 +1363,238 @@ useEffect(() => {
   
   return () => subscription.unsubscribe();
 }, [form, fetchMultipleMaterialImages, materialImageMap]);
+
+// Add this useEffect after your other useEffects
+useEffect(() => {
+  const handleGlobalPaste = async (e: ClipboardEvent) => {
+    // Only handle if we're focused on a form input or the page
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+    
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    // Find the first active item row or the last one
+    const activeItemIndex = itemFields.length > 0 ? itemFields.length - 1 : 0;
+    
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image size should be less than 5MB');
+            continue;
+          }
+          
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            const newImage: ImageFileWithPreview = {
+              file: file,
+              preview: result,
+              isExisting: false
+            };
+            
+            setItemImages(prev => {
+              const newMap = new Map(prev);
+              const currentImages = newMap.get(activeItemIndex) || [];
+              newMap.set(activeItemIndex, [...currentImages, newImage]);
+              return newMap;
+            });
+            
+            toast.success('Image pasted successfully');
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    }
+  };
+  
+  document.addEventListener('paste', handleGlobalPaste);
+  return () => document.removeEventListener('paste', handleGlobalPaste);
+}, [itemFields.length]);
+// Confirmation Modal Component
+const ConfirmationModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  data 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+  data: ProformaInvoiceFormValues | null;
+}) => {
+  if (!data) return null;
+  
+  const totalItems = data.items?.length || 0;
+  const subtotal = data.subtotal || 0;
+  const vat = data.vat || 0;
+  const total = data.total || 0;
+  const vatApplied = data.vatApplied || false;
+  const vatPercent = data.vatPercent || 15;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Confirm Proforma Invoice"
+      description="Please review all items before creating the invoice"
+    >
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+        {/* Customer Info */}
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            {data.store ? 'Stock Invoice' : 'Customer'}
+          </p>
+          <p className="text-sm font-medium">
+            {data.store ? 'Store Invoice (No Customer)' : customers.find(c => c.id === data.customerId)?.name || 'No customer selected'}
+          </p>
+        </div>
+
+        {/* Items Summary */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Items ({totalItems})
+            </p>
+          </div>
+
+          {/* Table Header - Sticky */}
+          <div className="sticky top-0 z-10 grid grid-cols-12 gap-2 rounded-t-lg bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
+            <div className="col-span-5">Item</div>
+            <div className="col-span-2 text-right">Qty</div>
+            <div className="col-span-2 text-right">Unit Price</div>
+            <div className="col-span-3 text-right">Amount</div>
+          </div>
+
+          {/* Items List with overflow */}
+          <div className="space-y-2 max-h-[40vh] overflow-y-auto overflow-x-hidden pr-1">
+            {data.items?.map((item, index) => {
+              const selection = hierarchicalSelections.get(index);
+              const categoryName = selection?.categoryId 
+                ? categories.find(c => c.id === selection.categoryId)?.name 
+                : 'No category';
+              const itemName = item.itemname || item.description || `Item ${index + 1}`;
+              
+              return (
+                <div 
+                  key={index}
+                  className={`grid grid-cols-12 gap-2 rounded-lg border p-3 transition-colors ${getItemColor(index)}`}
+                >
+                  <div className="col-span-5 min-w-0">
+                    <p className="text-sm font-medium truncate">{itemName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {categoryName}
+                      {item.size && ` • Size: ${item.size}`}
+                    </p>
+                    {item.additionalDescription && (
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {item.additionalDescription}
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-2 flex items-center justify-end">
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {item.quantity || 0}
+                    </Badge>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-end text-sm font-mono">
+                    {formatCurrency(item.unitPrice || 0)}
+                  </div>
+                  <div className="col-span-3 flex items-center justify-end text-sm font-bold">
+                    {formatCurrency(item.amount || 0)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Items count badge */}
+          <div className="flex justify-end">
+            <Badge variant="outline" className="text-xs">
+              Total: {totalItems} item{totalItems > 1 ? 's' : ''}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Totals Summary - Sticky at bottom of scroll */}
+        <div className="sticky bottom-0 rounded-lg border bg-card p-4 space-y-2 shadow-lg">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="font-mono font-medium">{formatCurrency(subtotal)}</span>
+          </div>
+          
+          {vatApplied && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">VAT ({vatPercent}%)</span>
+              <span className="font-mono font-medium">{formatCurrency(vat)}</span>
+            </div>
+          )}
+          
+          <div className="border-t pt-2 flex items-center justify-between text-base font-bold">
+            <span>Total</span>
+            <span className="font-mono text-primary">{formatCurrency(total)}</span>
+          </div>
+        </div>
+
+        {/* Validation Status */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className={`flex items-center gap-2 rounded-lg border p-2 text-xs ${
+            data.customerId || data.store 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}>
+            {data.customerId || data.store ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <X className="h-3.5 w-3.5" />
+            )}
+            <span>{data.store ? 'Stock Invoice' : 'Customer Selected'}</span>
+          </div>
+          
+          <div className={`flex items-center gap-2 rounded-lg border p-2 text-xs ${
+            data.items?.every(item => item.materials?.some(m => m.materialId)) 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}>
+            {data.items?.every(item => item.materials?.some(m => m.materialId)) ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <AlertCircle className="h-3.5 w-3.5" />
+            )}
+            <span>All items have materials</span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-3 pt-2 border-t sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-3 -mx-1 px-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Go Back
+          </Button>
+          <Button
+            type="button"
+            onClick={onConfirm}
+            disabled={isLoading}
+            className="min-w-32"
+          >
+            {isLoading ? (
+              <>Saving...</>
+            ) : (
+              <>Confirm & Create</>
+            )}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
   return (
     <>
     <div className="mx-auto w-full space-y-4">
@@ -1332,12 +1631,11 @@ useEffect(() => {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" onKeyDown={(e) => {
-      // Prevent Enter key from submitting the form anywhere
-      if (e.key === 'Enter') {
-        e.preventDefault();
-      }
-    }} >
+   <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4" onKeyDown={(e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+  }
+}}>
           {/* Invoice Details */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
@@ -1441,13 +1739,12 @@ useEffect(() => {
                   const isSizeAutoFilled = sizeAutoFilled.get(itemIndex) || false;
 
                   return (
-                    <div
-                      key={field.id}
-                      className="rounded-xl border bg-card shadow-sm overflow-visible"
-                    >
+                  <div
+  key={field.id}
+  className={`rounded-xl border shadow-sm overflow-visible ${getItemColor(itemIndex)}`}
+>
                       {/* Item Header Bar */}
-                      <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5">
-                        <div className="flex items-center gap-2">
+<div className={`flex items-center justify-between border-b px-4 py-2.5 ${getHeaderColor(itemIndex)}`}>                        <div className="flex items-center gap-2">
                           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
                             {itemIndex + 1}
                           </span>
@@ -1604,6 +1901,27 @@ useEffect(() => {
 
                         {/* Pricing Row */}
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                                <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.itemname`}
+                          
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs flex items-center gap-1">
+                                  Item name
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="text"
+                                    placeholder="Item name"
+                                    {...field}
+                                   
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.quantity`}
@@ -1670,92 +1988,123 @@ useEffect(() => {
                           />
 
                       {/* Unit Price - REQUIRED with validation */}
-                          <FormField
-                            control={form.control}
-                            name={`items.${itemIndex}.unitPrice`}
-                            rules={{
-                              required: 'Unit price is required',
-                              validate: (value) => value > 0 || 'Unit price must be greater than 0'
-                            }}
-                            render={({ field, fieldState }) => (
-                              <FormItem>
-                                <FormLabel className="flex items-center gap-2 text-xs">
-                                  Unit Price <span className="text-red-500">*</span>
-                                  {priceAutoFilled.get(itemIndex) && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                    >
-                                      Auto
-                                    </Badge>
-                                  )}
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="0.00"
-                                    value={
-                                      field.value
-                                        ? Number(field.value).toLocaleString("en-US", {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                          })
-                                        : ""
-                                    }
-                                    onChange={(e) => {
-                                      const raw = e.target.value.replace(/,/g, "");
-                                      const value = parseFloat(raw) || 0;
-                                      field.onChange(value);
-                                      calculateItemAmount(itemIndex);
-                                      if (priceAutoFilled.get(itemIndex)) {
-                                        setPriceAutoFilled((prev) => {
-                                          const newMap = new Map(prev);
-                                          newMap.delete(itemIndex);
-                                          return newMap;
-                                        });
-                                      }
-                                    }}
-                                    className={`${
-                                      priceAutoFilled.get(itemIndex)
-                                        ? "border-green-300 focus-visible:ring-green-500"
-                                        : ""
-                                    } ${
-                                      fieldState.error ? "border-red-500 focus-visible:ring-red-500" : ""
-                                    }`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`items.${itemIndex}.amount`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Amount</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="0.00"
-                                    {...field}
-                                    readOnly
-                                    className="bg-muted/50 font-semibold"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+{/* Unit Price - REQUIRED with validation */}
+<Controller
+    control={form.control}
+    name={`items.${itemIndex}.unitPrice`}
+    defaultValue={0}
+    rules={{
+        required: 'Unit price is required',
+        validate: (value) => {
+            if (value <= 0) return 'Unit price must be greater than 0';
+            if (value > 999999999.99) return 'Unit price is too large (max: 999,999,999.99)';
+            return true;
+        }
+    }}
+    render={({ field, fieldState }) => (
+        <FormItem>
+            <FormLabel className="flex items-center gap-2 text-xs">
+                Unit Price <span className="text-red-500">*</span>
+                {priceAutoFilled.get(itemIndex) && (
+                    <Badge
+                        variant="secondary"
+                        className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                    >
+                        Auto
+                    </Badge>
+                )}
+            </FormLabel>
+            <FormControl>
+                <Input
+                    type="text"  // Changed to "text" for better formatting control
+                    inputMode="decimal"  // Shows decimal keyboard on mobile
+                    placeholder="0.00"
+                    value={field.value ? formatDecimal(field.value, 2) : ''}
+                    onChange={(e) => {
+                        // Remove commas and non-numeric characters except decimal point
+                        const raw = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '');
+                        
+                        // Prevent multiple decimal points
+                        const parts = raw.split('.');
+                        if (parts.length > 2) return;
+                        
+                        // Limit decimal places to 2
+                        if (parts[1] && parts[1].length > 2) return;
+                        
+                        // Convert to number
+                        const numericValue = parseFloat(raw) || 0;
+                        
+                        // Check for maximum value
+                        if (numericValue > 999999999.99) {
+                            toast.error('Maximum unit price is 999,999,999.99');
+                            return;
+                        }
+                        
+                        field.onChange(numericValue);
+                        calculateItemAmount(itemIndex);
+                        
+                        if (priceAutoFilled.get(itemIndex)) {
+                            setPriceAutoFilled((prev) => {
+                                const newMap = new Map(prev);
+                                newMap.delete(itemIndex);
+                                return newMap;
+                            });
+                        }
+                    }}
+                    onBlur={() => {
+                        // Format the value when user leaves the field
+                        const currentValue = field.value || 0;
+                        if (currentValue > 0) {
+                            // Ensure proper decimal places
+                            field.onChange(parseFloat(currentValue.toFixed(2)));
+                        }
+                    }}
+                    className={`font-mono ${
+                        priceAutoFilled.get(itemIndex)
+                            ? "border-green-300 focus-visible:ring-green-500"
+                            : ""
+                    } ${
+                        fieldState.error ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
+                />
+            </FormControl>
+            <FormMessage />
+            {field.value > 999999 && (
+                <p className="text-[10px] text-amber-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Large number: {formatDecimal(field.value, 2)}
+                </p>
+            )}
+        </FormItem>
+    )}
+/>
+<FormField
+    control={form.control}
+    name={`items.${itemIndex}.amount`}
+    render={({ field }) => (
+        <FormItem>
+            <FormLabel className="text-xs">Amount</FormLabel>
+            <FormControl>
+                <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={field.value ? formatDecimal(field.value, 2) : ""}
+                    readOnly
+                    className="bg-muted/50 font-semibold"
+                />
+            </FormControl>
+            <FormMessage />
+        </FormItem>
+    )}
+/>
                         </div>
 
                         {/* Descriptions */}
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                           {/* Description - REQUIRED with validation */}
+                              {/* Description - REQUIRED with validation */}
+                    
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.description`}
@@ -1923,92 +2272,154 @@ useEffect(() => {
   )}
 </div>
                         {/* Images */}
-                        <div className="mt-3 border-t pt-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold flex items-center gap-1.5">
-                              <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                              Images
-                              {(itemImages.get(itemIndex)?.length || 0) > 0 && (
-                                <Badge variant="secondary" className="text-[10px] h-4 px-1">
-                                  {itemImages.get(itemIndex)?.length}
-                                </Badge>
-                              )}
-                            </p>
-                            <div>
-                              <input
-                                type="file"
-                                id={`item-images-${itemIndex}`}
-                                accept="image/*"
-                                multiple
-                                onChange={(e) => handleAddItemImage(itemIndex, e)}
-                                className="hidden"
-                              />
-                              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById(`item-images-${itemIndex}`)?.click()} className="h-6 gap-1 text-[10px] px-2">
-                                <Upload className="h-3 w-3" />
-                                Upload
-                              </Button>
-                            </div>
-                          </div>
+                     {/* Images - Enhanced with paste support */}
+<div className="mt-3 border-t pt-3">
+  <div className="flex items-center justify-between mb-2">
+    <p className="text-xs font-semibold flex items-center gap-1.5">
+      <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      Images
+      {(itemImages.get(itemIndex)?.length || 0) > 0 && (
+        <Badge variant="secondary" className="text-[10px] h-4 px-1">
+          {itemImages.get(itemIndex)?.length}
+        </Badge>
+      )}
+    </p>
+    <div className="flex items-center gap-2">
+      
+      
+      {/* Hidden paste area */}
+      <textarea
+        id={`paste-area-${itemIndex}`}
+        className="sr-only"
+        onPaste={async (e) => {
+          e.preventDefault();
+          const items = e.clipboardData?.items;
+          if (!items) return;
+          
+          for (const item of items) {
+            if (item.type.startsWith('image/')) {
+              const file = item.getAsFile();
+              if (file) {
+                // Process the pasted image
+                if (file.size > 5 * 1024 * 1024) {
+                  toast.error('Image size should be less than 5MB');
+                  continue;
+                }
+                
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  const newImage: ImageFileWithPreview = {
+                    file: file,
+                    preview: result,
+                    isExisting: false
+                  };
+                  
+                  setItemImages(prev => {
+                    const newMap = new Map(prev);
+                    const currentImages = newMap.get(itemIndex) || [];
+                    newMap.set(itemIndex, [...currentImages, newImage]);
+                    return newMap;
+                  });
+                  
+                  toast.success('Image pasted successfully');
+                };
+                reader.readAsDataURL(file);
+              }
+            }
+          }
+        }}
+        onKeyDown={(e) => {
+          // Capture Ctrl+V / Cmd+V
+          if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+            // Let the paste handler do its work
+          }
+        }}
+      />
+      
+      <input
+        type="file"
+        id={`item-images-${itemIndex}`}
+        accept="image/*"
+        multiple
+        onChange={(e) => handleAddItemImage(itemIndex, e)}
+        className="hidden"
+      />
+      <Button 
+        type="button" 
+        variant="outline" 
+        size="sm" 
+        onClick={() => document.getElementById(`item-images-${itemIndex}`)?.click()} 
+        className="h-6 gap-1 text-[10px] px-2"
+      >
+        <Upload className="h-3 w-3" />
+        Upload
+      </Button>
+    </div>
+  </div>
 
-                          {(itemImages.get(itemIndex)?.length || 0) > 0 && (
-                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                              {itemImages.get(itemIndex)?.map((image, imageIndex) => (
-                                <div key={imageIndex} className="relative group">
-                                  <div className="relative aspect-square rounded-lg border overflow-hidden bg-gray-100 dark:bg-gray-800">
-                                    <img
-                                      src={image.preview}
-                                      alt={`Item ${itemIndex + 1} image ${imageIndex + 1}`}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                                      }}
-                                    />
-                                    
-                                    {image.isExisting && (
-                                      <div className="absolute top-1 left-1">
-                                        <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                          Existing
-                                        </Badge>
-                                      </div>
-                                    )}
-                                    
-                                    <Button
-                                      type="button"
-                                      variant="destructive"
-                                      size="icon"
-                                      className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => removeItemImage(itemIndex, imageIndex)}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                    
-                                    <Button
-                                      type="button"
-                                      variant="secondary"
-                                      size="icon"
-                                      className="absolute bottom-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => window.open(image.preview, '_blank')}
-                                    >
-                                      <Eye className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                  
-                                  {!image.isExisting && image.file && (
-                                    <p className="text-xs text-muted-foreground mt-1 truncate">
-                                      {image.file.name}
-                                    </p>
-                                  )}
-                                  
-                                  {image.isExisting && (
-                                    <p className="text-[10px] text-muted-foreground mt-1 truncate">
-                                      {image.existingUrl?.split('/').pop() || 'Existing image'}
-                                    </p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+  {/* Image grid display - same as before */}
+  {(itemImages.get(itemIndex)?.length || 0) > 0 && (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+      {itemImages.get(itemIndex)?.map((image, imageIndex) => (
+        <div key={imageIndex} className="relative group">
+          <div className="relative aspect-square rounded-lg border overflow-hidden bg-gray-100 dark:bg-gray-800">
+            <img
+              src={image.preview}
+              alt={`Item ${itemIndex + 1} image ${imageIndex + 1}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/placeholder-image.png';
+              }}
+            />
+            
+            {image.isExisting && (
+              <div className="absolute top-1 left-1">
+                <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                  Existing
+                </Badge>
+              </div>
+            )}
+            
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => removeItemImage(itemIndex, imageIndex)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+            
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute bottom-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => window.open(image.preview, '_blank')}
+            >
+              <Eye className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          {!image.isExisting && image.file && (
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              {image.file.name}
+            </p>
+          )}
+          
+          {image.isExisting && (
+            <p className="text-[10px] text-muted-foreground mt-1 truncate">
+              {image.existingUrl?.split('/').pop() || 'Existing image'}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+  
+
+</div>
                       </div>
                     </div>
                   );
@@ -2247,6 +2658,13 @@ useEffect(() => {
     )}
   </div>
 </Modal>
+{/* Confirmation Modal */}
+<ConfirmationModal
+  isOpen={showConfirmationModal}
+  onClose={() => setShowConfirmationModal(false)}
+  onConfirm={confirmAndSubmit}
+  data={confirmationData}
+/>
     </>
   );
 }

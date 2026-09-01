@@ -183,7 +183,7 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
         pdfDoc.setTextColor(0, 0, 0);
         pdfDoc.setFontSize(11);
         pdfDoc.setFont('helvetica', 'normal');
-        pdfDoc.text(`To:${customerData.companyName || customerData.name || 'Rad'}`, 10, 71);
+       pdfDoc.text(`To: ${customerData.name || customerData.companyName || ''}`, 10, 71);
         pdfDoc.text(formatDate(invoice.createdAt), 200, 71, { align: 'right' });
         
         pdfDoc.setDrawColor(0, 0, 0);
@@ -192,8 +192,8 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
 
         pdfDoc.setFont('helvetica', 'bold');
         pdfDoc.setTextColor(TEXT_BROWN[0], TEXT_BROWN[1], TEXT_BROWN[2]);
-        pdfDoc.text('PROFORMA INVOCE', 10, 78);
-        pdfDoc.text('To:', 130, 78);
+        pdfDoc.text(`PROFORMA INVOICE:  ${invoice.piNumber || ''}`, 10, 78);
+      //  pdfDoc.text(`To:${customerData.name || customerData.companyName || ''}`, 130, 78);
       };
 
       // Draw Header on Page 1 initial view
@@ -209,7 +209,7 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
 
         return [
           (index + 1).toString(),
-          (item.item?.name || item.category?.name || '').toUpperCase(),
+          (item.item?.name || item.itemname|| item.category?.name || '').toUpperCase(),
           descriptionWithSpace,
           formatCurrency(item.unitPrice),
           item.quantity.toString(),
@@ -283,33 +283,45 @@ export const ProformaInvoicePDFGenerator: React.FC<PDFGeneratorProps> = ({
       }
 
       const subtotalValue = invoice.subtotal || totalPrice;
-      const vatValue = invoice.vat || (subtotalValue * 0.15);
+      const vatValue = invoice.vat || 0;
       const grandTotalValue = invoice.total || (subtotalValue + vatValue);
+const hasVat = vatValue > 0; // Check if VAT exists
 
       doc.setFontSize(10.5);
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
-      const preparerName = invoice.preparedBy?.name || 'System Admin';
+      const preparerName = invoice.preparedBy?.name || '';
       doc.text(`Prepared by : ${preparerName}`, 12, yPosition + 6);
-      doc.text(`${invoice.preparedBy?.phone || '0905 848586'}`, 12, yPosition + 13);
+      doc.text(`${invoice.preparedBy?.phone || ''}`, 12, yPosition + 13);
 
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bolditalic');
       doc.text('Sub Total', 135, yPosition);
       
-      doc.setTextColor(100, 100, 100);
-      doc.text('15 % VAT', 135, yPosition + 8);
-      doc.text('Grand Total', 135, yPosition + 16);
+     if (hasVat) {
+  doc.setTextColor(100, 100, 100);
+  doc.text('15 % VAT', 135, yPosition + 8);
+  doc.text('Grand Total', 135, yPosition + 16);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(formatCurrency(subtotalValue), 200, yPosition, { align: 'right' });
+  
+  doc.setTextColor(100, 100, 100);
+  doc.text(formatCurrency(vatValue), 200, yPosition + 8, { align: 'right' });
+  doc.text(formatCurrency(grandTotalValue), 200, yPosition + 16, { align: 'right' });
+} else {
+  // Without VAT - just show subtotal as grand total
+  doc.text('Grand Total', 135, yPosition + 8);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(formatCurrency(subtotalValue), 200, yPosition, { align: 'right' });
+  doc.text(formatCurrency(grandTotalValue), 200, yPosition + 8, { align: 'right' });
+}
 
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text(formatCurrency(subtotalValue), 200, yPosition, { align: 'right' });
-      
-      doc.setTextColor(100, 100, 100);
-      doc.text(formatCurrency(vatValue), 200, yPosition + 8, { align: 'right' });
-      doc.text(formatCurrency(grandTotalValue), 200, yPosition + 16, { align: 'right' });
-
-      doc.save(`Proforma_Invoice_${invoice.piNumber || 'export'}.pdf`);
+   
+      doc.save(`Proforma_Invoice_${invoice.piNumber || ''}.pdf`);
       toast.success('PDF downloaded successfully');
     } catch (error) {
       console.error('Error generating PDF:', error);

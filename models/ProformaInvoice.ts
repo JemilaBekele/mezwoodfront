@@ -65,7 +65,7 @@ export interface IProformaInvoiceItem {
   invoice?: IProformaInvoice;
 itemId?: string; // Add this - reference to Items table
   item?: IItem; // Add this - relation to Items model
-
+itemname?: string; // Add this - item name field
   categoryId?: string;    // 👈 required now
   category?: IProductCategory; // 👈 optional populated relation
 

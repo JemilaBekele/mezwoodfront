@@ -1,17 +1,13 @@
 import PageContainer from '@/components/layout/page-container';
-import { buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { DataTableSkeleton } from '@/components/ui/table/data-table-skeleton';
 import UserTableAction from '@/features/Employee/components/employee-table-action';
 import { searchParamsCache } from '@/lib/searchparams';
-import { cn } from '@/lib/utils';
-import { IconPlus, IconBriefcase } from '@tabler/icons-react';
-import Link from 'next/link';
+import { IconBriefcase } from '@tabler/icons-react';
+
 import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 
-import { PermissionGuard } from '@/components/PermissionGuard';
-import { PERMISSIONS } from '@/stores/permissions';
 
 import ProjectListingPage from '@/features/Project/listing';
 

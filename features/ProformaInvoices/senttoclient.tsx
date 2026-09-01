@@ -48,7 +48,7 @@ export default function PublicProformaView() {
   if (!invoice || !company) return <div className="p-10 text-center text-slate-500 font-medium">Invoice not found.</div>;
 
   const subtotal = invoice.subtotal || 0;
-  const vat = invoice.vat || (subtotal * 0.15);
+  const vat = invoice.vat || 0;
   const total = invoice.total || (subtotal + vat);
   const customerData = (invoice as any).customer || {};
 
@@ -133,15 +133,15 @@ export default function PublicProformaView() {
         <div className="mt-10">
           <div className="flex justify-between items-end border-b-[3px] border-black pb-1 mb-1">
             <p className="text-[15px] font-medium text-black">
-              To:{customerData.companyName || customerData.name || 'Amsal Resort (Hosana)'}
+              To: {customerData.name  ||customerData.companyName  || ''}
             </p>
             <p className="text-[15px] font-medium text-black">
               {formattedDate}
             </p>
           </div>
           <div className="flex justify-between font-bold text-[15px]" style={{ color: TEXT_BROWN }}>
-            <p>PROFORMA INVOCE</p>
-            <p className="pr-[200px]">To:</p>
+            <p>PROFORMA INVOICE: {invoice.piNumber || ''}</p>
+            {/* <p className="pr-[200px]">To:</p> */}
           </div>
         </div>
 
@@ -161,9 +161,9 @@ export default function PublicProformaView() {
             {invoice.items?.map((item: IProformaInvoiceItem, index: number) => (
               <tr key={index} className="border-b-[3px] border-black">
                 <td className="py-4 align-top font-bold">{index + 1}</td>
-                <td className="py-4 align-top font-bold uppercase">{item.item?.name || 'ITEM'}</td>
+                <td className="py-4 align-top font-bold uppercase">{item.item?.name || item.itemname|| item.category?.name || ''}</td>
                 <td className="py-4 align-top">
-                  <p style={{ color: TEXT_BROWN }}>{item.description || item.size || 'No description'}</p>
+                  <p style={{ color: TEXT_BROWN }}>{item.description || item.size || ''}</p>
                   {item.images?.[0] && (
                     <img 
                       src={normalizeImagePath(item.images[0].imageUrl)} 
@@ -197,10 +197,12 @@ export default function PublicProformaView() {
                 <span>Sub Total</span>
                 <span className="tabular-nums not-italic">{subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between font-bold italic text-gray-500">
-                <span>15 % VAT</span>
-                <span className="tabular-nums not-italic">{vat.toLocaleString()}</span>
-              </div>
+              {vat > 0 && (
+                <div className="flex justify-between font-bold italic text-gray-500">
+                  <span>15 % VAT</span>
+                  <span className="tabular-nums not-italic">{vat.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold italic text-gray-500">
                 <span>Grand Total</span>
                 <span className="tabular-nums not-italic">{total.toLocaleString()}</span>

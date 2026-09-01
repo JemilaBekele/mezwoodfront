@@ -53,7 +53,6 @@ export default async function PurchasePage(props: pageProps) {
        
         </div>
         <Separator />
-                <StageAllocationCalendar stage="DELIVERY" />
 
         <UserTableAction />
 
@@ -65,6 +64,8 @@ export default async function PurchasePage(props: pageProps) {
         >
           <DeliveryProjectListingPage />
         </Suspense>
+                        <StageAllocationCalendar stage="DELIVERY" />
+
       </div>
     </PageContainer>
   );

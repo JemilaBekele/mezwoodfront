@@ -91,6 +91,29 @@ export const projectColumns: ColumnDef<IProject>[] = [
     enableColumnFilter: true
   },
   {
+  accessorKey: 'designBy',
+  header: ({ column }) => (
+    <DataTableColumnHeader column={column} title='Design By' />
+  ),
+  cell: ({ row }) => {
+    const designer = row.original.designBy;
+    const name = designer?.name;
+
+    return (
+      <div className='flex items-center gap-2'>
+        <div className='flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase text-muted-foreground'>
+          {name ? name.charAt(0) : '?'}
+        </div>
+
+        <span className='font-medium'>
+          {name || '-'}
+        </span>
+      </div>
+    );
+  },
+  enableColumnFilter: true,
+},
+  {
     accessorKey: 'status',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Status' />

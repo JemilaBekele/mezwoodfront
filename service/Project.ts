@@ -43,24 +43,28 @@ interface ProjectStatisticsResponse {
 
 // Get all projects (with filtering & pagination)
 export const getProjects = async (params?: {
-  page?: number;
-  limit?: number;
+  startDate?: string;
+  endDate?: string;
+
   search?: string;
   status?: ProjectStatus;
   customerId?: string;
+  designById?:string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }) => {
   try {
     const response = await axiosInstance.get<ProjectsResponse>(`/projects`, {
       params: {
-        page: params?.page || 1,
-        limit: params?.limit || 10,
+     
         search: params?.search || '',
         status: params?.status,
         customerId: params?.customerId,
+        designById: params?.designById,
         sortBy: params?.sortBy || 'createdAt',
-        sortOrder: params?.sortOrder || 'desc'
+        sortOrder: params?.sortOrder || 'desc',
+        startDate: params?.startDate,
+        endDate: params?.endDate
       }
     });
 

@@ -24,6 +24,9 @@ import {
   BarChart3,
   CheckCheck,
   XCircle,
+  User,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 import { DataTable } from "@/components/ui/table/newdatatable";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
@@ -32,7 +35,17 @@ import { getProjects } from "@/service/Project";
 import { projectColumns } from "./tables/columns";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { IProject, ProjectStatus, DesignStatus, DifficultyLevel } from "@/models/Projects";
+import { IEmployee } from "@/models/employee";
+import * as XLSX from 'xlsx';
 
 type ProjectListingPageProps = object;
 
@@ -178,14 +191,23 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
   const statusFilter = searchParams.get("status") || "all";
   const designStatusFilter = searchParams.get("designStatus") || "all";
   const difficultyFilter = searchParams.get("difficulty") || "all";
+  const designerFilter = searchParams.get("designer") || "all";
+  
+  // ── Date filters ──────────────────────────────────────────────
+  const startDateParam = searchParams.get("startDate");
+  const endDateParam = searchParams.get("endDate");
+  const startDate = startDateParam ? new Date(startDateParam) : null;
+  const endDate = endDateParam ? new Date(endDateParam) : null;
 
   const [projects, setProjects] = useState<IProject[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"status" | "design" | "difficulty">("status");
+  const [exporting, setExporting] = useState(false);
+  const [designers, setDesigners] = useState<IEmployee[]>([]);
 
-  // ── Load Projects (without search - we'll filter client-side) ──
+  // ── Load Projects ──
   useEffect(() => {
     let cancelled = false;
 
@@ -195,16 +217,21 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
         setError(null);
 
         // Don't send search to API - we'll handle it client-side
-        const response = await getProjects({
-          page,
-          limit,
-          // search is intentionally omitted
-        });
+        const response = await getProjects();
 
         if (cancelled) return;
 
         setProjects(response.projects || []);
         setTotalCount(response.totalCount || 0);
+        
+        // Extract unique designers from projects
+        const uniqueDesigners = response.projects
+          ?.filter((p: IProject) => p.designBy)
+          .map((p: IProject) => p.designBy as IEmployee)
+          .filter((designer: IEmployee, index: number, self: IEmployee[]) => 
+            self.findIndex((d: IEmployee) => d.id === designer.id) === index
+          ) || [];
+        setDesigners(uniqueDesigners);
       } catch (err) {
         console.error("Error loading projects:", err);
 
@@ -223,7 +250,124 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [page, limit]); // Remove search from dependencies
+  }, [page, limit]);
+
+  // ── Export Projects ──────────────────────────────────────────
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      
+      // Get filtered data based on current filters
+      const filteredProjects = projects.filter((project) => {
+        // Status filter
+        if (statusFilter !== "all" && project.status !== statusFilter) return false;
+        
+        // Design status filter
+        if (designStatusFilter !== "all" && project.designStatus !== designStatusFilter) return false;
+        
+        // Difficulty filter
+        if (difficultyFilter !== "all" && project.difficulty !== difficultyFilter) return false;
+        
+        // Designer filter
+        if (designerFilter !== "all" && project.designById !== designerFilter) return false;
+        
+        // Date range filter - filter by createdAt
+        if (startDate || endDate) {
+          const projectDate = project.createdAt ? new Date(project.createdAt) : null;
+          if (!projectDate) return false;
+          
+          // Set time to start of day for proper comparison
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            if (projectDate < start) return false;
+          }
+          
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            if (projectDate > end) return false;
+          }
+        }
+        
+        // Search filter
+        if (search) {
+          const s = search.toLowerCase().trim();
+          if (s === '') return true;
+          
+          const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
+          const customerName = project.customer?.name || '';
+          const statusText = getStatusDisplayText(project.status);
+          const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
+          const difficultyText = getDifficultyDisplayText(project.difficulty);
+          const designerName = project.designBy?.name || '';
+          
+          const match =
+            String(invoiceNumber).toLowerCase().includes(s) ||
+            String(customerName).toLowerCase().includes(s) ||
+            statusText.toLowerCase().includes(s) ||
+            designStatusText.toLowerCase().includes(s) ||
+            difficultyText.toLowerCase().includes(s) ||
+            designerName.toLowerCase().includes(s);
+          
+          if (!match) return false;
+        }
+        
+        return true;
+      });
+
+      if (filteredProjects.length === 0) {
+        setError("No projects to export. Please adjust your filters.");
+        return;
+      }
+
+      // Prepare data for Excel
+      const exportData = filteredProjects.map((project) => ({
+        'Invoice Number': project.invoice?.piNumber || project.invoice?.id || '',
+        'Customer Name': project.customer?.name || '',
+                'Requested Delivery': project.requestedDelivery ? new Date(project.requestedDelivery).toLocaleDateString() : '',
+        'Status': getStatusDisplayText(project.status),
+        'Designer': project.designBy?.name || '',
+        'Created By': project.createdBy?.name || '',
+        'Created At': project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '',
+        'Updated At': project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : '',
+        'Total Project Quantity': project.totalProjectQuantity || 0,
+        'Total Days': project.totalDays || 0,
+        'Calculated Delivery': project.calculatedDelivery ? new Date(project.calculatedDelivery).toLocaleDateString() : '',
+               'Design Status': getDesignStatusDisplayText(project.designStatus || ''),
+        'Difficulty': getDifficultyDisplayText(project.difficulty),
+      }));
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // Auto-size columns (optional)
+      const maxWidth = 20;
+      const wscols = Object.keys(exportData[0] || {}).map(() => ({ wch: maxWidth }));
+      worksheet['!cols'] = wscols;
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Projects');
+      
+      // Generate file and download
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `projects_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+    } catch (err) {
+      console.error("Error exporting projects:", err);
+      setError("Failed to export projects. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ── Helpers ──────────────────────────────────────────────────
   const getStatusDisplayText = useCallback((status: string): string => {
@@ -239,7 +383,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
   }, []);
 
   const buildQueryStringLocal = useCallback(
-    (params: { status?: string; designStatus?: string; difficulty?: string; page?: string }) => {
+    (params: { status?: string; designStatus?: string; difficulty?: string; designer?: string; page?: string }) => {
       const urlParams = new URLSearchParams();
       if (search) urlParams.set("q", search);
       urlParams.set("page", params.page || "1");
@@ -247,13 +391,19 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       urlParams.set("status", params.status || statusFilter);
       urlParams.set("designStatus", params.designStatus || designStatusFilter);
       urlParams.set("difficulty", params.difficulty || difficultyFilter);
+      urlParams.set("designer", params.designer || designerFilter);
+      
+      // Preserve date filters
+      if (startDateParam) urlParams.set("startDate", startDateParam);
+      if (endDateParam) urlParams.set("endDate", endDateParam);
+      
       return `?${urlParams.toString()}`;
     },
-    [search, limit, statusFilter, designStatusFilter, difficultyFilter]
+    [search, limit, statusFilter, designStatusFilter, difficultyFilter, designerFilter, startDateParam, endDateParam]
   );
 
   const buildFilterUrl = useCallback(
-    (filterType: "status" | "designStatus" | "difficulty", value: string) => {
+    (filterType: "status" | "designStatus" | "difficulty" | "designer", value: string) => {
       const params: any = { page: "1" };
       params[filterType] = value;
       return buildQueryStringLocal(params);
@@ -287,13 +437,15 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       const statusText = getStatusDisplayText(project.status);
       const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
       const difficultyText = getDifficultyDisplayText(project.difficulty);
+      const designerName = project.designBy?.name || '';
       
       const match =
         String(invoiceNumber).toLowerCase().includes(s) ||
         String(customerName).toLowerCase().includes(s) ||
         statusText.toLowerCase().includes(s) ||
         designStatusText.toLowerCase().includes(s) ||
-        difficultyText.toLowerCase().includes(s);
+        difficultyText.toLowerCase().includes(s) ||
+        designerName.toLowerCase().includes(s);
       
       if (!match) return false;
     }
@@ -306,6 +458,28 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
 
     // Difficulty filter
     if (difficultyFilter !== "all" && project.difficulty !== difficultyFilter) return false;
+
+    // Designer filter
+    if (designerFilter !== "all" && project.designById !== designerFilter) return false;
+
+    // ── Date range filter ──────────────────────────────────────
+    if (startDate || endDate) {
+      const projectDate = project.createdAt ? new Date(project.createdAt) : null;
+      if (!projectDate) return false;
+      
+      // Set time to start of day for proper comparison
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (projectDate < start) return false;
+      }
+      
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (projectDate > end) return false;
+      }
+    }
 
     return true;
   });
@@ -344,7 +518,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
   const total = projects.length;
   const filteredCount = filteredData.length;
   const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
-  const hasFilter = statusFilter !== "all" || designStatusFilter !== "all" || difficultyFilter !== "all";
+  const hasFilter = statusFilter !== "all" || designStatusFilter !== "all" || difficultyFilter !== "all" || designerFilter !== "all" || !!startDate || !!endDate;
 
   // ── Get counts for tab badges ──────────────────────────────
   const getTabBadge = (tabKey: "status" | "design" | "difficulty") => {
@@ -365,9 +539,66 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     return "";
   };
 
+  // ── Format date for display ──────────────────────────────────
+  const formatDateDisplay = (date: Date | null): string => {
+    if (!date) return '';
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
   // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+      {/* ── Header with Designer Filter and Export ────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={designerFilter}
+              onValueChange={(value) => {
+                const url = buildFilterUrl("designer", value);
+                window.location.href = url;
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Designers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Designers</SelectItem>
+                {designers.map((designer) => {
+                  const designerId = designer.id ?? designer.name ?? "unknown-designer";
+
+                  return (
+                    <SelectItem key={designerId} value={designerId}>
+                      {designer.name}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <Button
+          onClick={handleExport}
+          disabled={exporting || projects.length === 0}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          {exporting ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          ) : (
+            <FileSpreadsheet className="h-4 w-4" />
+          )}
+          <span>Export to Excel</span>
+        </Button>
+      </div>
+
       {/* ── Tabs ───────────────────────────────────────────────── */}
       <Tabs 
         defaultValue="status" 
@@ -489,12 +720,27 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
                 Difficulty: {getDifficultyDisplayText(difficultyFilter)}
               </Badge>
             )}
+            {designerFilter !== "all" && (
+              <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+                Designer: {projects.find(p => p.designById === designerFilter)?.designBy?.name || designerFilter}
+              </Badge>
+            )}
+            {startDate && (
+              <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+                From: {formatDateDisplay(startDate)}
+              </Badge>
+            )}
+            {endDate && (
+              <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+                To: {formatDateDisplay(endDate)}
+              </Badge>
+            )}
             <span className="text-xs text-muted-foreground">
               ({filteredCount} results)
             </span>
           </div>
           <Link
-            href={buildQueryStringLocal({ status: "all", designStatus: "all", difficulty: "all", page: "1" })}
+            href={buildQueryStringLocal({ status: "all", designStatus: "all", difficulty: "all", designer: "all", page: "1" })}
             className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X className="h-3 w-3" />
@@ -533,6 +779,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
           statusFilter={statusFilter}
           designStatusFilter={designStatusFilter}
           difficultyFilter={difficultyFilter}
+          designerFilter={designerFilter}
         />
       )}
     </div>
