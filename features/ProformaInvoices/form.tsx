@@ -2015,28 +2015,50 @@ const ConfirmationModal = ({
                 )}
             </FormLabel>
             <FormControl>
-              <Input
-  type="number"
+<Input
+  type="text"
   inputMode="decimal"
-  step="0.01"
-  min="0"
-  max="999999999.99"
   placeholder="0.00"
-  value={field.value ?? ''}
+  value={field.value !== undefined && field.value !== null
+    ? formatDecimal(field.value, 2)
+    : ''
+  }
   onChange={(e) => {
     const value = e.target.value;
 
-    // Allow empty input
-    if (value === '') {
+    // Remove commas
+    const raw = value.replace(/,/g, '');
+
+    // Allow only numbers and decimal point
+    if (!/^\d*\.?\d*$/.test(raw)) {
+      return;
+    }
+
+    // Prevent multiple decimal points
+    const parts = raw.split('.');
+    if (parts.length > 2) {
+      return;
+    }
+
+    // Maximum 2 decimal places
+    if (parts[1] && parts[1].length > 2) {
+      return;
+    }
+
+    // Allow empty value
+    if (raw === '') {
       field.onChange(0);
       calculateItemAmount(itemIndex);
       return;
     }
 
-    const numericValue = parseFloat(value);
+    const numericValue = parseFloat(raw);
 
-    if (isNaN(numericValue)) return;
+    if (isNaN(numericValue)) {
+      return;
+    }
 
+    // Maximum value
     if (numericValue > 999999999.99) {
       toast.error('Maximum unit price is 999,999,999.99');
       return;
@@ -2060,15 +2082,15 @@ const ConfirmationModal = ({
       field.onChange(Number(currentValue.toFixed(2)));
     }
   }}
-  className={`font-mono ${
-    priceAutoFilled.get(itemIndex)
-      ? 'border-green-300 focus-visible:ring-green-500'
-      : ''
-  } ${
-    fieldState.error
-      ? 'border-red-500 focus-visible:ring-red-500'
-      : ''
-  }`}
+className={`h-10 text-sm font-mono ${
+  priceAutoFilled.get(itemIndex)
+    ? 'border-green-300 focus-visible:ring-green-500'
+    : ''
+} ${
+  fieldState.error
+    ? 'border-red-500 focus-visible:ring-red-500'
+    : ''
+}`}
 />
             </FormControl>
             <FormMessage />
