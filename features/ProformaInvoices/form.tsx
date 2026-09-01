@@ -2015,83 +2015,64 @@ const ConfirmationModal = ({
                 )}
             </FormLabel>
             <FormControl>
-<Input
-  type="text"
-  inputMode="decimal"
-  placeholder="0.00"
-  value={field.value !== undefined && field.value !== null
-    ? formatDecimal(field.value, 2)
-    : ''
-  }
-  onChange={(e) => {
-    const value = e.target.value;
+<div>
+  <Input
+    type="number"
+    inputMode="decimal"
+    step="0.01"
+    min="0"
+    max="999999999.99"
+    placeholder="0.00"
+    value={field.value ?? ''}
+    onChange={(e) => {
+      const value = e.target.value;
 
-    // Remove commas
-    const raw = value.replace(/,/g, '');
+      if (value === '') {
+        field.onChange(0);
+        calculateItemAmount(itemIndex);
+        return;
+      }
 
-    // Allow only numbers and decimal point
-    if (!/^\d*\.?\d*$/.test(raw)) {
-      return;
-    }
+      const numericValue = parseFloat(value);
 
-    // Prevent multiple decimal points
-    const parts = raw.split('.');
-    if (parts.length > 2) {
-      return;
-    }
+      if (isNaN(numericValue)) return;
 
-    // Maximum 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      return;
-    }
+      if (numericValue > 999999999.99) {
+        toast.error('Maximum unit price is 999,999,999.99');
+        return;
+      }
 
-    // Allow empty value
-    if (raw === '') {
-      field.onChange(0);
+      field.onChange(numericValue);
       calculateItemAmount(itemIndex);
-      return;
-    }
 
-    const numericValue = parseFloat(raw);
+      if (priceAutoFilled.get(itemIndex)) {
+        setPriceAutoFilled((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(itemIndex);
+          return newMap;
+        });
+      }
+    }}
+    onBlur={() => {
+      const currentValue = Number(field.value || 0);
 
-    if (isNaN(numericValue)) {
-      return;
-    }
+      if (currentValue > 0) {
+        field.onChange(Number(currentValue.toFixed(2)));
+      }
+    }}
+    className={`h-10 font-mono ${
+      priceAutoFilled.get(itemIndex)
+        ? 'border-green-300 focus-visible:ring-green-500'
+        : ''
+    } ${
+      fieldState.error
+        ? 'border-red-500 focus-visible:ring-red-500'
+        : ''
+    }`}
+  />
 
-    // Maximum value
-    if (numericValue > 999999999.99) {
-      toast.error('Maximum unit price is 999,999,999.99');
-      return;
-    }
 
-    field.onChange(numericValue);
-    calculateItemAmount(itemIndex);
-
-    if (priceAutoFilled.get(itemIndex)) {
-      setPriceAutoFilled((prev) => {
-        const newMap = new Map(prev);
-        newMap.delete(itemIndex);
-        return newMap;
-      });
-    }
-  }}
-  onBlur={() => {
-    const currentValue = Number(field.value || 0);
-
-    if (currentValue > 0) {
-      field.onChange(Number(currentValue.toFixed(2)));
-    }
-  }}
-className={`h-10 text-sm font-mono ${
-  priceAutoFilled.get(itemIndex)
-    ? 'border-green-300 focus-visible:ring-green-500'
-    : ''
-} ${
-  fieldState.error
-    ? 'border-red-500 focus-visible:ring-red-500'
-    : ''
-}`}
-/>
+</div>
             </FormControl>
             <FormMessage />
             {field.value > 999999 && (

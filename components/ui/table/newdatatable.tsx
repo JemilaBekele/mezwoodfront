@@ -66,7 +66,7 @@ export function DataTable<TData, TValue>({
     'limit',
     parseAsInteger
       .withOptions({ shallow: false, history: 'push' })
-      .withDefault(20)
+      .withDefault(10)
   );
 
   const paginationState = {
