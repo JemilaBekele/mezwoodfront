@@ -2015,58 +2015,61 @@ const ConfirmationModal = ({
                 )}
             </FormLabel>
             <FormControl>
-                <Input
-                    type="text"  // Changed to "text" for better formatting control
-                    inputMode="decimal"  // Shows decimal keyboard on mobile
-                    placeholder="0.00"
-                    value={field.value ? formatDecimal(field.value, 2) : ''}
-                    onChange={(e) => {
-                        // Remove commas and non-numeric characters except decimal point
-                        const raw = e.target.value.replace(/,/g, '').replace(/[^0-9.]/g, '');
-                        
-                        // Prevent multiple decimal points
-                        const parts = raw.split('.');
-                        if (parts.length > 2) return;
-                        
-                        // Limit decimal places to 2
-                        if (parts[1] && parts[1].length > 2) return;
-                        
-                        // Convert to number
-                        const numericValue = parseFloat(raw) || 0;
-                        
-                        // Check for maximum value
-                        if (numericValue > 999999999.99) {
-                            toast.error('Maximum unit price is 999,999,999.99');
-                            return;
-                        }
-                        
-                        field.onChange(numericValue);
-                        calculateItemAmount(itemIndex);
-                        
-                        if (priceAutoFilled.get(itemIndex)) {
-                            setPriceAutoFilled((prev) => {
-                                const newMap = new Map(prev);
-                                newMap.delete(itemIndex);
-                                return newMap;
-                            });
-                        }
-                    }}
-                    onBlur={() => {
-                        // Format the value when user leaves the field
-                        const currentValue = field.value || 0;
-                        if (currentValue > 0) {
-                            // Ensure proper decimal places
-                            field.onChange(parseFloat(currentValue.toFixed(2)));
-                        }
-                    }}
-                    className={`font-mono ${
-                        priceAutoFilled.get(itemIndex)
-                            ? "border-green-300 focus-visible:ring-green-500"
-                            : ""
-                    } ${
-                        fieldState.error ? "border-red-500 focus-visible:ring-red-500" : ""
-                    }`}
-                />
+              <Input
+  type="number"
+  inputMode="decimal"
+  step="0.01"
+  min="0"
+  max="999999999.99"
+  placeholder="0.00"
+  value={field.value ?? ''}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    // Allow empty input
+    if (value === '') {
+      field.onChange(0);
+      calculateItemAmount(itemIndex);
+      return;
+    }
+
+    const numericValue = parseFloat(value);
+
+    if (isNaN(numericValue)) return;
+
+    if (numericValue > 999999999.99) {
+      toast.error('Maximum unit price is 999,999,999.99');
+      return;
+    }
+
+    field.onChange(numericValue);
+    calculateItemAmount(itemIndex);
+
+    if (priceAutoFilled.get(itemIndex)) {
+      setPriceAutoFilled((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(itemIndex);
+        return newMap;
+      });
+    }
+  }}
+  onBlur={() => {
+    const currentValue = Number(field.value || 0);
+
+    if (currentValue > 0) {
+      field.onChange(Number(currentValue.toFixed(2)));
+    }
+  }}
+  className={`font-mono ${
+    priceAutoFilled.get(itemIndex)
+      ? 'border-green-300 focus-visible:ring-green-500'
+      : ''
+  } ${
+    fieldState.error
+      ? 'border-red-500 focus-visible:ring-red-500'
+      : ''
+  }`}
+/>
             </FormControl>
             <FormMessage />
             {field.value > 999999 && (
