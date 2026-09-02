@@ -13,15 +13,14 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { updateProformaInvoiceseco } from '@/service/ProformaInvoice';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { createProformaInvoice, updateProformaInvoiceseco } from '@/service/ProformaInvoice';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { IProformaInvoice, IProformaInvoiceItem, IProformaItemMaterial } from '@/models/ProformaInvoice';
+import { IAttachment, IProformaInvoice, IProformaInvoiceItem } from '@/models/ProformaInvoice';
 import { Textarea } from '@/components/ui/textarea';
-import Select from 'react-select';
-import { ArrowLeft, Upload, Download, Image as ImageIcon, Package, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Download, Image as ImageIcon, Package, Eye, RefreshCw, X, Check, AlertCircle, CheckSquare } from 'lucide-react';
 import { getCustomer } from '@/service/customer';
 import { getMaterials } from '@/service/material';
 import { getAllItemsimple } from '@/service/item';
@@ -47,11 +46,15 @@ interface ProformaInvoiceFormValues {
   store?: boolean;
 }
 
-interface SelectOption {
-  value: string;
-  label: string;
-}
 
+
+const formatDecimal = (value: number | undefined, decimals: number = 2): string => {
+    if (value === undefined || value === null) return '';
+    return value.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+};
 interface ProformaInvoiceFormProps {
   initialData: IProformaInvoice | null;
   pageTitle: string;
@@ -78,8 +81,11 @@ const safeString = (value: any): string => {
   if (!value) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'object') {
+    // If it has a 'name' property, use that
     if (value.name && typeof value.name === 'string') return value.name;
+    // If it has a 'id' property, use that as fallback
     if (value.id && typeof value.id === 'string') return value.id;
+    // Otherwise convert to string or return empty
     try {
       return JSON.stringify(value);
     } catch {
@@ -98,28 +104,32 @@ export default function ProformaInvoiceForm({
   const [customers, setCustomers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
-  const [attachments, setAttachments] = useState<File[]>([]);
   const [itemImages, setItemImages] = useState<Map<number, ImageFileWithPreview[]>>(new Map());
   const [isFetchingItems, setIsFetchingItems] = useState(false);
   const [priceAutoFilled, setPriceAutoFilled] = useState<Map<number, boolean>>(new Map());
   const [isStore, setIsStore] = useState<boolean>(initialData?.store || false);
   const [selectedItemIds, setSelectedItemIds] = useState<Map<number, string>>(new Map());
+  // Track which items have auto-filled size (to disable manual size input)
   const [sizeAutoFilled, setSizeAutoFilled] = useState<Map<number, boolean>>(new Map());
-
+// Add this state near your other state declarations
+const [existingAttachments, setExistingAttachments] = useState<IAttachment[]>([]);
+const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]);
+const [newAttachments, setNewAttachments] = useState<File[]>([]);
+  // Hierarchical data states
   const [categories, setCategories] = useState<IProductCategory[]>([]);
   const [sizes, setSizes] = useState<ISize[]>([]);
   const [types, setTypes] = useState<IProductType[]>([]);
   const [filteredItems, setFilteredItems] = useState<Map<number, any[]>>(new Map());
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+const [confirmationData, setConfirmationData] = useState<ProformaInvoiceFormValues | null>(null);
 
   const [selectedMaterialImage, setSelectedMaterialImage] = useState<string | null>(null);
-  const [showMaterialImageModal, setShowMaterialImageModal] = useState(false);
-  const [materialImageMap, setMaterialImageMap] = useState<Map<string, string>>(new Map());
+const [showMaterialImageModal, setShowMaterialImageModal] = useState(false);
+const [materialImageMap, setMaterialImageMap] = useState<Map<string, string>>(new Map());
 
+  // Track hierarchical selection per item row
   const [hierarchicalSelections, setHierarchicalSelections] = useState<Map<number, HierarchicalSelection>>(new Map());
-  
-  // Check if we're in edit mode
-  const isEditMode = !!initialData?.id;
   
   const defaultValues = useMemo<ProformaInvoiceFormValues>(
     () => ({
@@ -132,6 +142,7 @@ export default function ProformaInvoiceForm({
       amountDate: initialData?.amountDate || new Date(),
       store: initialData?.store || false,
       items: initialData?.items?.map((item) => {
+        // Safely extract description and size as strings
         const description = safeString(item.description);
         const size = safeString(item.size);
         
@@ -139,8 +150,9 @@ export default function ProformaInvoiceForm({
           id: item.id || '',
           invoiceId: item.invoiceId || '',
           itemId: item.itemId || '',
-          categoryId: item.categoryId || '',
+                    categoryId: item.categoryId || '',
           description: description,
+          itemname: item.itemname || '',
           size: size,
           quantity: item.quantity || 1,
           unitPrice: item.unitPrice || 0,
@@ -156,77 +168,165 @@ export default function ProformaInvoiceForm({
           })) || [],
           images: item.images || []
         };
-      }) || [],
+      }) || [
+        {
+          id: '',
+          invoiceId: '',
+          itemId: '',
+          categoryId: '',
+          itemname: '',
+          description: '',
+          size: '',
+          quantity: 1,
+          unitPrice: 0,
+          amount: 0,
+          additionalDescription: '',
+          materials: [],
+          images: []
+        }
+      ],
       attachments: []
     }),
     [initialData]
   );
 
-  const form = useForm<ProformaInvoiceFormValues>({
-    defaultValues,
-    mode: 'onChange',
-  });
+// Update the resolver to validate materials
+const form = useForm<ProformaInvoiceFormValues>({
+  defaultValues,
+  mode: 'onChange',
+  resolver: async (data) => {
+    const errors: any = {};
+    
+    // Validate each item
+    if (data.items && data.items.length > 0) {
+      data.items.forEach((item, index) => {
+        // Get the categoryId from hierarchical selections
+        const selection = hierarchicalSelections.get(index);
+        const categoryId = selection?.categoryId || '';
+        
+        // Category is mandatory
+        if (!categoryId || categoryId === '') {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            categoryId: {
+              type: 'required',
+              message: 'Category is required'
+            }
+          };
+        }
+        
+        // Description is required
+        if (!item.description || item.description.trim() === '') {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            description: {
+              type: 'required',
+              message: 'Description is required'
+            }
+          };
+        }
+        
+        // Unit Price is required (must be > 0)
+        if (!item.unitPrice || item.unitPrice <= 0) {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            unitPrice: {
+              type: 'required',
+              message: 'Unit price must be greater than 0'
+            }
+          };
+        }
+        
+        // ✅ At least one material is required
+        const materials = item.materials || [];
+        const hasValidMaterial = materials.some(m => m.materialId && m.materialId !== '');
+        
+        if (!hasValidMaterial) {
+          if (!errors.items) errors.items = [];
+          errors.items[index] = {
+            ...errors.items[index],
+            materials: {
+              type: 'required',
+              message: 'At least one material is required'
+            }
+          };
+        }
+      });
+    }
+    
+    return {
+      values: data,
+      errors: errors
+    };
+  }
+});
 
-  const { fields: itemFields } = useFieldArray({
+  const { fields: itemFields, append: appendItem, remove: removeItem } = useFieldArray({
     control: form.control,
     name: 'items'
   });
-
-  const getMaterialImage = useCallback(async (materialId: string) => {
-    if (!materialId) return;
-    
-    if (materialImageMap.has(materialId)) {
-      return;
-    }
-    
-    try {
-      const material = materials.find(m => m.id === materialId);
-      if (material?.imageUrl) {
-        const normalizedUrl = normalizeImagePath(material.imageUrl);
-        if (normalizedUrl) {
-          setMaterialImageMap(prev => {
-            const newMap = new Map(prev);
-            newMap.set(materialId, normalizedUrl);
-            return newMap;
-          });
-        }
+const getMaterialImage = useCallback(async (materialId: string) => {
+  if (!materialId) return;
+  
+  // Check if we already have the image in cache
+  if (materialImageMap.has(materialId)) {
+    return;
+  }
+  
+  try {
+    const material = materials.find(m => m.id === materialId);
+    if (material?.imageUrl) {
+      const normalizedUrl = normalizeImagePath(material.imageUrl);
+      if (normalizedUrl) {
+        setMaterialImageMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(materialId, normalizedUrl);
+          return newMap;
+        });
       }
-    } catch (error) {
-      console.error('Failed to load material image:', error);
     }
-  }, [materials, materialImageMap]);
-
- const calculateTotals = useCallback(() => {
+  } catch (error) {
+    console.error('Failed to load material image:', error);
+  }
+}, [materials, materialImageMap]);
+const calculateTotals = useCallback(() => {
     const itemsList = form.getValues('items');
-    const subtotal = itemsList.reduce((sum, item) => sum + (item.amount || 0), 0);
+    // Use toFixed(2) to maintain 2 decimal precision
+    const subtotal = parseFloat(
+        itemsList.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)
+    );
 
     const vatApplied = form.getValues('vatApplied');
-    const vatPercent = form.getValues('vatPercent') || 15;
+    const vatPercent = parseFloat((form.getValues('vatPercent') || 15).toString());
 
-    const vat = vatApplied ? subtotal * (vatPercent / 100) : 0;
-    const total = subtotal + vat;
+    const vat = vatApplied ? parseFloat((subtotal * (vatPercent / 100)).toFixed(2)) : 0;
+    const total = parseFloat((subtotal + vat).toFixed(2));
 
     form.setValue('subtotal', subtotal);
     form.setValue('vat', vat);
     form.setValue('total', total);
 
     if (vatApplied) {
-      form.setValue('vatPercent', 15);
+        form.setValue('vatPercent', 15);
     }
-  }, [form]);
-  const calculateItemAmount = useCallback((index: number) => {
-    const quantity = form.getValues(`items.${index}.quantity`);
-    const unitPrice = form.getValues(`items.${index}.unitPrice`);
-    const amount = quantity * unitPrice;
+}, [form]);
+const calculateItemAmount = useCallback((index: number) => {
+    const quantity = form.getValues(`items.${index}.quantity`) || 0;
+    const unitPrice = form.getValues(`items.${index}.unitPrice`) || 0;
+    // Round to 2 decimal places
+    const amount = parseFloat((quantity * unitPrice).toFixed(2));
     form.setValue(`items.${index}.amount`, amount);
     calculateTotals();
-  }, [calculateTotals, form]);
+}, [calculateTotals, form]);
 
-  // Initialize item images from initial data
+
 // Initialize hierarchical selections from existing items when editing
 useEffect(() => {
-  // Check if we have the items data and categories loaded
-  if (initialData?.items && initialData.items.length > 0 && categories.length > 0) {
+  // Check if we have both the items data and the hierarchical data loaded
+  if (initialData?.items && initialData.items.length > 0 && items.length > 0 && categories.length > 0) {
     const newHierarchicalSelections = new Map<number, HierarchicalSelection>();
     
     initialData.items.forEach((item, index) => {
@@ -236,73 +336,69 @@ useEffect(() => {
         fullItem = items.find(i => i.id === item.itemId);
       }
       
-      // Get category ID from the item data first, then from fullItem
+      // Get category ID from the item data (not from fullItem)
+      // The item data should have categoryId directly
       const categoryId = item.categoryId || fullItem?.categoryId || '';
       
-      // Get size and type from fullItem or use empty string
+      // Get size from the item data
       const sizeId = fullItem?.sizeId || '';
+      
+      // Get type from the item data
       const typeId = fullItem?.typeId || '';
       
-      // CRITICAL: Always set the selection, even if there's no fullItem
-      newHierarchicalSelections.set(index, {
-        categoryId: categoryId,
-        sizeId: sizeId,
-        typeId: typeId,
-        selectedItem: fullItem || null
-      });
-      
-      // If we have a category ID but no fullItem, we still need to show the category
-      // This is the case where only a category was selected without a specific item
-      if (categoryId && !fullItem) {
-        console.log(`Item ${index} has category ${categoryId} but no specific item`);
-        // The category should now display in the dropdown
-      }
-      
-      if (fullItem) {
-        setSelectedItemIds(prev => {
-          const newMap = new Map(prev);
-          newMap.set(index, fullItem.id);
-          return newMap;
+      if (categoryId) {
+        newHierarchicalSelections.set(index, {
+          categoryId: categoryId,
+          sizeId: sizeId,
+          typeId: typeId,
+          selectedItem: fullItem || null
         });
         
-        // Set description from the item
-        const itemName = safeString(fullItem.name);
-        form.setValue(`items.${index}.description`, itemName);
-        
-        // Set size from the item
-        if (fullItem.size) {
-          const sizeValue = safeString(fullItem.size);
-          form.setValue(`items.${index}.size`, sizeValue);
-          setSizeAutoFilled(prev => {
+        if (fullItem) {
+          setSelectedItemIds(prev => {
             const newMap = new Map(prev);
-            newMap.set(index, true);
+            newMap.set(index, fullItem.id);
             return newMap;
           });
-        }
-        
-        // Set price
-        if (fullItem.price && fullItem.price > 0) {
-          form.setValue(`items.${index}.unitPrice`, fullItem.price);
-          setPriceAutoFilled(prev => {
-            const newMap = new Map(prev);
-            newMap.set(index, true);
-            return newMap;
-          });
-          calculateItemAmount(index);
+          
+          // Set description from the item
+          const itemName = safeString(fullItem.name);
+          form.setValue(`items.${index}.description`, itemName);
+          
+          // Set size from the item
+          if (fullItem.size) {
+            const sizeValue = safeString(fullItem.size);
+            form.setValue(`items.${index}.size`, sizeValue);
+            setSizeAutoFilled(prev => {
+              const newMap = new Map(prev);
+              newMap.set(index, true);
+              return newMap;
+            });
+          }
+          
+          // Set price
+          if (fullItem.price && fullItem.price > 0) {
+            form.setValue(`items.${index}.unitPrice`, fullItem.price);
+            setPriceAutoFilled(prev => {
+              const newMap = new Map(prev);
+              newMap.set(index, true);
+              return newMap;
+            });
+            calculateItemAmount(index);
+          }
         }
       } else {
-        // If no fullItem, but we have a category, we need to make sure the form has the categoryId
-        if (categoryId) {
-          // The category is already set in the hierarchical selection
-          // The form already has the categoryId from defaultValues
-          console.log(`Category ${categoryId} set for item ${index} without specific item`);
-        }
+        // If no category, check if we have it from the selection
+        // But the category should be in the item data
+        console.warn('No category found for item', index);
       }
     });
     
     setHierarchicalSelections(newHierarchicalSelections);
   }
-}, [initialData, items, categories, form, calculateItemAmount]);
+}, [initialData, items, categories, form, calculateItemAmount]); // Add categories to dependencies
+
+// Initialize item images from existing data
 useEffect(() => {
   if (initialData?.items) {
     const newItemImages = new Map<number, ImageFileWithPreview[]>();
@@ -322,6 +418,7 @@ useEffect(() => {
     setItemImages(newItemImages);
   }
 }, [initialData]);
+  // Fetch data on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -358,78 +455,47 @@ useEffect(() => {
       setIsFetchingItems(false);
     }
   };
-
-  const fetchMultipleMaterialImages = useCallback(async (materialIds: string[]) => {
-    if (!materialIds.length) return;
-    
-    const newIds = materialIds.filter(id => !materialImageMap.has(id));
-    if (!newIds.length) return;
-    
-    newIds.forEach(materialId => {
-      const material = materials.find(m => m.id === materialId);
-      if (material?.imageUrl) {
-        const normalizedUrl = normalizeImagePath(material.imageUrl);
-        if (normalizedUrl) {
-          setMaterialImageMap(prev => {
-            const newMap = new Map(prev);
-            newMap.set(materialId, normalizedUrl);
-            return newMap;
-          });
-        }
+// Add this right after your getMaterialImage function
+const fetchMultipleMaterialImages = useCallback(async (materialIds: string[]) => {
+  if (!materialIds.length) return;
+  
+  // Only fetch images we don't have yet
+  const newIds = materialIds.filter(id => !materialImageMap.has(id));
+  if (!newIds.length) return;
+  
+  // Get images for all materials
+  newIds.forEach(materialId => {
+    const material = materials.find(m => m.id === materialId);
+    if (material?.imageUrl) {
+      const normalizedUrl = normalizeImagePath(material.imageUrl);
+      if (normalizedUrl) {
+        setMaterialImageMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(materialId, normalizedUrl);
+          return newMap;
+        });
       }
-    });
-  }, [materials, materialImageMap]);
+    }
+  });
+}, [materials, materialImageMap]);
+  const refreshItems = async () => {
+    await fetchItems();
+    toast.success('Items refreshed');
+  };
 
-  // Customer options
-  const customerOptions: SelectOption[] = useMemo(
-    () =>
-      customers.map((customer) => ({
-        value: customer.id,
-        label: `${customer.name}`
-      })),
-    [customers]
-  );
 
-  // Material options
-  const materialOptions: SelectOption[] = useMemo(
-    () => [
-      { value: '', label: 'Select a material' },
-      ...materials.map((material) => {
-        const details: string[] = [];
 
-        if (material.color?.trim()) {
-          details.push(material.color);
-        }
 
-        if (material.size?.trim()) {
-          details.push(material.size);
-        }
 
-        if (material.plainMDF) {
-          details.push('Plain MDF');
-        } else if (material.laminatedMDF) {
-          details.push('Laminated MDF');
-        } else if (material.wood) {
-          details.push('Wood');
-        } else if (material.metal) {
-          details.push('Metal');
-        } else if (material.accessory) {
-          details.push('Accessory');
-        } else if (material.other) {
-          details.push('Other');
-        }
 
-        return {
-          value: material.id,
-          label: details.length
-            ? `${material.name} (${details.join(' - ')})`
-            : material.name,
-        };
-      }),
-    ],
-    [materials]
-  );
+// Add this useEffect after your other useEffects
+useEffect(() => {
+  if (initialData?.attachments && initialData.attachments.length > 0) {
+    setExistingAttachments(initialData.attachments);
+  }
+}, [initialData]);
 
+  // Filter items based on selected category, size, and type
   useEffect(() => {
     if (items.length > 0) {
       const newFilteredItems = new Map<number, any[]>();
@@ -457,339 +523,11 @@ useEffect(() => {
     }
   }, [items, hierarchicalSelections]);
 
-  const handleCategoryChange = (itemIndex: number, categoryId: string) => {
-    if (isEditMode) {
-      toast.info('Category cannot be changed in edit mode');
-      return;
-    }
-    
-    const category = categories.find(c => c.id === categoryId);
-    if (!category) return;
 
-    setHierarchicalSelections(prev => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(itemIndex) || {
-        categoryId: '',
-        sizeId: '',
-        typeId: '',
-        selectedItem: null
-      };
-      newMap.set(itemIndex, {
-        ...existing,
-        categoryId: categoryId,
-        sizeId: '',
-        typeId: '',
-        selectedItem: null
-      });
-      return newMap;
-    });
 
-    form.setValue(`items.${itemIndex}.description`, '');
-    form.setValue(`items.${itemIndex}.unitPrice`, 0);
-    form.setValue(`items.${itemIndex}.size`, '');
-    form.setValue(`items.${itemIndex}.itemId`, '');
-    
-    setSelectedItemIds(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
-    
-    setPriceAutoFilled(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
 
-    setSizeAutoFilled(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
-  };
 
-  const handleSizeChange = (itemIndex: number, sizeId: string) => {
-    if (isEditMode) {
-      toast.info('Size cannot be changed in edit mode');
-      return;
-    }
-    
-    if (sizeAutoFilled.get(itemIndex)) {
-      toast.info('Size is auto-filled from selected item. Clear the item to change size.');
-      return;
-    }
 
-    const size = sizes.find(s => s.id === sizeId);
-    if (!size) return;
-
-    setHierarchicalSelections(prev => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(itemIndex) || {
-        categoryId: '',
-        sizeId: '',
-        typeId: '',
-        selectedItem: null
-      };
-      newMap.set(itemIndex, {
-        ...existing,
-        sizeId: sizeId,
-        typeId: '',
-        selectedItem: null
-      });
-      return newMap;
-    });
-
-    form.setValue(`items.${itemIndex}.size`, size.name);
-    form.setValue(`items.${itemIndex}.description`, '');
-    form.setValue(`items.${itemIndex}.unitPrice`, 0);
-    form.setValue(`items.${itemIndex}.itemId`, '');
-    
-    setSelectedItemIds(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
-    
-    setPriceAutoFilled(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
-
-    setSizeAutoFilled(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
-  };
-
-  const handleTypeChange = (itemIndex: number, typeId: string) => {
-    if (isEditMode) {
-      toast.info('Type cannot be changed in edit mode');
-      return;
-    }
-    
-    const type = types.find(t => t.id === typeId);
-    if (!type) return;
-
-    setHierarchicalSelections(prev => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(itemIndex) || {
-        categoryId: '',
-        sizeId: '',
-        typeId: '',
-        selectedItem: null
-      };
-      newMap.set(itemIndex, {
-        ...existing,
-        typeId: typeId,
-        selectedItem: null
-      });
-      return newMap;
-    });
-
-    form.setValue(`items.${itemIndex}.description`, '');
-    form.setValue(`items.${itemIndex}.unitPrice`, 0);
-    form.setValue(`items.${itemIndex}.itemId`, '');
-    
-    setSelectedItemIds(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
-    
-    setPriceAutoFilled(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(itemIndex);
-      return newMap;
-    });
-  };
-
-  const handleItemSelect = (itemIndex: number, selectedItem: any) => {
-    if (isEditMode) {
-      toast.info('Product selection cannot be changed in edit mode');
-      return;
-    }
-    
-    const currentSelection = getCurrentSelection(itemIndex);
-    
-    if (currentSelection.categoryId && selectedItem.categoryId !== currentSelection.categoryId) {
-      toast.error('Selected item does not match the selected category');
-      return;
-    }
-    
-    if (currentSelection.sizeId && selectedItem.sizeId !== currentSelection.sizeId) {
-      toast.error('Selected item does not match the selected size');
-      return;
-    }
-    
-    if (currentSelection.typeId && selectedItem.typeId !== currentSelection.typeId) {
-      toast.error('Selected item does not match the selected type');
-      return;
-    }
-
-    setHierarchicalSelections(prev => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(itemIndex) || {
-        categoryId: '',
-        sizeId: '',
-        typeId: '',
-        selectedItem: null
-      };
-      newMap.set(itemIndex, {
-        ...existing,
-        selectedItem: selectedItem
-      });
-      return newMap;
-    });
-
-    setSelectedItemIds(prev => {
-      const newMap = new Map(prev);
-      newMap.set(itemIndex, selectedItem.id);
-      return newMap;
-    });
-    
-    form.setValue(`items.${itemIndex}.itemId`, selectedItem.id);
-    const itemName = safeString(selectedItem.name);
-    form.setValue(`items.${itemIndex}.description`, itemName);
-    
-    if (selectedItem.size) {
-      const sizeValue = safeString(selectedItem.size);
-      form.setValue(`items.${itemIndex}.size`, sizeValue);
-      setSizeAutoFilled(prev => {
-        const newMap = new Map(prev);
-        newMap.set(itemIndex, true);
-        return newMap;
-      });
-      toast.success(`Size "${sizeValue}" auto-filled from item`);
-    }
-    
-    if (selectedItem.price && selectedItem.price > 0) {
-      form.setValue(`items.${itemIndex}.unitPrice`, selectedItem.price);
-      setPriceAutoFilled(prev => {
-        const newMap = new Map(prev);
-        newMap.set(itemIndex, true);
-        return newMap;
-      });
-      calculateItemAmount(itemIndex);
-      toast.success(`Price ${formatCurrency(selectedItem.price)} applied`);
-    }
-    
-    if (selectedItem.imageUrl) {
-      const normalizedImageUrl = normalizeImagePath(selectedItem.imageUrl);
-      if (normalizedImageUrl) {
-        const newImage: ImageFileWithPreview = {
-          preview: normalizedImageUrl,
-          isExisting: true,
-          existingUrl: selectedItem.imageUrl
-        };
-        
-        setItemImages(prev => {
-          const newMap = new Map(prev);
-          const currentImages = newMap.get(itemIndex) || [];
-          newMap.set(itemIndex, [...currentImages, newImage]);
-          return newMap;
-        });
-        
-        toast.success(`Image from item added`);
-      }
-    }
-    
-    if (selectedItem.itemMaterials && selectedItem.itemMaterials.length > 0) {
-      const materialIds = selectedItem.itemMaterials.map((im: any) => im.materialId);
-      fetchMultipleMaterialImages(materialIds);
-      
-      const materialsList = selectedItem.itemMaterials.map((im: { materialId: any; quantity: any; note: any; }) => ({
-        id: '',
-        itemId: '',
-        materialId: im.materialId,
-        quantity: im.quantity,
-        note: im.note || ''
-      }));
-      
-      form.setValue(`items.${itemIndex}.materials`, materialsList);
-      toast.success(`Added ${materialsList.length} material(s) from item`);
-    } else {
-      form.setValue(`items.${itemIndex}.materials`, []);
-    }
-  };
-
-  const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const newFiles = Array.from(files);
-      setAttachments((prev) => [...prev, ...newFiles]);
-    }
-  };
-
-  const handleAddItemImage = (itemIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isEditMode) {
-      toast.info('Images cannot be added in edit mode');
-      return;
-    }
-    
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const newImages: ImageFileWithPreview[] = [];
-      
-      Array.from(files).forEach(file => {
-        if (!file.type.startsWith('image/')) {
-          toast.error(`${file.name} is not an image file`);
-          return;
-        }
-        
-        if (file.size > 5 * 1024 * 1024) {
-          toast.error(`${file.name} size should be less than 5MB`);
-          return;
-        }
-        
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = reader.result as string;
-          newImages.push({
-            file: file,
-            preview: result,
-            isExisting: false
-          });
-          
-          if (newImages.length === Array.from(files).filter(f => f.type.startsWith('image/')).length) {
-            setItemImages(prev => {
-              const newMap = new Map(prev);
-              const currentImages = newMap.get(itemIndex) || [];
-              newMap.set(itemIndex, [...currentImages, ...newImages]);
-              return newMap;
-            });
-          }
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-  };
-
-  const removeItemImage = (itemIndex: number, imageIndex: number) => {
-    if (isEditMode) {
-      toast.info('Images cannot be removed in edit mode');
-      return;
-    }
-    
-    setItemImages(prev => {
-      const newMap = new Map(prev);
-      const currentImages = newMap.get(itemIndex) || [];
-      const updatedImages = currentImages.filter((_, idx) => idx !== imageIndex);
-      
-      if (updatedImages.length === 0) {
-        newMap.delete(itemIndex);
-      } else {
-        newMap.set(itemIndex, updatedImages);
-      }
-      
-      return newMap;
-    });
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
 
   const handleVatAppliedChange = (checked: boolean) => {
     form.setValue('vatApplied', checked);
@@ -803,81 +541,45 @@ useEffect(() => {
     calculateTotals();
   };
 
-  const addMaterialToItem = (itemIndex: number) => {
-    if (isEditMode) {
-      toast.info('Materials cannot be added in edit mode');
-      return;
-    }
+  const addItem = () => {
+    const newIndex = itemFields.length;
+    appendItem({
+      id: '',
+      invoiceId: '',
+      itemId: '',
+      description: '',
+      size: '',
+      quantity: 1,
+      unitPrice: 0,
+      amount: 0,
+      additionalDescription: '',
+      materials: [],
+      images: [],
+    });
     
-    const currentItems = form.getValues('items');
-    const item = currentItems[itemIndex];
-    
-    if (item) {
-      const updatedMaterials = [
-        ...(item.materials || []),
-        {
-          id: '',
-          itemId: item.id || '',
-          materialId: '',
-          quantity: 1,
-          note: ''
-        } as IProformaItemMaterial
-      ];
-      
-      form.setValue(`items.${itemIndex}.materials`, updatedMaterials);
-    }
+    setHierarchicalSelections(prev => {
+      const newMap = new Map(prev);
+      newMap.set(newIndex, {
+        categoryId: '',
+        sizeId: '',
+        typeId: '',
+        selectedItem: null
+      });
+      return newMap;
+    });
   };
 
-  const removeMaterialFromItem = (itemIndex: number, materialIndex: number) => {
-    if (isEditMode) {
-      toast.info('Materials cannot be removed in edit mode');
-      return;
-    }
-    
-    const currentItems = form.getValues('items');
-    const item = currentItems[itemIndex];
-    
-    if (item && item.materials) {
-      const updatedMaterials = item.materials.filter((_, idx) => idx !== materialIndex);
-      form.setValue(`items.${itemIndex}.materials`, updatedMaterials);
-    }
-  };
+ 
 
-  const updateMaterialInItem = (
-    itemIndex: number, 
-    materialIndex: number, 
-    field: keyof IProformaItemMaterial, 
-    value: any
-  ) => {
-    if (isEditMode) {
-      toast.info('Materials cannot be modified in edit mode');
-      return;
-    }
-    
-    const currentItems = form.getValues('items');
-    const item = currentItems[itemIndex];
-    
-    if (item && item.materials) {
-      const updatedMaterials = [...item.materials];
-      updatedMaterials[materialIndex] = {
-        ...updatedMaterials[materialIndex],
-        [field]: value
-      };
-      
-      form.setValue(`items.${itemIndex}.materials`, updatedMaterials);
-      
-      if (field === 'materialId' && value) {
-        getMaterialImage(value);
-      }
-    }
-  };
 
-  const handleMaterialImageClick = (imageUrl: string | null) => {
-    if (imageUrl) {
-      setSelectedMaterialImage(imageUrl);
-      setShowMaterialImageModal(true);
-    }
-  };
+// Add this function to handle material image click
+const handleMaterialImageClick = (imageUrl: string | null) => {
+  if (imageUrl) {
+    setSelectedMaterialImage(imageUrl);
+    setShowMaterialImageModal(true);
+  }
+};
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -886,98 +588,163 @@ useEffect(() => {
     }).format(amount);
   };
 
-  // Update the onSubmit function - only update, no create
-  const onSubmit = async (data: ProformaInvoiceFormValues) => {
-    if (!initialData?.id) {
-      toast.error('Cannot create new invoice. This form is for editing only.');
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
 
-      const formData = new FormData();
-      
-      formData.append('store', isStore.toString());
-      
-      Object.entries(data).forEach(([key, value]) => {
-        if (key !== 'items' && key !== 'attachments' && key !== 'store') {
-          if (value !== undefined && value !== null) {
+  const selectedCustomerId = form.watch('customerId');
+  const watchedItems = form.watch('items') || [];
+
+  // Validation status helpers for readiness checklist
+  const hasCustomer = isStore || Boolean(selectedCustomerId);
+  const hasItems = watchedItems.length > 0;
+  const allItemsHaveCategory = watchedItems.every((item, idx) => {
+    const sel = hierarchicalSelections.get(idx);
+    return Boolean(sel?.categoryId);
+  });
+  const allItemsHaveMaterials = watchedItems.every(item => 
+    item.materials && item.materials.some(m => m.materialId && m.materialId !== '')
+  );
+  const handleFormSubmit = (data: ProformaInvoiceFormValues) => {
+  // Show confirmation modal
+  setConfirmationData(data);
+  setShowConfirmationModal(true);
+};
+
+// Actual submission after confirmation
+const confirmAndSubmit = async () => {
+  if (!confirmationData) return;
+  
+  try {
+    await onSubmit(confirmationData);
+    // Close the modal after successful submission
+    setShowConfirmationModal(false);
+    setConfirmationData(null);
+  } catch (error) {
+    // Keep modal open on error so user can retry
+    console.error('Submission failed:', error);
+  }
+};
+// Complete onSubmit function
+const onSubmit = async (data: ProformaInvoiceFormValues) => {
+ 
+  
+  try {
+    setIsLoading(true);
+
+    const formData = new FormData();
+    
+    // Store flag
+    formData.append('store', isStore.toString());
+    
+    // Add all non-item fields
+    Object.entries(data).forEach(([key, value]) => {
+       if (key !== 'items' && key !== 'attachments' && key !== 'store') {
+        if (value !== undefined && value !== null) {
+          // ✅ Skip VAT fields when VAT is not applied
+          if (key === 'vat' || key === 'vatPercent' || key === 'vatApplied') {
+            // Only include VAT fields if VAT is actually applied
+            if (data.vatApplied === true) {
+              if (value instanceof Date) {
+                formData.append(key, value.toISOString());
+              } else {
+                formData.append(key, value.toString());
+              }
+            }
+            // Skip these fields when VAT is not applied
+          } else {
+            // Include all other fields normally
             if (value instanceof Date) {
               formData.append(key, value.toISOString());
             } else {
               formData.append(key, value.toString());
             }
           }
+        
+       }
+      }
+    });
+
+    // ✅ FIX: Prepare items WITH itemIndex and include image data
+    const itemsWithData = data.items.map((item, index) => {
+      const itemImagesData = itemImages.get(index) || [];
+      const selectedItemId = selectedItemIds.get(index);
+      const selection = hierarchicalSelections.get(index);
+      const categoryId = selection?.categoryId || '';
+      
+      // Process existing images
+      const existingImages = itemImagesData
+        .filter(img => img.isExisting && img.existingUrl)
+        .map(img => ({
+          id: img.id || '',
+          itemId: item.id || '',
+          imageUrl: img.existingUrl!,
+          createdAt: new Date().toISOString()
+        }));
+      
+      // Process new images (these will be uploaded as files)
+      const newImages = itemImagesData
+        .filter(img => !img.isExisting && img.file)
+        .map(img => ({
+          id: '',
+          itemId: item.id || '',
+          imageUrl: img.file!.name,
+          createdAt: new Date().toISOString()
+        }));
+      
+      return {
+        ...item,
+        itemId: selectedItemId || item.itemId || '',
+        categoryId: categoryId,
+        itemIndex: index, // ✅ CRITICAL: Include itemIndex for backend to match files
+        materials: item.materials?.map(material => ({
+          materialId: material.materialId,
+          quantity: material.quantity,
+          note: material.note || ''
+        })) || [],
+        images: [...existingImages, ...newImages]
+      };
+    });
+
+    // ✅ Send items as JSON string
+    formData.append('items', JSON.stringify(itemsWithData));
+
+    // ✅ FIX: Append images with the correct field name format
+    // The backend expects: items[${itemIndex}].images[${imageIndex}]
+    itemImages.forEach((images, itemIndex) => {
+      images.forEach((img, imgIndex) => {
+        if (!img.isExisting && img.file) {
+          // ✅ Use the EXACT format the backend expects
+          formData.append(`items[${itemIndex}].images[${imgIndex}]`, img.file);
         }
       });
+    });
 
-      const itemsWithData = data.items.map((item, index) => {
-        const itemImagesData = itemImages.get(index) || [];
-        const selectedItemId = selectedItemIds.get(index);
-        const selection = hierarchicalSelections.get(index);
-        
-        const categoryId = selection?.categoryId || '';
-        
-        const existingImages = itemImagesData
-          .filter(img => img.isExisting && img.existingUrl)
-          .map(img => ({
-            id: img.id || '',
-            itemId: item.id || '',
-            imageUrl: img.existingUrl!,
-            createdAt: new Date().toISOString()
-          }));
-        
-        const newImages = itemImagesData
-          .filter(img => !img.isExisting && img.file)
-          .map(img => ({
-            id: '',
-            itemId: item.id || '',
-            imageUrl: img.file!.name,
-            createdAt: new Date().toISOString()
-          }));
-        
-        return {
-          ...item,
-          itemId: selectedItemId || item.itemId || '',
-          categoryId: categoryId,
-          itemIndex: index,
-          materials: item.materials?.map(material => ({
-            materialId: material.materialId,
-            quantity: material.quantity,
-            note: material.note || ''
-          })) || [],
-          images: [...existingImages, ...newImages]
-        };
-      });
+    // ✅ Handle attachments to delete
+    if (attachmentsToDelete.length > 0) {
+      formData.append('attachmentsToDelete', JSON.stringify(attachmentsToDelete));
+    }
 
-      formData.append('items', JSON.stringify(itemsWithData));
+    // ✅ Add NEW attachments
+    newAttachments.forEach((file) => {
+      formData.append('attachments', file);
+    });
 
-      itemImages.forEach((images, itemIndex) => {
-        images.forEach((img, imgIndex) => {
-          if (!img.isExisting && img.file) {
-            formData.append(`items[${itemIndex}].images[${imgIndex}]`, img.file);
-          }
-        });
-      });
-
-      attachments.forEach((file) => {
-        formData.append('attachments', file);
-      });
-
-      // Only update, never create
+    // ✅ Send to backend
+    if (initialData?.id) {
       await updateProformaInvoiceseco(initialData.id, formData);
       toast.success('Proforma Invoice updated successfully');
-      
-      router.push('/dashboard/ProformaInvoice/my');
-      router.refresh();
-    } catch (error: any) {
-      console.error('Submit error:', error);
-      toast.error(error?.message || 'Error updating proforma invoice');
-    } finally {
-      setIsLoading(false);
+    } else {
+      await createProformaInvoice(formData);
+      toast.success('Proforma Invoice created successfully');
     }
-  };
+    
+    router.push('/dashboard/ProformaInvoice/my');
+    router.refresh();
+  } catch (error: any) {
+    console.error('Submit error:', error);
+    toast.error(error?.message || 'Error saving proforma invoice');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const [isDark, setIsDark] = useState(false);
 
@@ -996,6 +763,7 @@ useEffect(() => {
     return () => observer.disconnect();
   }, []);
 
+  // Updated dark styles with higher z-index and proper menu positioning
   const darkStyles = {
     control: (base: any) => ({
       ...base,
@@ -1047,7 +815,30 @@ useEffect(() => {
       backgroundColor: '#374151',
     }),
   };
+const getItemColor = (index: number) => {
+  const colors = [
+    'border-l-4 border-l-red-500 bg-red-50/20 dark:bg-red-950/10',
+    'border-l-4 border-l-orange-500 bg-orange-50/20 dark:bg-orange-950/10',
+    'border-l-4 border-l-yellow-500 bg-yellow-50/20 dark:bg-yellow-950/10',
+    'border-l-4 border-l-green-500 bg-green-50/20 dark:bg-green-950/10',
+    'border-l-4 border-l-blue-500 bg-blue-50/20 dark:bg-blue-950/10',
+    'border-l-4 border-l-purple-500 bg-purple-50/20 dark:bg-purple-950/10',
+  ];
+  return colors[index % colors.length];
+};
 
+const getHeaderColor = (index: number) => {
+  const colors = [
+    'bg-red-100/50 dark:bg-red-950/40 border-red-200/50 dark:border-red-800/30',
+    'bg-orange-100/50 dark:bg-orange-950/40 border-orange-200/50 dark:border-orange-800/30',
+    'bg-yellow-100/50 dark:bg-yellow-950/40 border-yellow-200/50 dark:border-yellow-800/30',
+    'bg-green-100/50 dark:bg-green-950/40 border-green-200/50 dark:border-green-800/30',
+    'bg-blue-100/50 dark:bg-blue-950/40 border-blue-200/50 dark:border-blue-800/30',
+    'bg-purple-100/50 dark:bg-purple-950/40 border-purple-200/50 dark:border-purple-800/30',
+  ];
+  return colors[index % colors.length];
+};
+  // Light mode styles with higher z-index
   const lightStyles = {
     menu: (base: any) => ({
       ...base,
@@ -1071,6 +862,7 @@ useEffect(() => {
     }),
   };
 
+  // Combine styles based on theme
   const getSelectStyles = () => {
     const base = isDark ? darkStyles : lightStyles;
     return {
@@ -1105,31 +897,381 @@ useEffect(() => {
       toast.error('Failed to refresh customers');
     }
   };
-
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name?.startsWith('items.') && name?.includes('.materials')) {
-        const allItems = form.getValues('items');
-        const materialIds: string[] = [];
-        allItems?.forEach(item => {
-          item.materials?.forEach(material => {
-            if (material.materialId && !materialImageMap.has(material.materialId)) {
-              materialIds.push(material.materialId);
-            }
-          });
+// Add this after your other useEffect hooks
+useEffect(() => {
+  // When materials change, fetch their images
+  const subscription = form.watch((value, { name }) => {
+    if (name?.startsWith('items.') && name?.includes('.materials')) {
+      const allItems = form.getValues('items');
+      const materialIds: string[] = [];
+      allItems?.forEach(item => {
+        item.materials?.forEach(material => {
+          if (material.materialId && !materialImageMap.has(material.materialId)) {
+            materialIds.push(material.materialId);
+          }
         });
-        if (materialIds.length > 0) {
-          fetchMultipleMaterialImages(materialIds);
+      });
+      if (materialIds.length > 0) {
+        fetchMultipleMaterialImages(materialIds);
+      }
+    }
+  });
+  
+  return () => subscription.unsubscribe();
+}, [form, fetchMultipleMaterialImages, materialImageMap]);
+
+// Add this useEffect after your other useEffects
+useEffect(() => {
+  const handleGlobalPaste = async (e: ClipboardEvent) => {
+    // Only handle if we're focused on a form input or the page
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+    
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    // Find the first active item row or the last one
+    const activeItemIndex = itemFields.length > 0 ? itemFields.length - 1 : 0;
+    
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image size should be less than 5MB');
+            continue;
+          }
+          
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            const newImage: ImageFileWithPreview = {
+              file: file,
+              preview: result,
+              isExisting: false
+            };
+            
+            setItemImages(prev => {
+              const newMap = new Map(prev);
+              const currentImages = newMap.get(activeItemIndex) || [];
+              newMap.set(activeItemIndex, [...currentImages, newImage]);
+              return newMap;
+            });
+            
+            toast.success('Image pasted successfully');
+          };
+          reader.readAsDataURL(file);
         }
+      }
+    }
+  };
+  
+  document.addEventListener('paste', handleGlobalPaste);
+  return () => document.removeEventListener('paste', handleGlobalPaste);
+}, [itemFields.length]);
+// Confirmation Modal Component
+
+const ConfirmationModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  data 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+  data: ProformaInvoiceFormValues | null;
+}) => {
+  if (!data) return null;
+  
+  const totalItems = data.items?.length || 0;
+  const subtotal = data.subtotal || 0;
+  const vat = data.vat || 0;
+  const total = data.total || 0;
+  const vatApplied = data.vatApplied || false;
+  const vatPercent = data.vatPercent || 15;
+
+  // Build grouped materials summary
+  const getMaterialsSummary = () => {
+    const materialMap = new Map();
+    
+    data.items?.forEach((item) => {
+      if (item.materials && item.materials.length > 0) {
+        item.materials.forEach((material) => {
+          if (!material.materialId) return;
+          
+          // Get material name from the materials list
+          const materialObj = materials.find(m => m.id === material.materialId);
+          const key = `${material.materialId}-${material.materialId}`;
+          
+          if (!materialMap.has(key)) {
+            materialMap.set(key, {
+              materialId: material.materialId,
+              name: materialObj?.name || 'Unknown Material',
+              color: materialObj?.color || '-',
+              size: materialObj?.size || '-',
+              totalQuantity: 0,
+              totalAdditional: 0,
+              notes: [],
+              items: new Set()
+            });
+          }
+          
+          const entry = materialMap.get(key);
+          entry.totalQuantity += (material.quantity || 1);
+          if (material.additionalQuantity) {
+            entry.totalAdditional += material.additionalQuantity;
+          }
+          if (material.note) {
+            entry.notes.push(material.note);
+          }
+          
+          const itemName = item.itemname || item.description || 'Unnamed Item';
+          const itemSize = item.size || '';
+          const itemIdentifier = itemSize ? `${itemName} (${itemSize})` : itemName;
+          entry.items.add(itemIdentifier);
+        });
       }
     });
     
-    return () => subscription.unsubscribe();
-  }, [form, fetchMultipleMaterialImages, materialImageMap]);
+    return Array.from(materialMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+  };
+
+  const materialsSummary = getMaterialsSummary();
+  const hasMaterials = materialsSummary.length > 0;
 
   return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Confirm Proforma Invoice"
+      description="Please review all items before creating the invoice"
+    >
+      <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
+        {/* Customer Info */}
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            {data.store ? 'Stock Invoice' : 'Customer'}
+          </p>
+          <p className="text-sm font-medium">
+            {data.store ? 'Store Invoice (No Customer)' : customers.find(c => c.id === data.customerId)?.name || 'No customer selected'}
+          </p>
+        </div>
+
+        {/* Items Summary */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Items ({totalItems})
+            </p>
+          </div>
+
+          {/* Table Header - Sticky */}
+          <div className="sticky top-0 z-10 grid grid-cols-12 gap-2 rounded-t-lg bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
+            <div className="col-span-5">Item</div>
+            <div className="col-span-2 text-right">Qty</div>
+            <div className="col-span-2 text-right">Unit Price</div>
+            <div className="col-span-3 text-right">Amount</div>
+          </div>
+
+          {/* Items List with overflow */}
+          <div className="space-y-2 max-h-[30vh] overflow-y-auto overflow-x-hidden pr-1">
+            {data.items?.map((item, index) => {
+              const selection = hierarchicalSelections.get(index);
+              const categoryName = selection?.categoryId 
+                ? categories.find(c => c.id === selection.categoryId)?.name 
+                : 'No category';
+              const itemName = item.itemname || item.description || `Item ${index + 1}`;
+              
+              return (
+                <div 
+                  key={index}
+                  className={`grid grid-cols-12 gap-2 rounded-lg border p-3 transition-colors ${getItemColor(index)}`}
+                >
+                  <div className="col-span-5 min-w-0">
+                    <p className="text-sm font-medium truncate">{itemName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {categoryName}
+                      {item.size && ` • Size: ${item.size}`}
+                    </p>
+                    {item.additionalDescription && (
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {item.additionalDescription}
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-2 flex items-center justify-end">
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {item.quantity || 0}
+                    </Badge>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-end text-sm font-mono">
+                    {formatCurrency(item.unitPrice || 0)}
+                  </div>
+                  <div className="col-span-3 flex items-center justify-end text-sm font-bold">
+                    {formatCurrency(item.amount || 0)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Items count badge */}
+          <div className="flex justify-end">
+            <Badge variant="outline" className="text-xs">
+              Total: {totalItems} item{totalItems > 1 ? 's' : ''}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Materials Summary Section */}
+        {hasMaterials && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Package className="h-3.5 w-3.5" />
+                Materials Summary ({materialsSummary.length} types)
+              </p>
+            </div>
+            
+            <div className="rounded-lg border bg-muted/10 overflow-hidden">
+              {/* Material Table Header */}
+              <div className="grid grid-cols-12 gap-2 bg-muted/30 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <div className="col-span-4">Material</div>
+                <div className="col-span-2">Color</div>
+                <div className="col-span-2">Size</div>
+                <div className="col-span-2 text-right">Total Qty</div>
+              </div>
+              
+              {/* Material Items */}
+              <div className="max-h-[20vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {materialsSummary.map((material, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-2 hover:bg-muted/20 transition-colors text-xs">
+                    <div className="col-span-4 font-medium truncate">
+                      {material.name}
+                    </div>
+                    <div className="col-span-2 text-muted-foreground">
+                      {material.color !== '-' && (
+                        <span className="flex items-center gap-1.5">
+                          <span 
+                            className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200" 
+                            style={{ backgroundColor: material.color.toLowerCase() }}
+                          />
+                          {material.color}
+                        </span>
+                      )}
+                      {material.color === '-' && <span className="text-slate-400">-</span>}
+                    </div>
+                    <div className="col-span-2 font-mono text-muted-foreground">
+                      {material.size}
+                    </div>
+                    <div className="col-span-2 text-right font-mono font-semibold">
+                      {material.totalQuantity}
+                      {material.totalAdditional > 0 && (
+                        <span className="text-[10px] text-muted-foreground ml-1">
+                          +{material.totalAdditional}
+                        </span>
+                      )}
+                    </div>
+               
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* No materials warning */}
+        {!hasMaterials && data.items?.some(item => item.materials && item.materials.length > 0) === false && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-center">
+            <p className="text-xs text-amber-800 flex items-center justify-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              No materials have been specified for any item.
+            </p>
+          </div>
+        )}
+
+        {/* Totals Summary - Sticky at bottom of scroll */}
+        <div className="sticky bottom-0 rounded-lg border bg-card p-4 space-y-2 shadow-lg">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="font-mono font-medium">{formatCurrency(subtotal)}</span>
+          </div>
+          
+          {vatApplied && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">VAT ({vatPercent}%)</span>
+              <span className="font-mono font-medium">{formatCurrency(vat)}</span>
+            </div>
+          )}
+          
+          <div className="border-t pt-2 flex items-center justify-between text-base font-bold">
+            <span>Total</span>
+            <span className="font-mono text-primary">{formatCurrency(total)}</span>
+          </div>
+        </div>
+
+        {/* Validation Status */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className={`flex items-center gap-2 rounded-lg border p-2 text-xs ${
+            data.customerId || data.store 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}>
+            {data.customerId || data.store ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <X className="h-3.5 w-3.5" />
+            )}
+            <span>{data.store ? 'Stock Invoice' : 'Customer Selected'}</span>
+          </div>
+          
+          <div className={`flex items-center gap-2 rounded-lg border p-2 text-xs ${
+            data.items?.every(item => item.materials?.some(m => m.materialId)) 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}>
+            {data.items?.every(item => item.materials?.some(m => m.materialId)) ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <AlertCircle className="h-3.5 w-3.5" />
+            )}
+            <span>All items have materials</span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-3 pt-2 border-t sticky bottom-0 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 py-3 -mx-1 px-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Go Back
+          </Button>
+          <Button
+            type="button"
+            onClick={onConfirm}
+            disabled={isLoading}
+            className="min-w-32"
+          >
+            {isLoading ? (
+              <>Saving...</>
+            ) : (
+              <>Confirm & Create</>
+            )}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+return (
     <>
     <div className="mx-auto w-full space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button
@@ -1144,19 +1286,30 @@ useEffect(() => {
           <div>
             <h2 className="text-lg font-bold tracking-tight">{pageTitle}</h2>
             <p className="text-xs text-muted-foreground">
-              {isEditMode ? 'Update the invoice details below' : 'View invoice details'}
+              {initialData ? 'Update the invoice details below' : 'Fill in the details to create a new proforma invoice'}
             </p>
-          
           </div>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={refreshItems}
+          disabled={isFetchingItems}
+          className="gap-1.5 text-xs"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetchingItems ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" onKeyDown={(e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-      }
-    }} >
+   <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4" onKeyDown={(e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+  }
+}}>
+          {/* Invoice Details */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <CardTitle className="text-sm font-semibold">Invoice Details</CardTitle>
@@ -1167,20 +1320,15 @@ useEffect(() => {
                   id="store-checkbox"
                   checked={isStore}
                   onCheckedChange={(checked) => {
-                    if (isEditMode) {
-                      toast.info('Store status cannot be changed in edit mode');
-                      return;
-                    }
                     setIsStore(checked as boolean);
                     if (checked) {
                       form.setValue('customerId', '');
                     }
                   }}
-                  disabled={isEditMode}
                 />
                 <label
                   htmlFor="store-checkbox"
-                  className={`cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className="cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Stock Invoice
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
@@ -1205,18 +1353,11 @@ useEffect(() => {
                       <FormControl>
                         <Checkbox
                           checked={field.value}
-                          onCheckedChange={(checked) => {
-                            if (isEditMode) {
-                              toast.info('VAT setting cannot be changed in edit mode');
-                              return;
-                            }
-                            handleVatAppliedChange(checked as boolean);
-                          }}
-                          disabled={isEditMode}
+                          onCheckedChange={handleVatAppliedChange}
                         />
                       </FormControl>
                       <div className="space-y-0.5 leading-none">
-                        <FormLabel className={`text-sm ${isEditMode ? 'opacity-70' : ''}`}>Apply 15% VAT</FormLabel>
+                        <FormLabel className="text-sm">Apply 15% VAT</FormLabel>
                         <p className="text-xs text-muted-foreground">
                           Add 15% VAT to the subtotal
                         </p>
@@ -1236,15 +1377,7 @@ useEffect(() => {
                           type="date"
                           {...field}
                           value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
-                          onChange={(e) => {
-                            if (isEditMode) {
-                              toast.info('Date cannot be changed in edit mode');
-                              return;
-                            }
-                            field.onChange(e.target.value);
-                          }}
-                          disabled={isEditMode}
-                          className={isEditMode ? 'opacity-70' : ''}
+                          onChange={(e) => field.onChange(e.target.value)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1255,6 +1388,7 @@ useEffect(() => {
             </CardContent>
           </Card>
 
+          {/* Line Items */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <div className="flex items-center justify-between">
@@ -1264,11 +1398,10 @@ useEffect(() => {
                     {itemFields.length}
                   </Badge>
                 </div>
-                {isEditMode && (
-                  <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                    Edit Mode
-                  </Badge>
-                )}
+                <Button type="button" variant="outline" size="sm" onClick={addItem} className="gap-1.5 text-xs h-7">
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Product
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="overflow-visible">
@@ -1279,20 +1412,15 @@ useEffect(() => {
                   const isSizeAutoFilled = sizeAutoFilled.get(itemIndex) || false;
 
                   return (
-                    <div
-                      key={field.id}
-                      className={`rounded-xl border bg-card shadow-sm overflow-visible ${isEditMode ? 'border-blue-200 dark:border-blue-800' : ''}`}
-                    >
-                      <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5">
-                        <div className="flex items-center gap-2">
+                  <div
+  key={field.id}
+  className={`rounded-xl border shadow-sm overflow-visible ${getItemColor(itemIndex)}`}
+>
+                      {/* Item Header Bar */}
+<div className={`flex items-center justify-between border-b px-4 py-2.5 ${getHeaderColor(itemIndex)}`}>                        <div className="flex items-center gap-2">
                           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
                             {itemIndex + 1}
                           </span>
-                          {isEditMode && (
-                            <Badge variant="secondary" className="text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-                              Editable Fields
-                            </Badge>
-                          )}
                           {currentSelection.categoryId && (
                             <Badge variant="outline" className="text-[10px]">
                               Category: {categories.find(c => c.id === currentSelection.categoryId)?.name || 'Selected'}
@@ -1303,123 +1431,98 @@ useEffect(() => {
                               Item: {safeString(currentSelection.selectedItem.name)}
                             </Badge>
                           )}
+                          {isSizeAutoFilled && (
+                            <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                              Size Auto-filled
+                            </Badge>
+                          )}
                         </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeItem(itemIndex)}
+                          disabled={itemFields.length <= 1}
+                          className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
+                        </Button>
                       </div>
 
                       <div className="space-y-4 p-4 overflow-visible">
+                        {/* Product Selector - READ ONLY */}
                         <div className="overflow-visible">
-                          <p className="mb-2 text-xs font-medium text-muted-foreground">Product Selection (Read-Only in Edit Mode)</p>
+                          <p className="mb-2 text-xs font-medium text-muted-foreground">Product Selection</p>
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-4 overflow-visible">
+                            {/* Category - READ ONLY */}
                             <div className="overflow-visible">
                               <FormLabel className="text-xs flex items-center gap-1">
                                 Category <span className="text-red-500">*</span>
                               </FormLabel>
-                              <Select
-                                options={categories.map(cat => ({
-                                  value: cat.id,
-                                  label: cat.name
-                                }))}
-                                value={categories.find(cat => cat.id === currentSelection.categoryId) ? {
-                                  value: currentSelection.categoryId,
-                                  label: categories.find(cat => cat.id === currentSelection.categoryId)?.name || ''
-                                } : null}
-                                onChange={(option: any) => handleCategoryChange(itemIndex, option?.value || '')}
-                                placeholder="Select category"
-                                isSearchable
-                                styles={getSelectStyles()}
-                                isClearable
-                                isDisabled={true}
-                                menuPortalTarget={document.body}
-                              />
+                              <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                {currentSelection.categoryId ? 
+                                  categories.find(c => c.id === currentSelection.categoryId)?.name || 'Selected' 
+                                  : 'No category selected'}
+                              </div>
                             </div>
 
+                            {/* Size - READ ONLY */}
                             <div className="overflow-visible">
                               <FormLabel className="text-xs">Size</FormLabel>
-                              <Select
-                                options={sizes
-                                  .filter(size => !currentSelection.categoryId || size.categoryId === currentSelection.categoryId)
-                                  .map(size => ({
-                                    value: size.id,
-                                    label: size.name
-                                  }))}
-                                value={sizes.find(s => s.id === currentSelection.sizeId) ? {
-                                  value: currentSelection.sizeId,
-                                  label: sizes.find(s => s.id === currentSelection.sizeId)?.name || ''
-                                } : null}
-                                onChange={(option: any) => handleSizeChange(itemIndex, option?.value || '')}
-                                placeholder={currentSelection.categoryId ? "Select size (optional)" : "Select category first"}
-                                isSearchable
-                                isDisabled={true}
-                                styles={getSelectStyles()}
-                                isClearable
-                                menuPortalTarget={document.body}
-                              />
+                              <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                {currentSelection.sizeId ? 
+                                  sizes.find(s => s.id === currentSelection.sizeId)?.name || 'Selected' 
+                                  : 'No size selected'}
+                              </div>
                             </div>
 
+                            {/* Type - READ ONLY */}
                             <div className="overflow-visible">
                               <FormLabel className="text-xs">Type</FormLabel>
-                              <Select
-                                options={types
-                                  .filter(type => !currentSelection.sizeId || type.sizeId === currentSelection.sizeId)
-                                  .map(type => ({
-                                    value: type.id,
-                                    label: type.name
-                                  }))}
-                                value={types.find(t => t.id === currentSelection.typeId) ? {
-                                  value: currentSelection.typeId,
-                                  label: types.find(t => t.id === currentSelection.typeId)?.name || ''
-                                } : null}
-                                onChange={(option: any) => handleTypeChange(itemIndex, option?.value || '')}
-                                placeholder={currentSelection.sizeId ? "Select type (optional)" : "Select size first"}
-                                isSearchable
-                                isDisabled={true}
-                                styles={getSelectStyles()}
-                                isClearable
-                                menuPortalTarget={document.body}
-                              />
+                              <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                {currentSelection.typeId ? 
+                                  types.find(t => t.id === currentSelection.typeId)?.name || 'Selected' 
+                                  : 'No type selected'}
+                              </div>
                             </div>
 
+                            {/* Item - READ ONLY */}
                             <div className="overflow-visible">
                               <FormLabel className="text-xs">Product</FormLabel>
-                              <Select
-                                options={availableItems.map((item: any) => ({
-                                  value: item.id,
-                                  label: `${item.name}${item.color ? ` - ${item.color}` : ''}`,
-                                  item: item
-                                }))}
-                                value={availableItems.find((item: any) => item.id === currentSelection.selectedItem?.id) ? {
-                                  value: currentSelection.selectedItem?.id || '',
-                                  label: safeString(currentSelection.selectedItem?.name)
-                                } : null}
-                                onChange={(option: any) => {
-                                  if (option?.item) {
-                                    handleItemSelect(itemIndex, option.item);
-                                  }
-                                }}
-                                placeholder={
-                                  !currentSelection.categoryId 
-                                    ? "Select category first" 
-                                    : availableItems.length === 0 
-                                      ? "No items available" 
-                                      : "Select item (optional)"
-                                }
-                                isSearchable
-                                isLoading={isFetchingItems}
-                                isDisabled={true}
-                                styles={getSelectStyles()}
-                                noOptionsMessage={() => 
-                                  currentSelection.categoryId 
-                                    ? "No items available for these filters" 
-                                    : "Select a category first"
-                                }
-                                isClearable
-                                menuPortalTarget={document.body}
-                              />
+                              <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                {currentSelection.selectedItem ? 
+                                  safeString(currentSelection.selectedItem.name) 
+                                  : 'No item selected'}
+                              </div>
                             </div>
                           </div>
                         </div>
 
+                        {/* Pricing Row - Only Unit Price and Item Name editable */}
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                          <FormField
+                            control={form.control}
+                            name={`items.${itemIndex}.itemname`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs flex items-center gap-1">
+                                  Item name
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="text"
+                                    placeholder="Item name"
+                                    {...field}
+                                    className="border-blue-200 focus-visible:ring-blue-500"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          {/* Quantity - READ ONLY */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.quantity`}
@@ -1427,137 +1530,145 @@ useEffect(() => {
                               <FormItem>
                                 <FormLabel className="text-xs">Qty</FormLabel>
                                 <FormControl>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    placeholder="1"
-                                    {...field}
-                                    onChange={(e) => {
-                                      if (isEditMode) {
-                                        toast.info('Quantity cannot be changed in edit mode');
-                                        return;
-                                      }
-                                      field.onChange(parseInt(e.target.value) || 1);
-                                      calculateItemAmount(itemIndex);
-                                    }}
-                                    disabled={true}
-                                    className="opacity-70 bg-muted"
-                                  />
+                                  <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                    {field.value || 1}
+                                  </div>
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
 
+                          {/* Size - READ ONLY */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.size`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs flex items-center gap-1">
+                                <FormLabel className="text-xs">
                                   Size
-                                  {isEditMode && (
-                                    <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                      Editable
-                                    </Badge>
-                                  )}
-                                  {isSizeAutoFilled && !isEditMode && (
+                                  {isSizeAutoFilled && (
                                     <Badge variant="secondary" className="ml-1 text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                                      Locked
+                                      Auto
                                     </Badge>
                                   )}
                                 </FormLabel>
                                 <FormControl>
-                                  {!isEditMode && isSizeAutoFilled ? (
-                                    <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
-                                      {safeString(field.value) || 'Auto-filled'}
-                                    </div>
-                                  ) : (
-                                    <Input
-                                      type="text"
-                                      placeholder={isEditMode ? "Edit size" : "Enter size"}
-                                      {...field}
-                                      value={safeString(field.value)}
-                                      onChange={(e) => {
-                                        if (isEditMode) {
-                                          field.onChange(e.target.value);
-                                          // Recalculate when size changes (though size doesn't affect amount)
-                                        } else {
-                                          field.onChange(e.target.value);
-                                        }
-                                      }}
-                                      className={`${isEditMode ? 'border-green-300 focus-visible:ring-green-500' : ''} ${field.value ? "border-blue-300 focus-visible:ring-blue-500" : ""}`}
-                                      disabled={!isEditMode && isSizeAutoFilled}
-                                    />
-                                  )}
+                                  <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                    {field.value || '-'}
+                                  </div>
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
 
-                          <FormField
+                          {/* Unit Price - EDITABLE */}
+                          <Controller
                             control={form.control}
                             name={`items.${itemIndex}.unitPrice`}
+                            defaultValue={0}
                             rules={{
                               required: 'Unit price is required',
-                              validate: (value) => value > 0 || 'Unit price must be greater than 0'
+                              validate: (value) => {
+                                if (value <= 0) return 'Unit price must be greater than 0';
+                                if (value > 999999999.99) return 'Unit price is too large (max: 999,999,999.99)';
+                                return true;
+                              }
                             }}
                             render={({ field, fieldState }) => (
                               <FormItem>
                                 <FormLabel className="flex items-center gap-2 text-xs">
                                   Unit Price <span className="text-red-500">*</span>
-                                  {isEditMode && (
+                                  {priceAutoFilled.get(itemIndex) && (
                                     <Badge
                                       variant="secondary"
-                                      className="text-[10px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                      className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                                     >
-                                      Editable
+                                      Auto
                                     </Badge>
                                   )}
                                 </FormLabel>
                                 <FormControl>
-                                  <Input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="0.00"
-                                    value={
-                                      field.value
-                                        ? Number(field.value).toLocaleString("en-US", {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                          })
-                                        : ""
-                                    }
-                                    onChange={(e) => {
-                                      const raw = e.target.value.replace(/,/g, "");
-                                      const value = parseFloat(raw) || 0;
-                                      field.onChange(value);
-                                      calculateItemAmount(itemIndex);
-                                      if (priceAutoFilled.get(itemIndex)) {
-                                        setPriceAutoFilled((prev) => {
-                                          const newMap = new Map(prev);
-                                          newMap.delete(itemIndex);
-                                          return newMap;
-                                        });
-                                      }
-                                    }}
-                                    className={`${
-                                      isEditMode ? 'border-yellow-300 focus-visible:ring-yellow-500' : ''
-                                    } ${
-                                      priceAutoFilled.get(itemIndex)
-                                        ? "border-green-300 focus-visible:ring-green-500"
-                                        : ""
-                                    } ${
-                                      fieldState.error ? "border-red-500 focus-visible:ring-red-500" : ""
-                                    }`}
-                                  />
+                                  <div>
+                                    <Input
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="0.01"
+                                      min="0"
+                                      max="999999999.99"
+                                      placeholder="0.00"
+                                      value={field.value ?? ''}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+
+                                        if (value === '') {
+                                          field.onChange(0);
+                                          calculateItemAmount(itemIndex);
+                                          return;
+                                        }
+
+                                        const numericValue = parseFloat(value);
+
+                                        if (isNaN(numericValue)) return;
+
+                                        if (numericValue > 999999999.99) {
+                                          toast.error('Maximum unit price is 999,999,999.99');
+                                          return;
+                                        }
+
+                                        field.onChange(numericValue);
+                                        calculateItemAmount(itemIndex);
+
+                                        if (priceAutoFilled.get(itemIndex)) {
+                                          setPriceAutoFilled((prev) => {
+                                            const newMap = new Map(prev);
+                                            newMap.delete(itemIndex);
+                                            return newMap;
+                                          });
+                                        }
+                                      }}
+                                      onBlur={() => {
+                                        const currentValue = Number(field.value || 0);
+
+                                        if (currentValue > 0) {
+                                          field.onChange(Number(currentValue.toFixed(2)));
+                                        }
+                                      }}
+                                      className={`h-10 font-mono ${
+                                        priceAutoFilled.get(itemIndex)
+                                          ? 'border-green-300 focus-visible:ring-green-500'
+                                          : ''
+                                      } ${
+                                        fieldState.error
+                                          ? 'border-red-500 focus-visible:ring-red-500'
+                                          : ''
+                                      }`}
+                                    />
+
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      Format:{' '}
+                                      <span className="font-mono">
+                                        {Number(field.value || 0).toLocaleString('en-US', {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        })}
+                                      </span>
+                                    </p>
+                                  </div>
                                 </FormControl>
                                 <FormMessage />
+                                {field.value > 999999 && (
+                                  <p className="text-[10px] text-amber-500 flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" />
+                                    Large number: {formatDecimal(field.value, 2)}
+                                  </p>
+                                )}
                               </FormItem>
                             )}
                           />
 
+                          {/* Amount - READ ONLY */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.amount`}
@@ -1566,13 +1677,12 @@ useEffect(() => {
                                 <FormLabel className="text-xs">Amount</FormLabel>
                                 <FormControl>
                                   <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
+                                    type="text"
+                                    inputMode="decimal"
                                     placeholder="0.00"
-                                    {...field}
+                                    value={field.value ? formatDecimal(field.value, 2) : ""}
                                     readOnly
-                                    className="bg-muted/50 font-semibold"
+                                    className="bg-muted/50 font-semibold cursor-not-allowed"
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -1581,7 +1691,9 @@ useEffect(() => {
                           />
                         </div>
 
+                        {/* Descriptions - Both Editable */}
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          {/* Description - EDITABLE */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.description`}
@@ -1593,11 +1705,6 @@ useEffect(() => {
                               <FormItem>
                                 <FormLabel className="text-xs flex items-center gap-1">
                                   Description <span className="text-red-500">*</span>
-                                  {isEditMode && (
-                                    <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                      Editable
-                                    </Badge>
-                                  )}
                                 </FormLabel>
                                 <FormControl>
                                   <Textarea
@@ -1606,10 +1713,7 @@ useEffect(() => {
                                     rows={2}
                                     className={`${
                                       fieldState.error ? "border-red-500 focus-visible:ring-red-500" : ""
-                                    } ${isEditMode ? 'border-green-300 focus-visible:ring-green-500' : ''}`}
-                                    onChange={(e) => {
-                                      field.onChange(e);
-                                    }}
+                                    }`}
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -1617,28 +1721,18 @@ useEffect(() => {
                             )}
                           />
 
+                          {/* Additional Description - EDITABLE */}
                           <FormField
                             control={form.control}
                             name={`items.${itemIndex}.additionalDescription`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs flex items-center gap-1">
-                                  Additional Description
-                                  {isEditMode && (
-                                    <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                      Editable
-                                    </Badge>
-                                  )}
-                                </FormLabel>
+                                <FormLabel className="text-xs">Additional Description</FormLabel>
                                 <FormControl>
                                   <Textarea
                                     placeholder="Extra details about the item"
                                     {...field}
                                     rows={2}
-                                    className={isEditMode ? 'border-green-300 focus-visible:ring-green-500' : ''}
-                                    onChange={(e) => {
-                                      field.onChange(e);
-                                    }}
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -1647,19 +1741,23 @@ useEffect(() => {
                           />
                         </div>
 
-                        {/* Materials - Read Only in Edit Mode */}
+                        {/* Materials - READ ONLY */}
                         <div className="mt-3 border-t pt-3 overflow-visible">
                           <div className="mb-2 flex items-center justify-between">
                             <p className="text-xs font-semibold flex items-center gap-1.5">
                               <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                              Materials
-                              {isEditMode && (
-                                <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                                  Read Only
-                                </Badge>
-                              )}
+                              Materials <span className="text-red-500">*</span>
                             </p>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {form.watch(`items.${itemIndex}.materials`)?.length || 0} materials
+                            </Badge>
                           </div>
+
+                          {form.formState.errors?.items?.[itemIndex]?.materials && (
+                            <p className="text-xs text-red-500 mb-2">
+                              {form.formState.errors.items[itemIndex].materials.message as string}
+                            </p>
+                          )}
 
                           {(form.watch(`items.${itemIndex}.materials`)?.length || 0) > 0 ? (
                             <div className="space-y-3 overflow-visible">
@@ -1667,28 +1765,33 @@ useEffect(() => {
                                 const materialImage = material.materialId ? materialImageMap.get(material.materialId) : null;
                                 
                                 return (
-                                  <div key={materialIndex} className={`grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 overflow-visible ${isEditMode ? 'bg-muted/20 border-blue-200 dark:border-blue-800' : ''}`}>
+                                  <div key={materialIndex} className="grid grid-cols-1 gap-3 rounded border p-3 md:grid-cols-12 overflow-visible bg-muted/10">
                                     <div className="md:col-span-4 overflow-visible">
                                       <FormLabel className="text-xs">Material</FormLabel>
-                                      <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
-                                        {materials.find(m => m.id === material.materialId)?.name || 'Unknown material'}
+                                      <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                        {material.materialId ? (
+                                          materials.find(m => m.id === material.materialId)?.name || 'Unknown Material'
+                                        ) : (
+                                          <span className="text-muted-foreground">No material selected</span>
+                                        )}
                                       </div>
                                     </div>
 
                                     <div className="md:col-span-2">
                                       <FormLabel className="text-xs">Quantity</FormLabel>
-                                      <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
-                                        {material.quantity}
+                                      <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
+                                        {material.quantity || 1}
                                       </div>
                                     </div>
 
                                     <div className="md:col-span-3">
                                       <FormLabel className="text-xs">Note</FormLabel>
-                                      <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed">
-                                        {material.note || 'No note'}
+                                      <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground opacity-75 cursor-not-allowed truncate">
+                                        {material.note || <span className="text-muted-foreground">No note</span>}
                                       </div>
                                     </div>
 
+                                    {/* Material Image Preview */}
                                     <div className="md:col-span-2 flex items-end justify-center">
                                       {material.materialId && materialImageMap.has(material.materialId) ? (
                                         <div 
@@ -1708,7 +1811,7 @@ useEffect(() => {
                                           </div>
                                         </div>
                                       ) : material.materialId ? (
-                                        <div className="w-12 h-12 rounded-lg border border-dashed bg-muted/20 flex items-center justify-center text-muted-foreground animate-pulse">
+                                        <div className="w-12 h-12 rounded-lg border border-dashed bg-muted/20 flex items-center justify-center text-muted-foreground">
                                           <ImageIcon className="h-4 w-4" />
                                         </div>
                                       ) : (
@@ -1717,28 +1820,25 @@ useEffect(() => {
                                         </div>
                                       )}
                                     </div>
+
+                                 
                                   </div>
                                 );
                               })}
                             </div>
                           ) : (
-                            <p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">
-                              No materials
+                            <p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground bg-muted/10">
+                              No materials assigned
                             </p>
                           )}
                         </div>
 
-                        {/* Images - Read Only in Edit Mode */}
+                        {/* Images - READ ONLY */}
                         <div className="mt-3 border-t pt-3">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs font-semibold flex items-center gap-1.5">
                               <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
                               Images
-                              {isEditMode && (
-                                <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                                  Read Only
-                                </Badge>
-                              )}
                               {(itemImages.get(itemIndex)?.length || 0) > 0 && (
                                 <Badge variant="secondary" className="text-[10px] h-4 px-1">
                                   {itemImages.get(itemIndex)?.length}
@@ -1747,6 +1847,7 @@ useEffect(() => {
                             </p>
                           </div>
 
+                          {/* Image grid display - READ ONLY */}
                           {(itemImages.get(itemIndex)?.length || 0) > 0 && (
                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                               {itemImages.get(itemIndex)?.map((image, imageIndex) => (
@@ -1792,6 +1893,7 @@ useEffect(() => {
             </CardContent>
           </Card>
 
+          {/* Summary */}
           <Card>
             <CardHeader className="pb-3 pt-4 px-4">
               <CardTitle className="text-sm font-semibold">Summary</CardTitle>
@@ -1825,26 +1927,104 @@ useEffect(() => {
             </CardContent>
           </Card>
 
-     
+          {/* Attachments - READ ONLY */}
+          <Card>
+            <CardHeader className="pb-3 pt-4 px-4">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-semibold">Attachments</CardTitle>
+                {(existingAttachments.length + newAttachments.length) > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5">
+                    {existingAttachments.length + newAttachments.length}
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 px-4 pb-4">
+              {/* Existing Attachments - READ ONLY */}
+              {existingAttachments.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground">Attachments</p>
+                  {existingAttachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex items-center justify-between rounded-lg border bg-card px-4 py-2.5 hover:bg-muted/20 transition-colors group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Download className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium truncate">
+                          {attachment.fileUrl.split('/').pop() || 'Attachment'}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary shrink-0"
+                          onClick={() => window.open(attachment.fileUrl, '_blank')}
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
+          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-slate-500" />
+                Readiness Verification
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-2.5 text-xs">
+              
+              <div className={`flex items-center justify-between p-2 rounded-lg border ${hasCustomer ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+                <span className="font-medium">{isStore ? 'Stock Invoice Selected' : 'Customer Account Assigned'}</span>
+                {hasCustomer ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+              </div>
+
+              <div className={`flex items-center justify-between p-2 rounded-lg border ${hasItems ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+                <span className="font-medium">{watchedItems.length} Product Line(s) Added</span>
+                {hasItems ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+              </div>
+
+              <div className={`flex items-center justify-between p-2 rounded-lg border ${allItemsHaveCategory ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                <span className="font-medium">Categories Selected</span>
+                {allItemsHaveCategory ? <Check className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+              </div>
+
+              <div className={`flex items-center justify-between p-2 rounded-lg border ${allItemsHaveMaterials ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                <span className="font-medium">Materials Specified</span>
+                {allItemsHaveMaterials ? <Check className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+              </div>
+
+            </CardContent>
+          </Card>
+
+          {/* Submit */}
           <div className="flex items-center justify-end gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={() => router.push('/dashboard/ProformaInvoice')}
             >
-              {isEditMode ? 'Back' : 'Cancel'}
+              Cancel
             </Button>
-            {isEditMode && (
-              <Button
-                type="submit"
-                disabled={isLoading}
-                size="sm"
-                className="min-w-30 bg-yellow-600 hover:bg-yellow-700 text-white"
-              >
-                {isLoading ? 'Saving...' : 'Update Invoice'}
-              </Button>
-            )}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              size="sm"
+              className="min-w-30"
+            >
+              {isLoading
+                ? 'Saving...'
+                : initialData
+                ? 'Update Invoice'
+                : 'Create Invoice'}
+            </Button>
           </div>
         </form>
       </Form>
@@ -1861,6 +2041,7 @@ useEffect(() => {
         onSuccess={handleCustomerCreated}
       />
     </Modal>
+    {/* Material Image Modal */}
     <Modal
       isOpen={showMaterialImageModal}
       onClose={() => setShowMaterialImageModal(false)}
@@ -1882,6 +2063,13 @@ useEffect(() => {
         )}
       </div>
     </Modal>
+    {/* Confirmation Modal */}
+    <ConfirmationModal
+      isOpen={showConfirmationModal}
+      onClose={() => setShowConfirmationModal(false)}
+      onConfirm={confirmAndSubmit}
+      data={confirmationData}
+    />
     </>
   );
 }

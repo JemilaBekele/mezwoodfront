@@ -328,8 +328,7 @@ const calculateItemAmount = useCallback((index: number) => {
     calculateTotals();
 }, [calculateTotals, form]);
 
-  // Initialize item images from initial data
-// Initialize hierarchical selections from existing items when editing
+
 // Initialize hierarchical selections from existing items when editing
 useEffect(() => {
   // Check if we have both the items data and the hierarchical data loaded
@@ -1415,6 +1414,7 @@ useEffect(() => {
   return () => document.removeEventListener('paste', handleGlobalPaste);
 }, [itemFields.length]);
 // Confirmation Modal Component
+
 const ConfirmationModal = ({ 
   isOpen, 
   onClose, 
@@ -1435,6 +1435,55 @@ const ConfirmationModal = ({
   const vatApplied = data.vatApplied || false;
   const vatPercent = data.vatPercent || 15;
 
+  // Build grouped materials summary
+  const getMaterialsSummary = () => {
+    const materialMap = new Map();
+    
+    data.items?.forEach((item) => {
+      if (item.materials && item.materials.length > 0) {
+        item.materials.forEach((material) => {
+          if (!material.materialId) return;
+          
+          // Get material name from the materials list
+          const materialObj = materials.find(m => m.id === material.materialId);
+          const key = `${material.materialId}-${material.materialId}`;
+          
+          if (!materialMap.has(key)) {
+            materialMap.set(key, {
+              materialId: material.materialId,
+              name: materialObj?.name || 'Unknown Material',
+              color: materialObj?.color || '-',
+              size: materialObj?.size || '-',
+              totalQuantity: 0,
+              totalAdditional: 0,
+              notes: [],
+              items: new Set()
+            });
+          }
+          
+          const entry = materialMap.get(key);
+          entry.totalQuantity += (material.quantity || 1);
+          if (material.additionalQuantity) {
+            entry.totalAdditional += material.additionalQuantity;
+          }
+          if (material.note) {
+            entry.notes.push(material.note);
+          }
+          
+          const itemName = item.itemname || item.description || 'Unnamed Item';
+          const itemSize = item.size || '';
+          const itemIdentifier = itemSize ? `${itemName} (${itemSize})` : itemName;
+          entry.items.add(itemIdentifier);
+        });
+      }
+    });
+    
+    return Array.from(materialMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+  };
+
+  const materialsSummary = getMaterialsSummary();
+  const hasMaterials = materialsSummary.length > 0;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -1442,7 +1491,7 @@ const ConfirmationModal = ({
       title="Confirm Proforma Invoice"
       description="Please review all items before creating the invoice"
     >
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+      <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
         {/* Customer Info */}
         <div className="rounded-lg border bg-muted/20 p-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -1470,7 +1519,7 @@ const ConfirmationModal = ({
           </div>
 
           {/* Items List with overflow */}
-          <div className="space-y-2 max-h-[40vh] overflow-y-auto overflow-x-hidden pr-1">
+          <div className="space-y-2 max-h-[30vh] overflow-y-auto overflow-x-hidden pr-1">
             {data.items?.map((item, index) => {
               const selection = hierarchicalSelections.get(index);
               const categoryName = selection?.categoryId 
@@ -1518,6 +1567,73 @@ const ConfirmationModal = ({
             </Badge>
           </div>
         </div>
+
+        {/* Materials Summary Section */}
+        {hasMaterials && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Package className="h-3.5 w-3.5" />
+                Materials Summary ({materialsSummary.length} types)
+              </p>
+            </div>
+            
+            <div className="rounded-lg border bg-muted/10 overflow-hidden">
+              {/* Material Table Header */}
+              <div className="grid grid-cols-12 gap-2 bg-muted/30 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <div className="col-span-4">Material</div>
+                <div className="col-span-2">Color</div>
+                <div className="col-span-2">Size</div>
+                <div className="col-span-2 text-right">Total Qty</div>
+              </div>
+              
+              {/* Material Items */}
+              <div className="max-h-[20vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {materialsSummary.map((material, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 px-3 py-2 hover:bg-muted/20 transition-colors text-xs">
+                    <div className="col-span-4 font-medium truncate">
+                      {material.name}
+                    </div>
+                    <div className="col-span-2 text-muted-foreground">
+                      {material.color !== '-' && (
+                        <span className="flex items-center gap-1.5">
+                          <span 
+                            className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200" 
+                            style={{ backgroundColor: material.color.toLowerCase() }}
+                          />
+                          {material.color}
+                        </span>
+                      )}
+                      {material.color === '-' && <span className="text-slate-400">-</span>}
+                    </div>
+                    <div className="col-span-2 font-mono text-muted-foreground">
+                      {material.size}
+                    </div>
+                    <div className="col-span-2 text-right font-mono font-semibold">
+                      {material.totalQuantity}
+                      {material.totalAdditional > 0 && (
+                        <span className="text-[10px] text-muted-foreground ml-1">
+                          +{material.totalAdditional}
+                        </span>
+                      )}
+                    </div>
+               
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* No materials warning */}
+        {!hasMaterials && data.items?.some(item => item.materials && item.materials.length > 0) === false && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-center">
+            <p className="text-xs text-amber-800 flex items-center justify-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              No materials have been specified for any item.
+            </p>
+          </div>
+        )}
 
         {/* Totals Summary - Sticky at bottom of scroll */}
         <div className="sticky bottom-0 rounded-lg border bg-card p-4 space-y-2 shadow-lg">
@@ -1595,6 +1711,7 @@ const ConfirmationModal = ({
     </Modal>
   );
 };
+
   return (
     <>
     <div className="mx-auto w-full space-y-4">

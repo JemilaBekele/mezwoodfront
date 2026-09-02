@@ -2,9 +2,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +35,6 @@ import {
   Box,
   Layers,
   Info,
-  Calendar,
   Phone,
   MapPin,
   ArrowRight,
@@ -48,8 +47,6 @@ import {
   Clock,
   ChevronRight,
   Plus,
-  Percent,
-  TrendingUp,
   ShieldCheck,
   Paperclip,
 } from 'lucide-react';
@@ -1238,14 +1235,14 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                   <TableHeader className="bg-slate-100/70 border-b border-slate-200">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-12 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">#</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[180px]">Product </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[100px]">Size</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-45">Product </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-25">Size</TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Qty</TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Unit Price</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right min-w-[120px]">Line Amount</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right min-w-30">Line Amount</TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Materials</TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Images</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[200px]">Description</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-50">Description</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-slate-100">
@@ -1306,7 +1303,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                                           Image Preview ({imgIndex + 1} of {images.length})
                                         </DialogTitle>
                                       </DialogHeader>
-                                      <div className="p-4 bg-slate-100 flex items-center justify-center min-h-[300px]">
+                                      <div className="p-4 bg-slate-100 flex items-center justify-center min-h-75">
                                         <img
                                           src={normalizeImagePath(image.imageUrl)}
                                           alt={`Full image ${imgIndex + 1}`}
@@ -1330,9 +1327,9 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                           </TableCell>
                           <TableCell className="max-w-xs text-xs text-slate-600">
                             <div className="space-y-1">
-                              <p className="break-words font-medium">{formatDescription(item.description)}</p>
+                              <p className="wrap-break-word font-medium">{formatDescription(item.description)}</p>
                               {item.additionalDescription && (
-                                <p className="text-[11px] text-slate-400 italic break-words">
+                                <p className="text-[11px] text-slate-400 italic wrap-break-word">
                                   {formatDescription(item.additionalDescription)}
                                 </p>
                               )}
@@ -1404,141 +1401,288 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
         </TabsContent>
 
         {/* MATERIALS TAB */}
-        <TabsContent value="materials" className="space-y-6">
-          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                <Box className="h-4 w-4 text-slate-500" />
-                Materials Requirement Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              
-              {/* Materials Count Metric Banner */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Types</p>
-                  <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
-                    {invoice.items.reduce(
-                      (total, item) => total + (item.proformaItemMaterials?.length || 0),
-                      0
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Units</p>
-                  <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
-                    {invoice.items.reduce(
-                      (total, item) => total + getItemMaterialsTotal(item),
-                      0
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 col-span-2 md:col-span-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Items with Specs</p>
-                  <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
-                    {invoice.items.filter(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0).length} / {invoice.items.length}
-                  </p>
-                </div>
-              </div>
+       {/* MATERIALS TAB */}
+<TabsContent value="materials" className="space-y-6">
+  <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+      <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+        <Box className="h-4 w-4 text-slate-500" />
+        Materials Requirement Summary
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="p-6 space-y-6">
+      
+      {/* Materials Count Metric Banner */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Types</p>
+          <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+            {(() => {
+              // Get unique materials across all items
+              const materialMap = new Map();
+              invoice.items.forEach(item => {
+                if (item.proformaItemMaterials) {
+                  item.proformaItemMaterials.forEach(material => {
+                    const key = `${material.material?.name || ''}-${material.material?.color || ''}-${material.material?.size || ''}`;
+                    if (!materialMap.has(key)) {
+                      materialMap.set(key, {
+                        name: material.material?.name || '',
+                        color: material.material?.color || '',
+                        size: material.material?.size || '',
+                        totalQuantity: 0,
+                        totalAdditional: 0,
+                        notes: material.note || '',
+                        items: []
+                      });
+                    }
+                    const entry = materialMap.get(key);
+                    entry.totalQuantity += material.quantity;
+                    entry.totalAdditional += (material.additionalQuantity || 0);
+                    // Store first note if exists, or concatenate unique notes
+                    if (material.note && !entry.notes) {
+                      entry.notes = material.note;
+                    } else if (material.note && entry.notes !== material.note) {
+                      entry.notes = `${entry.notes}; ${material.note}`;
+                    }
+                    // Track which items use this material
+                    const itemName = item.item?.name || item.description || 'Unnamed Item';
+                    if (!entry.items.includes(itemName)) {
+                      entry.items.push(itemName);
+                    }
+                  });
+                }
+              });
+              return materialMap.size;
+            })()}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Units</p>
+          <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+            {invoice.items.reduce(
+              (total, item) => total + getItemMaterialsTotal(item),
+              0
+            )}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 col-span-2 md:col-span-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Items with Specs</p>
+          <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+            {invoice.items.filter(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0).length} / {invoice.items.length}
+          </p>
+        </div>
+      </div>
 
-              {/* Item Materials Accordion/Card Breakdown */}
-              <div className="space-y-4">
-                {invoice.items.map((item) => {
-                  if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+      {/* Grouped Materials Summary Table */}
+      <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <CardHeader className="bg-indigo-50/60 px-5 py-3 border-b border-slate-200">
+          <CardTitle className="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-2">
+            <Layers className="h-3.5 w-3.5 text-indigo-600" />
+            Consolidated Materials Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-50/60">
+              <TableRow>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Material Name</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Color</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Size</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Qty</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add. Qty</TableHead>
 
-                  return (
-                    <Card key={item.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                      <CardHeader className="bg-slate-50/80 px-5 py-3 border-b border-slate-100">
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center justify-between">
-                          <span className="flex items-center gap-2">
-                            <Package className="h-3.5 w-3.5 text-slate-500" />
-                            {item.item?.name || item.description}
-                            {item.size && (
-                              <Badge variant="outline" className="ml-2 font-mono text-[10px]">
-                                {item.size}
-                              </Badge>
-                            )}
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100 text-xs">
+              {(() => {
+                // Build grouped materials
+                const materialMap = new Map();
+                invoice.items.forEach(item => {
+                  if (item.proformaItemMaterials) {
+                    item.proformaItemMaterials.forEach(material => {
+                      const key = `${material.material?.name || ''}-${material.material?.color || ''}-${material.material?.size || ''}`;
+                      if (!materialMap.has(key)) {
+                        materialMap.set(key, {
+                          name: material.material?.name || '-',
+                          color: material.material?.color || '-',
+                          size: material.material?.size || '-',
+                          totalQuantity: 0,
+                          totalAdditional: 0,
+                          notes: [],
+                          items: new Set(),
+                          itemDetails: []
+                        });
+                      }
+                      const entry = materialMap.get(key);
+                      entry.totalQuantity += material.quantity;
+                      entry.totalAdditional += (material.additionalQuantity || 0);
+                      if (material.note) {
+                        entry.notes.push(material.note);
+                      }
+                      const itemName = item.item?.name || item.description || 'Unnamed Item';
+                      const itemSize = item.size || '';
+                      const itemIdentifier = itemSize ? `${itemName} (${itemSize})` : itemName;
+                      entry.items.add(itemIdentifier);
+                      entry.itemDetails.push({
+                        name: itemName,
+                        size: itemSize,
+                        quantity: material.quantity,
+                        additional: material.additionalQuantity || 0
+                      });
+                    });
+                  }
+                });
+
+                // Sort materials by total quantity (descending)
+                return Array.from(materialMap.values())
+                  .sort((a, b) => b.totalQuantity - a.totalQuantity)
+                  .map((groupedMaterial) => (
+                    <TableRow key={`${groupedMaterial.name}-${groupedMaterial.color}-${groupedMaterial.size}`} className="hover:bg-slate-50/50">
+                      <TableCell className="font-semibold text-slate-800">
+                        {groupedMaterial.name}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {groupedMaterial.color !== '-' && (
+                          <span className="flex items-center gap-1.5">
+                            <span 
+                              className="inline-block w-3 h-3 rounded-full border border-slate-200" 
+                              style={{ backgroundColor: groupedMaterial.color.toLowerCase() }}
+                            />
+                            {groupedMaterial.color}
                           </span>
-                          <span className="text-[10px] font-mono text-slate-500">
-                            {item.proformaItemMaterials.length} material(s)
-                          </span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <Table>
-                          <TableHeader className="bg-slate-50/40">
-                            <TableRow>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Material Name</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Color</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Size</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Qty</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add. Qty</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Notes</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody className="divide-y divide-slate-100 text-xs">
-                            {item.proformaItemMaterials.map((material: IProformaItemMaterial) => (
-                              <TableRow key={material.id} className="hover:bg-slate-50/50">
-                                <TableCell className="font-semibold text-slate-800">
-                                  {material.material?.name || '-'}
-                                </TableCell>
-                                <TableCell className="text-slate-600">{material.material?.color || '-'}</TableCell>
-                                <TableCell className="font-mono text-slate-600">{material.material?.size || '-'}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="font-mono text-xs border-slate-200">
-                                    {material.quantity} units
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="secondary" className="font-mono text-xs">
-                                    +{material?.additionalQuantity || 0}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-slate-500 text-xs">
-                                  {material.note ? (
-                                    <span className="line-clamp-1">{material.note}</span>
-                                  ) : (
-                                    <span className="text-slate-300 italic">No notes</span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        )}
+                        {groupedMaterial.color === '-' && '-'}
+                      </TableCell>
+                      <TableCell className="font-mono text-slate-600">
+                        {groupedMaterial.size}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="font-mono text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          {groupedMaterial.totalQuantity} units
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {groupedMaterial.totalAdditional > 0 ? (
+                          <Badge variant="secondary" className="font-mono text-xs">
+                            +{groupedMaterial.totalAdditional}
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-300 text-[10px]">+0</span>
+                        )}
+                      </TableCell>
+                
+                    
+                    </TableRow>
+                  ));
+              })()}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-                {/* Items Without Materials Card */}
-                {invoice.items.filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0).length > 0 && (
-                  <Card className="rounded-xl border border-slate-200 bg-amber-50/30 shadow-sm">
-                    <CardHeader className="py-3 px-5 border-b border-amber-100">
-                      <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-2">
-                        <Info className="h-4 w-4 text-amber-600" />
-                        Items Without Specified Materials
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-2">
-                      {invoice.items
-                        .filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0)
-                        .map((item) => (
-                          <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg border border-amber-200/60 bg-white text-xs">
-                            <span className="font-medium text-slate-800">{item.description}</span>
-                            <Badge variant="outline" className="font-mono border-amber-300 text-amber-800">
-                              {formatCurrency(item.amount)}
+      {/* Original Item Materials Accordion/Card Breakdown (Collapsible) */}
+      <details className="space-y-4">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900 flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
+          <ChevronRight className="h-3.5 w-3.5" />
+          View Breakdown by Product
+        </summary>
+        <div className="space-y-4 pt-4">
+          {invoice.items.map((item) => {
+            if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+
+            return (
+              <Card key={item.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50/80 px-5 py-3 border-b border-slate-100">
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Package className="h-3.5 w-3.5 text-slate-500" />
+                      {item.item?.name || item.description}
+                      {item.size && (
+                        <Badge variant="outline" className="ml-2 font-mono text-[10px]">
+                          {item.size}
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {item.proformaItemMaterials.length} material(s)
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-slate-50/40">
+                      <TableRow>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Material Name</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Color</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Size</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Qty</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add. Qty</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-slate-100 text-xs">
+                      {item.proformaItemMaterials.map((material: IProformaItemMaterial) => (
+                        <TableRow key={material.id} className="hover:bg-slate-50/50">
+                          <TableCell className="font-semibold text-slate-800">
+                            {material.material?.name || '-'}
+                          </TableCell>
+                          <TableCell className="text-slate-600">{material.material?.color || '-'}</TableCell>
+                          <TableCell className="font-mono text-slate-600">{material.material?.size || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-xs border-slate-200">
+                              {material.quantity} units
                             </Badge>
-                          </div>
-                        ))}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="font-mono text-xs">
+                              +{material?.additionalQuantity || 0}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-slate-500 text-xs">
+                            {material.note ? (
+                              <span className="line-clamp-1">{material.note}</span>
+                            ) : (
+                              <span className="text-slate-300 italic">No notes</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </details>
 
-            </CardContent>
-          </Card>
-        </TabsContent>
+      {/* Items Without Materials Card */}
+      {invoice.items.filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0).length > 0 && (
+        <Card className="rounded-xl border border-slate-200 bg-amber-50/30 shadow-sm">
+          <CardHeader className="py-3 px-5 border-b border-amber-100">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-2">
+              <Info className="h-4 w-4 text-amber-600" />
+              Items Without Specified Materials
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-2">
+            {invoice.items
+              .filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0)
+              .map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg border border-amber-200/60 bg-white text-xs">
+                  <span className="font-medium text-slate-800">{item.description}</span>
+                  <Badge variant="outline" className="font-mono border-amber-300 text-amber-800">
+                    {formatCurrency(item.amount)}
+                  </Badge>
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+      )}
+
+    </CardContent>
+  </Card>
+</TabsContent>
 
         {/* ATTACHMENTS TAB */}
         <TabsContent value="attachments" className="space-y-4">

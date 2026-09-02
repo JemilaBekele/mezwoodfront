@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IProformaInvoice, IProformaInvoiceItem, IProformaItemMaterial } from '@/models/ProformaInvoice';
 import { Textarea } from '@/components/ui/textarea';
 import Select from 'react-select';
-import { Plus, Trash2, Package, RefreshCw, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Package, RefreshCw, AlertTriangle, Image as ImageIcon, Layers, CheckCircle } from 'lucide-react';
 import { getCustomer } from '@/service/customer';
 import { getMaterials, getMaterialStockById } from '@/service/material';
 import { getItems } from '@/service/item';
@@ -677,6 +677,62 @@ export default function DesignProformaInvoiceForm({
     }
     return material.quantity || 0;
   };
+  const getMaterialsSummary = useCallback(() => {
+    const itemsList = form.getValues('items');
+    const materialMap = new Map();
+    
+    itemsList.forEach((item) => {
+      if (item.materials && item.materials.length > 0) {
+        item.materials.forEach((material) => {
+          if (!material.materialId) return;
+          
+          const materialObj = materials.find(m => m.id === material.materialId);
+          const originalQty = originalMaterialQuantities.get(material.id) || 0;
+          const additionalQty = material.additionalQuantity || 0;
+          const totalQty = originalQty + additionalQty;
+          
+          const key = `${material.materialId}-${material.materialId}`;
+          
+          if (!materialMap.has(key)) {
+            materialMap.set(key, {
+              materialId: material.materialId,
+              name: materialObj?.name || 'Unknown Material',
+              color: materialObj?.color || '-',
+              size: materialObj?.size || '-',
+              totalOriginalQuantity: 0,
+              totalAdditionalQuantity: 0,
+              totalQuantity: 0,
+              notes: [],
+              items: new Set(),
+              stockInfo: materialStock.get(material.materialId)
+            });
+          }
+          
+          const entry = materialMap.get(key);
+          if (originalQty > 0) {
+            entry.totalOriginalQuantity += originalQty;
+          }
+          entry.totalAdditionalQuantity += additionalQty;
+          entry.totalQuantity += totalQty > 0 ? totalQty : (material.quantity || 0);
+          
+          if (material.note) {
+            entry.notes.push(material.note);
+          }
+          
+          const itemName = item.description || 'Unnamed Item';
+          const itemSize = item.size || '';
+          const itemIdentifier = itemSize ? `${itemName} (${itemSize})` : itemName;
+          entry.items.add(itemIdentifier);
+        });
+      }
+    });
+    
+    return Array.from(materialMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+  }, [form, materials, originalMaterialQuantities, materialStock]);
+
+  const materialsSummary = getMaterialsSummary();
+  const hasMaterials = materialsSummary.length > 0;
+  const totalUnits = materialsSummary.reduce((sum, m) => sum + m.totalQuantity, 0);
 
   // Custom Select Option Component with Image
   const CustomSelectOption = (props: any) => {
@@ -810,7 +866,183 @@ export default function DesignProformaInvoiceForm({
                 )}
               />
             </div>
-
+    {hasMaterials && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-primary/5 p-4 border-b">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="font-semibold text-sm md:text-base flex items-center gap-2">
+                      <Layers className="h-4 w-4 md:h-5 md:w-5" />
+                      Materials Summary
+                      <Badge variant="secondary" className="text-xs">
+                        {materialsSummary.length} types
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Total: {totalUnits} units
+                      </Badge>
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      {isLoadingStock && (
+                        <Badge variant="outline" className="text-xs animate-pulse">
+                          Loading stock...
+                        </Badge>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={refreshMaterials}
+                        className="h-7 text-xs"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 w-full overflow-x-auto">
+                  <div className="min-w-150 md:min-w-full">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/30">
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Material</th>
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Color</th>
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Size</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Original</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Additional</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Qty</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stock</th>
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Used In</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {materialsSummary.map((material, idx) => {
+                          const isExceeded = material.stockInfo && 
+                            material.totalAdditionalQuantity > material.stockInfo.available && 
+                            material.stockInfo.available > 0;
+                          const isOutOfStock = material.stockInfo && material.stockInfo.isOutOfStock;
+                          const isAvailable = material.stockInfo && material.stockInfo.available > 0 && !isExceeded;
+                          
+                          // Get material image for preview
+                          const materialObj = materials.find(m => m.id === material.materialId);
+                          const imageUrl = materialObj?.imageUrl ? normalizeImagePath(materialObj.imageUrl) : null;
+                          
+                          return (
+                            <tr key={idx} className="hover:bg-muted/20 transition-colors">
+                              <td className="py-2 px-3">
+                                <div className="flex items-center gap-2">
+                                  {imageUrl ? (
+                                    <div className="relative h-8 w-8 rounded overflow-hidden border border-gray-200 dark:border-gray-600 flex-shrink-0">
+                                      <Image
+                                        src={imageUrl}
+                                        alt={material.name}
+                                        fill
+                                        className="object-cover"
+                                        sizes="32px"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="h-8 w-8 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600 flex-shrink-0">
+                                      <ImageIcon className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <span className="font-medium">
+                                    {material.name}
+                                    {material.items.size > 1 && (
+                                      <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0">
+                                        ×{material.items.size}
+                                      </Badge>
+                                    )}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-muted-foreground">
+                                {material.color !== '-' && (
+                                  <span className="flex items-center gap-1.5">
+                                    <span 
+                                      className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200 flex-shrink-0" 
+                                      style={{ backgroundColor: material.color.toLowerCase() }}
+                                    />
+                                    {material.color}
+                                  </span>
+                                )}
+                                {material.color === '-' && <span className="text-slate-400">-</span>}
+                              </td>
+                              <td className="py-2 px-3 font-mono text-muted-foreground">
+                                {material.size}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono">
+                                {material.totalOriginalQuantity > 0 ? material.totalOriginalQuantity : '-'}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono">
+                                {material.totalAdditionalQuantity > 0 ? (
+                                  <Badge variant="secondary" className="text-xs font-mono">
+                                    +{material.totalAdditionalQuantity}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-semibold">
+                                {material.totalQuantity}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono">
+                                {material.stockInfo ? (
+                                  <span className={material.stockInfo.available > 0 ? 'text-green-600' : 'text-red-600'}>
+                                    {material.stockInfo.available}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3">
+                                {isOutOfStock ? (
+                                  <Badge variant="destructive" className="text-[10px]">
+                                    <AlertTriangle className="h-2.5 w-2.5 mr-1" />
+                                    Out of Stock
+                                  </Badge>
+                                ) : isExceeded ? (
+                                  <Badge variant="destructive" className="text-[10px] bg-yellow-600 hover:bg-yellow-700">
+                                    <AlertTriangle className="h-2.5 w-2.5 mr-1" />
+                                    Exceeds Stock
+                                  </Badge>
+                                ) : isAvailable ? (
+                                  <Badge variant="default" className="text-[10px] bg-green-500">
+                                    <CheckCircle className="h-2.5 w-2.5 mr-1" />
+                                    Available
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Unknown
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="py-2 px-3">
+                                <div className="flex flex-wrap gap-1">
+                                  {Array.from(material.items).slice(0, 2).map((itemName) => {
+                                    const itemLabel = String(itemName);
+                                    return (
+                                      <Badge key={itemLabel} variant="outline" className="text-[9px]">
+                                        {itemLabel.length > 15 ? itemLabel.substring(0, 15) + '...' : itemLabel}
+                                      </Badge>
+                                    );
+                                  })}
+                                  {material.items.size > 2 && (
+                                    <Badge variant="outline" className="text-[9px]">
+                                      +{material.items.size - 2}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="border-t pt-6 overflow-visible">
               <div className="mb-4 flex items-center justify-between">
                 <CardTitle className="text-lg">Items</CardTitle>

@@ -42,6 +42,7 @@ import {
   Upload,
   X,
   Paperclip,
+  ChevronRight,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage, DesignStatus, IProjectLog, StageStatus, WorkShift } from '@/models/Projects';
 import { getProjectId, updateProjectDesignStatus } from '@/service/Project';
@@ -73,7 +74,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1037,64 +1037,107 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
         {/* Material Stock Details Card */}
         {materialStockChecks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2">
-                <Package className="h-5 w-5" />
-                Material Stock Status
-                <Badge variant={allMaterialsAvailable ? 'default' : 'destructive'} className="ml-0 md:ml-2">
-                  {allMaterialsAvailable ? 'All Available' : `${materialStockChecks.filter(c => !c.isAvailable).length} Shortfalls`}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                <div className="min-w-160 md:min-w-full">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs sm:text-sm">Material</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Color</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Size</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Required</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Issued</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Remaining</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Stock</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Status</TableHead>
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex flex-wrap items-center gap-2">
+        <Package className="h-5 w-5" />
+        Material Stock Status
+        <Badge variant={allMaterialsAvailable ? 'default' : 'destructive'} className="ml-0 md:ml-2">
+          {allMaterialsAvailable ? 'All Available' : `${materialStockChecks.filter(c => !c.isAvailable).length} Shortfalls`}
+        </Badge>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="min-w-160 md:min-w-full">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs sm:text-sm">Material</TableHead>
+                <TableHead className="text-xs sm:text-sm">Color</TableHead>
+                <TableHead className="text-xs sm:text-sm">Size</TableHead>
+                <TableHead className="text-xs sm:text-sm">Total Required</TableHead>
+   
+                <TableHead className="text-xs sm:text-sm">Stock</TableHead>
+                <TableHead className="text-xs sm:text-sm">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(() => {
+                // Group identical materials by name + color + size
+                const groupedMap = new Map();
+                
+                materialStockChecks.forEach((check) => {
+                  const key = `${check.materialName}-${check.color}-${check.size}`;
+                  
+                  if (!groupedMap.has(key)) {
+                    groupedMap.set(key, {
+                      ...check,
+                      requiredQuantity: 0,
+                      alreadyIssued: 0,
+                      remainingNeeded: 0,
+                      // Store original items for reference
+                      items: []
+                    });
+                  }
+                  
+                  const entry = groupedMap.get(key);
+                  entry.requiredQuantity += (check.requiredQuantity || 0);
+                  entry.alreadyIssued += (check.alreadyIssued || 0);
+                  entry.remainingNeeded += (check.remainingNeeded || 0);
+                  entry.items.push(check);
+                });
+                
+                // Convert to array and sort by material name
+                return Array.from(groupedMap.values())
+                  .sort((a, b) => a.materialName.localeCompare(b.materialName))
+                  .map((grouped) => {
+                    // Calculate combined availability
+                    const isAvailable = grouped.items.every((item: { isAvailable: any; }) => item.isAvailable);
+                    
+                    return (
+                      <TableRow key={`${grouped.materialId}-${grouped.color}-${grouped.size}`}>
+                        <TableCell className="font-medium text-xs sm:text-sm">
+                          {grouped.materialName}
+                          {grouped.items.length > 1 && (
+                            <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0">
+                              ×{grouped.items.length}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs sm:text-sm">{grouped.color}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{grouped.size}</TableCell>
+                        <TableCell className="text-xs sm:text-sm font-semibold">
+                          {grouped.requiredQuantity}
+                        </TableCell>
+                    
+                        <TableCell className="text-xs sm:text-sm">{grouped.availableStock}</TableCell>
+                        <TableCell>
+                          {isAvailable ? (
+                            <Badge variant="default" className="bg-green-500 text-[10px] sm:text-xs whitespace-nowrap">
+                              <CheckCircle2 className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+                              Available
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px] sm:text-xs whitespace-nowrap">
+                              <AlertCircle className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+                              Shortfall
+                            </Badge>
+                          )}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {materialStockChecks.map((check) => (
-                        <TableRow key={check.materialId}>
-                          <TableCell className="font-medium text-xs sm:text-sm">{check.materialName}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">{check.color}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">{check.size}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">{check.requiredQuantity}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">{check.alreadyIssued}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">{check.remainingNeeded}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">{check.availableStock}</TableCell>
-                          <TableCell>
-                            {check.isAvailable ? (
-                              <Badge variant="default" className="bg-green-500 text-[10px] sm:text-xs whitespace-nowrap">
-                                <CheckCircle2 className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
-                                Available
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive" className="text-[10px] sm:text-xs whitespace-nowrap">
-                                <AlertCircle className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
-                                Shortfall
-                              </Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                    );
+                  });
+              })()}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+      
+    
+    </CardContent>
+  </Card>
+)}
 
         {/* Tabs for Stages and Proforma Invoice */}
         <Tabs defaultValue="proforma" className="w-full">
@@ -1519,74 +1562,236 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                       )}
                     </TabsContent>
 
-                    {/* Materials Tab */}
-                    <TabsContent value="materials" className="space-y-4 mt-4">
-                      {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
-                        <div className="space-y-4">
-                          {proformaInvoice.items.map((item) => {
-                            if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
-                            
-                            return (
-                              <div key={item.id} className="border rounded-lg overflow-hidden">
-                                <div className="bg-muted/30 p-3 border-b">
-                                  <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || item?.itemname || item?.category?.name || 'Unnamed Item'}</h4>
-                                  {item.size && item.size !== "" && (
-                                    <p className="text-sm text-muted-foreground">Size: {item.size}</p>
-                                  )}
-                                </div>
-                                <div className="p-3 w-full overflow-x-auto">
-                                  <div className="min-w-125 md:min-w-full">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow>
-                                          <TableHead className="text-xs md:text-sm">Material</TableHead>
-                                          <TableHead className="text-xs md:text-sm">Color</TableHead>
-                                          <TableHead className="text-xs md:text-sm">Size</TableHead>
-                                          <TableHead className="text-xs md:text-sm">Qty</TableHead>
-                                          <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
-                                          <TableHead className="text-xs md:text-sm">Note</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {item.proformaItemMaterials.map((material) => (
-                                          <TableRow key={material.id}>
-                                            <TableCell className="text-sm">
-                                              <p className="font-medium">
-                                                {material.material?.name || ''}
-                                              </p>
-                                            </TableCell>
-                                            <TableCell className="text-sm">{material.material?.color || ''}</TableCell>
-                                            <TableCell className="text-sm">{material.material?.size || ''}</TableCell>
-                                            <TableCell className="text-sm">
-                                              <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                              <Badge variant="outline" className="text-xs">{material?.additionalQuantity || 0}</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                              {material.note && material.note !== "" ? (
-                                                <p className="text-sm line-clamp-2">{material.note}</p>
-                                              ) : (
-                                                <span className="text-muted-foreground text-sm">-</span>
-                                              )}
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-                          <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
-                        </div>
+     {/* Materials Tab */}
+<TabsContent value="materials" className="space-y-4 mt-4">
+  {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
+    <div className="space-y-4">
+      {/* Materials Summary Card */}
+      <div className="border rounded-lg overflow-hidden">
+        <div className="bg-primary/5 p-3 border-b">
+          <h4 className="font-semibold text-sm md:text-base flex items-center gap-2">
+            <Package className="h-4 w-4 md:h-5 md:w-5" />
+            Materials Summary
+            <Badge variant="secondary" className="text-xs">
+              {(() => {
+                // Get unique materials across all items
+                const uniqueMaterials = new Map();
+                proformaInvoice.items.forEach(item => {
+                  if (item.proformaItemMaterials) {
+                    item.proformaItemMaterials.forEach(material => {
+                      if (material.material?.id) {
+                        const key = material.material.id;
+                        if (!uniqueMaterials.has(key)) {
+                          uniqueMaterials.set(key, {
+                            material: material.material,
+                            totalQuantity: 0,
+                            totalAdditional: 0,
+                            items: new Set()
+                          });
+                        }
+                        const entry = uniqueMaterials.get(key);
+                        entry.totalQuantity += (material.quantity || 0);
+                        entry.totalAdditional += (material.additionalQuantity || 0);
+                        entry.items.add(item?.item?.name || item?.itemname || 'Unnamed');
+                      }
+                    });
+                  }
+                });
+                return uniqueMaterials.size;
+              })()} types
+            </Badge>
+          </h4>
+        </div>
+        <div className="p-3 w-full overflow-x-auto">
+          <div className="min-w-150 md:min-w-full">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs md:text-sm">Material</TableHead>
+                  <TableHead className="text-xs md:text-sm">Color</TableHead>
+                  <TableHead className="text-xs md:text-sm">Size</TableHead>
+                  <TableHead className="text-xs md:text-sm text-right">Total Qty</TableHead>
+                  <TableHead className="text-xs md:text-sm text-right">Add. Qty</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(() => {
+                  // Group materials by ID
+                  const groupedMaterials = new Map();
+                  proformaInvoice.items.forEach(item => {
+                    if (item.proformaItemMaterials) {
+                      item.proformaItemMaterials.forEach(material => {
+                        if (material.material?.id) {
+                          const key = material.material.id;
+                          if (!groupedMaterials.has(key)) {
+                            groupedMaterials.set(key, {
+                              material: material.material,
+                              totalQuantity: 0,
+                              totalAdditional: 0,
+                              notes: [],
+                              items: new Set()
+                            });
+                          }
+                          const entry = groupedMaterials.get(key);
+                          entry.totalQuantity += (material.quantity || 0);
+                          entry.totalAdditional += (material.additionalQuantity || 0);
+                          if (material.note) {
+                            entry.notes.push(material.note);
+                          }
+                          const itemName = item?.item?.name || item?.itemname || 'Unnamed';
+                          const itemSize = item?.size || '';
+                          const identifier = itemSize ? `${itemName} (${itemSize})` : itemName;
+                          entry.items.add(identifier);
+                        }
+                      });
+                    }
+                  });
+
+                  return Array.from(groupedMaterials.values())
+                    .sort((a, b) => a.material.name.localeCompare(b.material.name))
+                    .map((group) => (
+                      <TableRow key={group.material.id}>
+                        <TableCell className="text-sm font-medium">
+                          {group.material.name}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {group.material.color ? (
+                            <span className="flex items-center gap-1.5">
+                              <span 
+                                className="inline-block w-3 h-3 rounded-full border border-slate-200 flex-shrink-0" 
+                                style={{ backgroundColor: group.material.color.toLowerCase() }}
+                              />
+                              {group.material.color}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {group.material.size || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-right font-semibold">
+                          {group.totalQuantity}
+                        </TableCell>
+                        <TableCell className="text-sm text-right">
+                          {group.totalAdditional > 0 ? (
+                            <Badge variant="secondary" className="text-xs">
+                              +{group.totalAdditional}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </TableCell>
+                       
+                      </TableRow>
+                    ));
+                })()}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </div>
+
+      {/* Collapsible Breakdown by Product */}
+      <details className="space-y-4">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900 flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
+          <ChevronRight className="h-3.5 w-3.5" />
+          View Breakdown by Product
+        </summary>
+        <div className="space-y-4 pt-4">
+          {proformaInvoice.items.map((item) => {
+            if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+            
+            return (
+              <div key={item.id} className="border rounded-lg overflow-hidden">
+                <div className="bg-muted/30 p-3 border-b">
+                  <h4 className="font-semibold text-sm md:text-base flex items-center justify-between">
+                    <span>
+                      {item?.item?.name || item?.itemname || item?.category?.name || 'Unnamed Item'}
+                      {item.size && item.size !== "" && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          Size: {item.size}
+                        </Badge>
                       )}
-                    </TabsContent>
+                    </span>
+                    <Badge variant="secondary" className="text-xs">
+                      {item.proformaItemMaterials.length} material(s)
+                    </Badge>
+                  </h4>
+                </div>
+                <div className="p-3 w-full overflow-x-auto">
+                  <div className="min-w-125 md:min-w-full">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs md:text-sm">Material</TableHead>
+                          <TableHead className="text-xs md:text-sm">Color</TableHead>
+                          <TableHead className="text-xs md:text-sm">Size</TableHead>
+                          <TableHead className="text-xs md:text-sm">Qty</TableHead>
+                          <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
+                          <TableHead className="text-xs md:text-sm">Note</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {item.proformaItemMaterials.map((material) => (
+                          <TableRow key={material.id}>
+                            <TableCell className="text-sm">
+                              <p className="font-medium">
+                                {material.material?.name || ''}
+                              </p>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {material.material?.color ? (
+                                <span className="flex items-center gap-1.5">
+                                  <span 
+                                    className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200 flex-shrink-0" 
+                                    style={{ backgroundColor: material.material.color.toLowerCase() }}
+                                  />
+                                  {material.material.color}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">{material.material?.size || '-'}</TableCell>
+                            <TableCell className="text-sm">
+                              <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {(material?.additionalQuantity ?? 0) > 0 ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  +{material.additionalQuantity}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">0</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {material.note && material.note !== "" ? (
+                                <p className="text-sm line-clamp-2">{material.note}</p>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </details>
+    </div>
+  ) : (
+    <div className="text-center py-8">
+      <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+      <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
+    </div>
+  )}
+</TabsContent>
 
                     {/* Images Tab */}
                     <TabsContent value="images" className="space-y-4 mt-4">
