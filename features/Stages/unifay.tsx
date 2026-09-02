@@ -1479,7 +1479,7 @@ const formatDescription = (text: string, limit = 80) => {
                         <div key={item.id} className="border rounded-lg p-3">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm">{item.item?.name || item.category?.name || ''}</h4>
+                              <h4 className="font-semibold text-sm">{item.item?.name || item.itemname|| item.category?.name || ''}</h4>
                               {item.size && item.size !== "" && (
                                 <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                               )}
@@ -1550,7 +1550,7 @@ const formatDescription = (text: string, limit = 80) => {
                           <TableBody>
                             {proformaInvoice.items.map((item) => (
                               <TableRow key={item.id}>
-                                <TableCell className="text-sm font-medium">{item?.item?.name || ''}</TableCell>
+                                <TableCell className="text-sm font-medium">{item.item?.name || item.itemname|| item.category?.name || ''}</TableCell>
                                 <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : ''}</TableCell>
                                 <TableCell className="text-sm">{item.quantity}</TableCell>
                                 <TableCell>
@@ -1610,7 +1610,7 @@ const formatDescription = (text: string, limit = 80) => {
                       return (
                         <div key={item.id} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
+                            <h4 className="font-semibold text-sm md:text-base">{item.item?.name || item.itemname|| item.category?.name || 'Unnamed Item'}</h4>
                             {item.size && item.size !== "" && (
                               <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                             )}
@@ -1679,7 +1679,7 @@ const formatDescription = (text: string, limit = 80) => {
                       return (
                         <div key={item.id} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/30 p-3 border-b">
-                            <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
+                            <h4 className="font-semibold text-sm md:text-base">{item.item?.name || item.itemname|| item.category?.name || 'Unnamed Item'}</h4>
                             {item.size && item.size !== "" && (
                               <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                             )}
@@ -1692,7 +1692,7 @@ const formatDescription = (text: string, limit = 80) => {
                                        onClick={() => window.open(normalizeImagePath(image.imageUrl), '_blank')}>
                                     <Image
                                       src={normalizeImagePath(image.imageUrl) || '/placeholder-image.jpg'}
-                                      alt={item?.item?.name || 'Item image'}
+                                      alt={item.item?.name || item.itemname|| item.category?.name || 'Item image'}
                                       fill
                                       className="object-cover transition-transform group-hover:scale-105"
                                     />

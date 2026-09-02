@@ -46,7 +46,7 @@ export const formatMinutes = (minutes?: number) => {
 /* ------------------------------------------------------------------ *
  * Ethiopian (Ge'ez) calendar helpers
  * ------------------------------------------------------------------ */
-const ETHIOPIAN_MONTHS = [
+export const ETHIOPIAN_MONTHS = [
   'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
   'Megabit', 'Miazia', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume',
 ];
@@ -168,4 +168,51 @@ export function formatDateTimeEth(date: Date | string | number | undefined) {
   const d = formatDateEth(date);
   const t = formatTimeEth(date);
   return [d, t].filter(Boolean).join(' ');
+}
+
+
+export function ethiopianToGregorian({
+  year,
+  month,
+  date,
+}: {
+  year: number;
+  month: number;
+  date: number;
+}) {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(date) ||
+    month < 1 ||
+    month > 13 ||
+    date < 1 ||
+    date > (month === 13 ? 6 : 30)
+  ) {
+    throw new Error("Invalid Ethiopian date");
+  }
+
+  // Ethiopian year Y begins around September 11 of Gregorian Y + 7.
+  const gregorianYear = year + 7;
+
+  // Your existing gregorianToEthiopian() treats September 11
+  // as the beginning of the Ethiopian year.
+  const start = new Date(
+    gregorianYear,
+    8, // September (0-based)
+    11
+  );
+
+  const daysBeforeMonth =
+    month === 13
+      ? 12 * 30
+      : (month - 1) * 30;
+
+  const totalDays =
+    daysBeforeMonth + (date - 1);
+
+  const result = new Date(start);
+  result.setDate(result.getDate() + totalDays);
+
+  return result;
 }

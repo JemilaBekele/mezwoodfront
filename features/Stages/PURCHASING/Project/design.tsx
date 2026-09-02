@@ -786,7 +786,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
           <CardHeader className="bg-purple-50 border-b border-purple-100">
             <CardTitle className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5 text-purple-600" />
-              <span className="text-purple-900">Purchasing Stage Details</span>
+              <span className="text-purple-900">Stock Management Stage Details</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -905,7 +905,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             ) : (
               <div className="text-center py-12">
                 <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-4 text-muted-foreground">No purchasing stage information available for this project</p>
+                <p className="mt-4 text-muted-foreground">No Stock Management stage information available for this project</p>
               </div>
             )}
           </CardContent>
@@ -956,7 +956,8 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                         <TableBody>
                           {proformaInvoice.items.map((item) => (
                             <TableRow key={item.id}>
-                              <TableCell>{item.item?.name || ''}</TableCell>
+                              <TableCell>                            {item.item?.name || item.itemname|| item.category?.name || ''}
+</TableCell>
                               <TableCell>{item.size || ''}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>

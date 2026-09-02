@@ -36,7 +36,7 @@ export default async function PurchasePage(props: pageProps) {
     <PageContainer scrollable={true}>
       <div className='flex flex-1 flex-col space-y-4'>
         <div className='flex items-start justify-between'>
-          <Heading title='Project Purchase stage' description='Manage Project ' />
+          <Heading title='Stock Management stage' description='Manage Project ' />
 
                          <PermissionGuard requiredPermission={PERMISSIONS.STAGE.VIEW_PAINTING_PROJECTS.name}>
 
@@ -44,7 +44,7 @@ export default async function PurchasePage(props: pageProps) {
               href='/dashboard/Stage/Purchase/finish'
               className={cn(buttonVariants(), 'text-xs md:text-sm')}
             >
-              Finished Purchase stage
+              Finished Stock Management stage
             </Link>  
               
                                   </PermissionGuard>

@@ -18,11 +18,11 @@ import {
   Scissors,
   CalendarDays,
   User,
-  Award,
+
   BarChart3,
   Layers,
   Package,
-  Wrench,
+
   PenTool,
   Ruler,
   ListChecks,
@@ -1387,7 +1387,9 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                               <div key={item.id} className="border rounded-lg p-3">
                                 <div className="flex justify-between items-start mb-2">
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-sm">{item?.item?.name || ''}</h4>
+                                      {item.item?.name && item.itemname && item.category?.name && (
+                                    <h4 className="font-semibold text-sm">{item.item?.name || item.itemname|| item.category?.name || ''}</h4>
+                                             )}
                                     {item.size && item.size !== "" && (
                                       <p className="text-xs text-muted-foreground">Size: {item.size}</p>
                                     )}
@@ -1457,7 +1459,7 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                 <TableBody>
                                   {proformaInvoice.items.map((item) => (
                                     <TableRow key={item.id}>
-                                      <TableCell className="text-sm font-medium">{item?.item?.name || ''}</TableCell>
+                                      <TableCell className="text-sm font-medium">{item.item?.name || item.itemname|| item.category?.name || ''}</TableCell>
                                       <TableCell className="text-sm">{item.size && item.size !== "" ? item.size : ''}</TableCell>
                                       <TableCell className="text-sm">{item.quantity}</TableCell>
                                       <TableCell>
@@ -1527,7 +1529,7 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                             return (
                               <div key={item.id} className="border rounded-lg overflow-hidden">
                                 <div className="bg-muted/30 p-3 border-b">
-                                  <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
+                                  <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || item?.itemname || item?.category?.name || 'Unnamed Item'}</h4>
                                   {item.size && item.size !== "" && (
                                     <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                                   )}
@@ -1596,7 +1598,7 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                             return (
                               <div key={item.id} className="border rounded-lg overflow-hidden">
                                 <div className="bg-muted/30 p-3 border-b">
-                                  <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || ''}</h4>
+                                  <h4 className="font-semibold text-sm md:text-base">{item?.item?.name || item?.itemname || item?.category?.name || 'Unnamed Item'}</h4>
                                   {item.size && item.size !== "" && (
                                     <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                                   )}

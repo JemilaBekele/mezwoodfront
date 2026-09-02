@@ -1050,7 +1050,16 @@ export default function ItemForm({
       materialName: '',
     });
   };
-
+// Add this function after the fetchMaterials function (around line 570)
+const refreshMaterials = async () => {
+  try {
+    const materialsData = await getMaterials();
+    setMaterials(materialsData || []);
+    toast.success('Materials refreshed');
+  } catch {
+    toast.error('Failed to refresh materials');
+  }
+};
   return (
     <div>
       {/* Image View Modal */}
@@ -1444,7 +1453,20 @@ export default function ItemForm({
                     <AlertCircle className="h-3 w-3" />
                     {errors.materials}
                   </p>
-                )}
+                )}             <Button
+  type="button"
+  variant="ghost"
+  size="sm"
+  onClick={refreshMaterials}
+  className="h-8 text-xs py-4 px-3 whitespace-nowrap self-center border border-gray-300 hover:border-gray-400"
+  disabled={loadingMaterials}
+>
+  {loadingMaterials ? (
+    <Loader2 className="h-3 w-3 animate-spin" />
+  ) : (
+    'Refresh'
+  )}
+</Button>
               </div>
 
               <div className="pb-4 border-b">
@@ -1497,6 +1519,7 @@ export default function ItemForm({
                         )}
                       </SelectContent>
                     </Select>
+
                   </div>
 
                   <div className="sm:col-span-3">

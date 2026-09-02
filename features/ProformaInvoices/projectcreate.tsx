@@ -58,6 +58,9 @@ import {
   DollarSign,
   Package,
 } from 'lucide-react';
+import { formatDateEth } from '@/lib/format';
+import { EthiopianDatePicker } from '@/lib/ethcalander';
+import React from 'react';
 
 interface ProjectFormValues {
   invoiceId: string;
@@ -109,7 +112,9 @@ export default function ProjectCreatePage({ id }: ProjectCreatePageProps) {
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationResult, setCalculationResult] = useState<CalculationResponse | null>(null);
   const [showEstimationDetails, setShowEstimationDetails] = useState(false);
-
+const [calendarType, setCalendarType] = React.useState<"gregorian" | "ethiopian">(
+  "ethiopian"
+);
   const defaultValues = useMemo<ProjectFormValues>(
     () => ({
       invoiceId: id || '',
@@ -694,7 +699,6 @@ const formatDisplayDate = (dateString: string): string => {
                   )}
                 />
 
-                {/* Target Requested Delivery Date */}
 {/* Target Requested Delivery Date */}
 <FormField
   control={form.control}
@@ -704,8 +708,10 @@ const formatDisplayDate = (dateString: string): string => {
       <div className="flex items-center justify-between">
         <FormLabel className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
           <Calendar className="h-4 w-4 text-slate-500" />
-          Requested Delivery Date <span className="text-rose-500">*</span>
+          Requested Delivery Date{" "}
+          <span className="text-rose-500">*</span>
         </FormLabel>
+
         {calculationResult?.timeline?.estimatedDeliveryDate && (
           <Button
             type="button"
@@ -714,30 +720,85 @@ const formatDisplayDate = (dateString: string): string => {
             onClick={handleCopyCalculatedDate}
             className="h-6 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 px-2"
           >
-            <Copy className="h-3 w-3 mr-1" /> Use Calculated Date
+            <Copy className="h-3 w-3 mr-1" />
+            Use Calculated Date
           </Button>
         )}
       </div>
-      <FormControl>
-        <Input
-          type="date"
-          {...field}
-          value={field.value || ''}
-          min={new Date().toISOString().split('T')[0]}
-          className="h-10 rounded-lg border-slate-300 text-xs font-mono"
-          required
-          onChange={(e) => {
-            // Store in YYYY-MM-DD format for the form state
-            field.onChange(e.target.value);
-          }}
-        />
-      </FormControl>
-      {/* Display formatted date if value exists */}
+
+      {/* Ethiopian Calendar Picker */}
+  <div className="space-y-2">
+  {/* Calendar selector */}
+  <div className="flex items-center justify-between">
+    <span className="text-xs font-medium text-slate-600">
+      Calendar
+    </span>
+
+    <div className="inline-flex rounded-lg border bg-slate-50 p-1">
+      <button
+        type="button"
+        onClick={() => setCalendarType("gregorian")}
+        className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+          calendarType === "gregorian"
+            ? "bg-white text-slate-900 shadow-sm"
+            : "text-slate-500 hover:text-slate-700"
+        }`}
+      >
+        Gregorian
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setCalendarType("ethiopian")}
+        className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+          calendarType === "ethiopian"
+            ? "bg-white text-slate-900 shadow-sm"
+            : "text-slate-500 hover:text-slate-700"
+        }`}
+      >
+        Ethiopian
+      </button>
+    </div>
+  </div>
+
+  {calendarType === "ethiopian" ? (
+    <FormControl>
+      <EthiopianDatePicker
+        value={field.value}
+        onChange={field.onChange}
+        minDate={new Date()}
+      />
+    </FormControl>
+  ) : (
+    <FormControl>
+      <Input
+        type="date"
+        value={field.value || ""}
+        min={new Date().toISOString().split("T")[0]}
+        className="h-10 rounded-lg border-slate-300 text-xs font-mono"
+        required
+        onChange={(e) => field.onChange(e.target.value)}
+      />
+    </FormControl>
+  )}
+</div>
+      {/* Gregorian date */}
       {field.value && (
         <p className="text-xs text-slate-500 mt-1">
-          Selected: {formatDisplayDate(field.value)}
+          Gregorian: {formatDisplayDate(field.value)}
         </p>
       )}
+
+      {/* Ethiopian date */}
+      {field.value && (
+        <p className="text-xs text-slate-500 mt-1">
+          Ethiopian:{" "}
+          <span className="font-medium text-slate-700">
+            {formatDateEth(field.value)}
+          </span>
+        </p>
+      )}
+
       <FormMessage />
     </FormItem>
   )}

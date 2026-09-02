@@ -8,8 +8,6 @@ import { searchParamsCache } from '@/lib/searchparams';
 import { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 
-import { PermissionGuard } from '@/components/PermissionGuard';
-import { PERMISSIONS } from '@/stores/permissions';
 
 import FinshPurchaseProjectListingPage from '@/features/Stages/PURCHASING/Project/finished';
 
@@ -33,7 +31,7 @@ export default async function PurchasePage(props: pageProps) {
     <PageContainer scrollable={true}>
       <div className='flex flex-1 flex-col space-y-4'>
         <div className='flex items-start justify-between'>
-          <Heading title='              Finished  Purchase stage' description='Manage Project ' />
+          <Heading title='              Finished  Stock Management stage' description='Manage Project ' />
        
         </div>
         <Separator />
