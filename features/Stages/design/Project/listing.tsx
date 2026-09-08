@@ -275,15 +275,31 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
   }
 
   // ── Client-side filtering ──────────────────────────────────
- const sortedProjects = [...projects].sort((a, b) => {
-  const dateA = a.requestedDelivery ? new Date(a.requestedDelivery).getTime() : null;
-  const dateB = b.requestedDelivery ? new Date(b.requestedDelivery).getTime() : null;
-  
+const sortedProjects = [...projects].sort((a, b) => {
+  const dateA = a.newRequestedDelivery
+    ? new Date(a.newRequestedDelivery).getTime()
+    : a.requestedDelivery
+      ? new Date(a.requestedDelivery).getTime()
+      : null;
+
+  const dateB = b.newRequestedDelivery
+    ? new Date(b.newRequestedDelivery).getTime()
+    : b.requestedDelivery
+      ? new Date(b.requestedDelivery).getTime()
+      : null;
+
+  // Both have dates
   if (dateA !== null && dateB !== null) {
-    return dateA - dateB; // Earliest first
+    return dateA - dateB;
   }
-  if (dateA === null && dateB !== null) return 1; // Nulls last
+
+  // A has no date → last
+  if (dateA === null && dateB !== null) return 1;
+
+  // B has no date → last
   if (dateA !== null && dateB === null) return -1;
+
+  // Both have no date
   return 0;
 });
 

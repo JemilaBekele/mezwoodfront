@@ -62,7 +62,7 @@ import {
 } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { getMaterialStockById } from '@/service/StockCorrection';
+import { getMaterialStockknow } from '@/service/StockCorrection';
 import { normalizeImagePath } from '@/lib/norm';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
@@ -210,7 +210,7 @@ const DesignProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
       for (const material of allMaterials) {
         try {
-          const stockData = await getMaterialStockById(material.materialId);
+          const stockData = await getMaterialStockknow(material.materialId);
           const availableStock = stockData?.totalQuantity || 0;
           
           const alreadyIssued = material.givenquantity || 0;

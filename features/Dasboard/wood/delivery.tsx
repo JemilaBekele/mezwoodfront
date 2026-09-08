@@ -31,6 +31,7 @@ interface Comparison {
   projectDeliveryDate?: string;
   stageDeliveryDate?: string;
   requestedDeliveryDate?: string;
+  newRequestedDeliveryDate?: string;
   differenceInDays: number;
   whichIsEarlier: string;
 }
@@ -45,6 +46,7 @@ interface MismatchedProject {
     calculatedDelivery: string | null;
     manualDelivery: string | null;
     requestedDelivery: string | null;
+    newRequestedDelivery: string | null;
     projectFinalDelivery: string;
     stageDeliveryDate: string;
   };
@@ -67,6 +69,7 @@ interface RequestedDeliveryMismatchProject {
     calculatedDelivery: string | null;
     manualDelivery: string | null;
     requestedDelivery: string | null;
+    newRequestedDelivery: string | null;
     projectFinalDelivery: string;
     stageDeliveryDate: string;
   };
@@ -100,7 +103,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<DeliveryDateReport | null>(null);
   const [sortConfig, setSortConfig] = useState<{
-    key: 'requestedDate' | 'stageDate' | 'customerName' | 'status';
+    key: 'requestedDate' | 'newRequestedDate' | 'stageDate' | 'customerName' | 'status';
     direction: 'asc' | 'desc';
   }>({
     key: 'requestedDate',
@@ -142,14 +145,14 @@ const DeliveryDateComparisonReport: React.FC = () => {
 
   // ==================== SORTING LOGIC ====================
   
-  const handleSort = (key: 'requestedDate' | 'stageDate' | 'customerName' | 'status') => {
+  const handleSort = (key: 'requestedDate' | 'newRequestedDate' | 'stageDate' | 'customerName' | 'status') => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
   };
 
-  const getSortIcon = (key: 'requestedDate' | 'stageDate' | 'customerName' | 'status') => {
+  const getSortIcon = (key: 'requestedDate' | 'newRequestedDate' | 'stageDate' | 'customerName' | 'status') => {
     if (sortConfig.key !== key) {
       return <ArrowUpDown className="h-3 w-3 ml-1 inline" />;
     }
@@ -167,6 +170,10 @@ const DeliveryDateComparisonReport: React.FC = () => {
         case 'requestedDate':
           aValue = a.dates?.requestedDelivery ? new Date(a.dates.requestedDelivery).getTime() : 0;
           bValue = b.dates?.requestedDelivery ? new Date(b.dates.requestedDelivery).getTime() : 0;
+          break;
+        case 'newRequestedDate':
+          aValue = a.dates?.newRequestedDelivery ? new Date(a.dates.newRequestedDelivery).getTime() : 0;
+          bValue = b.dates?.newRequestedDelivery ? new Date(b.dates.newRequestedDelivery).getTime() : 0;
           break;
         case 'stageDate':
           aValue = a.dates?.stageDeliveryDate ? new Date(a.dates.stageDeliveryDate).getTime() : 0;
@@ -662,6 +669,12 @@ const DeliveryDateComparisonReport: React.FC = () => {
                     >
                       Requested Date {getSortIcon('requestedDate')}
                     </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort('newRequestedDate')}
+                    >
+                      New Requested Date {getSortIcon('newRequestedDate')}
+                    </TableHead>
                     <TableHead>Days Until Requested</TableHead>
                     <TableHead>Difference</TableHead>
                     <TableHead>Earlier</TableHead>
@@ -695,6 +708,9 @@ const DeliveryDateComparisonReport: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           {formatDate(project.dates?.requestedDelivery)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(project.dates?.newRequestedDelivery)}
                         </TableCell>
                         <TableCell>
                           {warning.isWarning ? (

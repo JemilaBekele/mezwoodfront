@@ -11,7 +11,6 @@ import { Suspense } from 'react';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
-import FinishingProjectListingPage from '@/features/Stages/FINISHING/Project/listing';
 import NotFinishingProjectListingPage from '@/features/Stages/FINISHING/Project/listing';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -54,7 +53,6 @@ export default async function PurchasePage(props: pageProps) {
     
         </div>
         <Separator />
-                <StageAllocationCalendar stage="FINISHING" />
 
         <UserTableAction />
 
@@ -66,6 +64,8 @@ export default async function PurchasePage(props: pageProps) {
         >
           <NotFinishingProjectListingPage />
         </Suspense>
+                        <StageAllocationCalendar stage="FINISHING" />
+
       </div>
     </PageContainer>
   );

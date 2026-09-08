@@ -152,24 +152,59 @@ export const projectColumns: ColumnDef<IProject>[] = [
     },
     enableColumnFilter: true
   },
-  {
-    accessorKey: 'requestedDelivery',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Requested' />
-    ),
-    cell: ({ cell }) => {
-      const date = cell.getValue<Date | null>();
-      if (!date) return <span className='text-muted-foreground'>-</span>;
-      const d = new Date(date);
+{
+  id: 'requestedDelivery',
+  header: ({ column }) => (
+    <DataTableColumnHeader column={column} title='Requested' />
+  ),
+  cell: ({ row }) => {
+    const project = row.original;
+
+    const requestedDelivery = project.requestedDelivery
+      ? new Date(project.requestedDelivery)
+      : null;
+
+    const newRequestedDelivery = project.newRequestedDelivery
+      ? new Date(project.newRequestedDelivery)
+      : null;
+
+    const formatDate = (date: Date) =>
+      date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+
+    if (!requestedDelivery && !newRequestedDelivery) {
       return (
-        <div className='flex items-center gap-1.5 text-sm text-muted-foreground'>
-          <CalendarDays className='h-3.5 w-3.5' />
-          <span>{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-        </div>
+        <span className='text-muted-foreground'>
+          -
+        </span>
       );
-    },
-    enableColumnFilter: false
+    }
+
+    return (
+      <div className='flex flex-col gap-1.5 text-sm'>
+        {/* Original Requested Delivery */}
+        {requestedDelivery && (
+          <div className='flex items-center gap-1.5 text-muted-foreground'>
+            <CalendarDays className='h-3.5 w-3.5' />
+            <span>{formatDate(requestedDelivery)}</span>
+          </div>
+        )}
+
+        {/* New Requested Delivery */}
+        {newRequestedDelivery && (
+          <div className='flex items-center gap-1.5 font-medium'>
+            <CalendarDays className='h-3.5 w-3.5' />
+            <span>{formatDate(newRequestedDelivery)}</span>
+          </div>
+        )}
+      </div>
+    );
   },
+  enableColumnFilter: false,
+},
   {
     accessorKey: 'totalDays',
     header: ({ column }) => (

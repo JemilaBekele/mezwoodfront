@@ -745,3 +745,43 @@ export const disallowDeliveryWithBalance = async (projectId: string) => {
     throw error;
   }
 };
+
+export const addNewRequestedDeliveryDate = async (
+  projectId: string,
+  newDeliveryDate: string
+): Promise<{ success: boolean; message: string }> => {
+  if (!projectId || !projectId.trim()) {
+    return {
+      success: false,
+      message: 'Project ID is required',
+    };
+  }
+
+  if (!newDeliveryDate || !newDeliveryDate.trim()) {
+    return {
+      success: false,
+      message: 'Requested delivery date is required',
+    };
+  }
+
+  try {
+    const response = await axiosInstance.patch(
+      `/projectschange/${projectId}/requested-delivery-date`,
+      {
+        newDeliveryDate,
+      }
+    );
+
+    return {
+      success: true,
+      message: response.data?.message || 'Requested delivery date added successfully',
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message:
+        error.response?.data?.message ||
+        'Failed to add requested delivery date',
+    };
+  }
+};

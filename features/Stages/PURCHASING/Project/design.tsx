@@ -8,27 +8,23 @@ import { formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import {
   Calendar,
-  Clock,
   Users,
   FileText,
   Loader2,
   TrendingUp,
-
   CalendarDays,
   User,
- 
   BarChart3,
   Layers,
   Package,
-
   Box,
   ShoppingCart,
- 
   AlertCircle,
   Eye,
   X,
   Image as ImageIcon,
   ChevronRight,
+  CheckCircle,
 } from 'lucide-react';
 import { IProject, ProjectStatus, DifficultyLevel, IProjectStage } from '@/models/Projects';
 import { getProjectId } from '@/service/Project';
@@ -45,7 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -66,10 +61,10 @@ import { getMaterialStockById } from '@/service/StockCorrection';
 import { updateProformaMaterialStatus } from '@/service/material';
 import { getAllEmploy } from '@/service/employee';
 import { Input } from '@/components/ui/input';
-
 import { normalizeImagePath } from '@/lib/norm';
 import Image from 'next/image';
 import { getStatusConfig } from '../../unifay';
+import { Textarea } from '@/components/ui/textarea';
 
 // Skeleton Loader Component
 const SkeletonCard = ({ className = '' }: { className?: string }) => (
@@ -146,7 +141,6 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [project, setProject] = useState<IProject | null>(null);
   const [proformaInvoice, setProformaInvoice] = useState<IProformaInvoice | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   // State for material stock information
   const [materialStockInfo, setMaterialStockInfo] = useState<MaterialStockInfo>({});
@@ -164,10 +158,10 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   
-  // New state for partial issuance
+  // State for issuance
   const [givenQuantity, setGivenQuantity] = useState<number>(0);
-  const [additionalQuantity, setAdditionalQuantity] = useState<number>(0);
   const [issueType, setIssueType] = useState<'full' | 'partial'>('full');
+  const [issueNote, setIssueNote] = useState<string>('');
 
   // State for purchase needed items
   const [purchaseNeededItems, setPurchaseNeededItems] = useState<PurchaseNeededItem[]>([]);
@@ -185,6 +179,14 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     setPreviewImage(null);
   };
 
+  // Helper function to get material image with fallback
+  const getMaterialImage = (material: IProformaItemMaterial) => {
+    if (material.material?.imageUrl) {
+      return normalizeImagePath(material.material.imageUrl);
+    }
+    return null;
+  };
+
   // Fetch users for givenTo dropdown
   useEffect(() => {
     const fetchUsers = async () => {
@@ -199,7 +201,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     fetchUsers();
   }, []);
 
-  // Calculate items that need to be purchased based on stock availability - FIXED to include additional quantity
+  // Calculate items that need to be purchased based on stock availability
   const calculatePurchaseNeededItems = useCallback(async (materials: IProformaItemMaterial[]) => {
     if (!materials || materials.length === 0) return;
 
@@ -208,19 +210,14 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
     for (const material of materials) {
       try {
-        // Get stock data for this material
         const stockData = await getMaterialStockById(material.materialId);
         const availableStock = stockData?.totalQuantity || 0;
         
         const alreadyIssued = material.givenquantity || 0;
-        // FIX: Total required = quantity + additionalQuantity
         const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
         const remainingNeeded = totalRequired - alreadyIssued;
-        
-        // Calculate shortfall (if stock is less than remaining needed)
         const shortfall = remainingNeeded > availableStock ? remainingNeeded - availableStock : 0;
         
-        // Only add to purchase list if there's a shortfall
         if (shortfall > 0) {
           neededItems.push({
             materialId: material.materialId,
@@ -255,10 +252,8 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
       const materialKey = material.id;
       
-      // Skip if already loading or if we already have stock info
       if (materialStockInfo[materialKey]?.loading || materialStockInfo[materialKey]?.available !== undefined) return;
 
-      // Set loading state
       setMaterialStockInfo(prev => ({
         ...prev,
         [materialKey]: { available: 0, loading: true }
@@ -312,15 +307,14 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     try {
       if (id) {
         const projectData = await getProjectId(id);
+        console.log(projectData)
         setProject(projectData);
 
-        // Fetch proforma invoice if available
         if (projectData.invoice?.id) {
           try {
             const invoice = await getProformaInvoiceById(projectData.invoice.id);
             setProformaInvoice(invoice);
             
-            // Collect all materials from the invoice
             const allMaterials: IProformaItemMaterial[] = [];
             invoice.items?.forEach(item => {
               if (item.proformaItemMaterials && item.proformaItemMaterials.length > 0) {
@@ -328,10 +322,8 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
               }
             });
             
-            // Fetch stock for all materials
             if (allMaterials.length > 0) {
               await fetchStockForMaterials(allMaterials);
-              // Calculate purchase needed items
               await calculatePurchaseNeededItems(allMaterials);
             }
           } catch (error) {
@@ -351,25 +343,27 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     fetchProjectData();
   }, [fetchProjectData]);
 
-  // Handle material issue button click - Check stock first
+  // Handle material issue button click
   const handleIssueMaterialClick = async (material: IProformaItemMaterial) => {
     setSelectedMaterial(material);
     setIsCheckingStock(true);
     setIsIssueDialogOpen(true);
-    // Reset form values
     setIssueType('full');
     setGivenQuantity(0);
-    setAdditionalQuantity(0);
     setSelectedUserId('');
+    setIssueNote('');
 
     try {
       const stock = await getMaterialStockById(material.materialId);
       setStockData(stock);
       
       const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
+      const alreadyIssued = material.givenquantity || 0;
+      const remainingNeeded = totalRequired - alreadyIssued;
       const availableQuantity = stock?.totalQuantity || 0;
-      if (availableQuantity < totalRequired) {
-        toast.error(`Insufficient stock! Available: ${availableQuantity}, Required: ${totalRequired}`);
+      
+      if (availableQuantity < remainingNeeded) {
+        toast.warning(`Low stock! Available: ${availableQuantity}, Remaining needed: ${remainingNeeded}`);
       }
     } catch (error) {
       console.error('Error checking stock:', error);
@@ -379,7 +373,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     }
   };
 
-  // Handle confirm issue
+  // Handle confirm issue - UPDATED to match API signature
   const handleConfirmIssue = async () => {
     if (!selectedMaterial || !selectedUserId) {
       toast.error('Please select a user to issue the material to');
@@ -392,17 +386,12 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
     let totalGiven = 0;
     let status = MaterialIssueStatus.ISSUED;
-    let givenQty = 0;
-    let additionalQty = 0;
 
     if (issueType === 'full') {
-      // Full issuance - issue all remaining needed
       totalGiven = remainingNeeded;
-      givenQty = remainingNeeded;
       status = MaterialIssueStatus.ISSUED;
     } else {
-      // Partial issuance
-      totalGiven = givenQuantity + additionalQuantity;
+      totalGiven = givenQuantity;
       
       if (totalGiven <= 0) {
         toast.error('Please enter a valid quantity to issue');
@@ -410,16 +399,13 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
       }
       
       if (totalGiven > remainingNeeded) {
-        toast.error(`Total quantity (${totalGiven}) cannot exceed remaining needed (${remainingNeeded})`);
+        toast.error(`Quantity (${totalGiven}) cannot exceed remaining needed (${remainingNeeded})`);
         return;
       }
       
-      givenQty = givenQuantity;
-      additionalQty = additionalQuantity;
       status = totalGiven >= remainingNeeded ? MaterialIssueStatus.ISSUED : MaterialIssueStatus.PARTIALLY;
     }
 
-    // Check if stock is sufficient
     if (stockData && totalGiven > stockData.totalQuantity) {
       toast.error(`Insufficient stock! Available: ${stockData.totalQuantity}, Required: ${totalGiven}`);
       return;
@@ -431,22 +417,18 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
         selectedMaterial.id,
         status,
         selectedUserId,
-        givenQty,
-        additionalQty
+        totalGiven,
+        undefined,
       );
       
-      const successMessage = status === MaterialIssueStatus.PARTIALLY 
-        ? `Material partially issued successfully. Total given: ${totalGiven} units`
-        : `Material issued successfully. Total given: ${totalGiven} units`;
-      toast.success(successMessage);
+      toast.success(`Material issued successfully. Total given: ${totalGiven} units`);
       setIsIssueDialogOpen(false);
       setSelectedMaterial(null);
       setSelectedUserId('');
       setStockData(null);
       setGivenQuantity(0);
-      setAdditionalQuantity(0);
+      setIssueNote('');
       
-      // Refresh the project data to update UI
       await fetchProjectData();
     } catch (error: any) {
       console.error('Error issuing material:', error);
@@ -466,7 +448,10 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     try {
       await updateProformaMaterialStatus(
         materialId,
-        MaterialIssueStatus.CANCELLED
+        MaterialIssueStatus.CANCELLED,
+        undefined,
+        0,
+        undefined,
       );
       
       toast.success('Material cancelled successfully');
@@ -485,9 +470,9 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     
     switch (status) {
       case MaterialIssueStatus.ISSUED:
-        return <Badge className="bg-green-500">Issued</Badge>;
+        return <Badge className="bg-green-500 text-white">Fully Issued</Badge>;
       case MaterialIssueStatus.PARTIALLY:
-        return <Badge className="bg-yellow-500">Partially Issued</Badge>;
+        return <Badge className="bg-yellow-500 text-white">Partially Issued</Badge>;
       case MaterialIssueStatus.CANCELLED:
         return <Badge variant="destructive">Cancelled</Badge>;
       case MaterialIssueStatus.PENDING:
@@ -496,7 +481,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
     }
   };
 
-  // Get stock display for material - FIXED to include additional quantity
+  // Get stock display for material
   const getStockDisplay = (material: IProformaItemMaterial) => {
     const stockInfo = materialStockInfo[material.id];
     
@@ -512,7 +497,6 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
       return <span className="text-xs text-red-500">Error</span>;
     }
     
-    // FIX: Total required = quantity + additionalQuantity
     const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
     const alreadyIssued = material.givenquantity || 0;
     const remainingNeeded = totalRequired - alreadyIssued;
@@ -523,11 +507,67 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
         <span className={`text-xs font-medium ${isSufficient ? 'text-green-600' : 'text-red-600'}`}>
           {stockInfo.available} units available
         </span>
+        {!isSufficient && (
+          <span className="text-xs text-red-500 block">
+            Shortfall: {remainingNeeded - stockInfo.available} units
+          </span>
+        )}
       </div>
     );
   };
 
- 
+  // Check if all materials are issued
+  const areAllMaterialsIssued = useCallback(() => {
+    if (!proformaInvoice?.items) return false;
+    
+    const allMaterials: IProformaItemMaterial[] = [];
+    proformaInvoice.items.forEach(item => {
+      if (item.proformaItemMaterials) {
+        allMaterials.push(...item.proformaItemMaterials);
+      }
+    });
+    
+    if (allMaterials.length === 0) return true;
+    
+    for (const material of allMaterials) {
+      const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
+      const alreadyIssued = material.givenquantity || 0;
+      
+      if (alreadyIssued < totalRequired) {
+        return false;
+      }
+    }
+    
+    return true;
+  }, [proformaInvoice]);
+
+  // Calculate issuance progress
+  const getIssuanceProgress = useCallback(() => {
+    if (!proformaInvoice?.items) return { total: 0, issued: 0, percentage: 0 };
+    
+    const allMaterials: IProformaItemMaterial[] = [];
+    proformaInvoice.items.forEach(item => {
+      if (item.proformaItemMaterials) {
+        allMaterials.push(...item.proformaItemMaterials);
+      }
+    });
+    
+    if (allMaterials.length === 0) return { total: 0, issued: 0, percentage: 100 };
+    
+    let totalRequired = 0;
+    let totalIssued = 0;
+    
+    for (const material of allMaterials) {
+      totalRequired += (material.quantity || 0) + (material.additionalQuantity || 0);
+      totalIssued += material.givenquantity || 0;
+    }
+    
+    return {
+      total: totalRequired,
+      issued: totalIssued,
+      percentage: totalRequired > 0 ? Math.round((totalIssued / totalRequired) * 100) : 100
+    };
+  }, [proformaInvoice]);
 
   // Difficulty badge configuration
   const getDifficultyConfig = (difficulty: DifficultyLevel) => {
@@ -566,9 +606,9 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   const difficultyConfig = project ? getDifficultyConfig(project.difficulty) : null;
   const purchasingStatusConfig = getPurchasingStatusConfig();
 
-  // Calculate total shortfall
-  const totalShortfall = purchaseNeededItems.reduce((sum, item) => sum + item.shortfall, 0);
   const hasItemsToPurchase = purchaseNeededItems.length > 0;
+  const allIssued = areAllMaterialsIssued();
+  const progress = getIssuanceProgress();
 
   // Show loading state with skeleton
   if (loading) {
@@ -595,204 +635,363 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* ========== SECTION 1: ITEMS NEED TO PURCHASE - ONLY SHOW IF ITEMS EXIST ========== */}
+    <div className="space-y-6 p-4">
+      {/* ========== SECTION 1: ITEMS NEED TO PURCHASE ========== */}
       {hasItemsToPurchase && (
-  <Card className="border-2 border-red-200 shadow-lg dark:border-red-800">
-    <CardHeader className="bg-red-50 border-b border-red-200 dark:bg-red-950 dark:border-red-800">
-      <CardTitle className="flex items-center gap-2 text-2xl font-bold text-red-700 dark:text-red-400">
-        <ShoppingCart className="h-6 w-6" />
-        ITEMS NEED TO PURCHASE
-        <Badge variant="destructive" className="ml-2">
-          {(() => {
-            // Group identical materials
-            const grouped = new Map();
-            purchaseNeededItems.forEach(item => {
-              const key = `${item.materialName}-${item.color}-${item.size}`;
-              if (!grouped.has(key)) {
-                grouped.set(key, { ...item, items: [] });
-              }
-              grouped.get(key).items.push(item);
-            });
-            return grouped.size;
-          })()} material(s)
-        </Badge>
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="pt-6 overflow-visible">
-      {loadingPurchaseNeeded ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-          <p>Checking stock levels...</p>
-        </div>
-      ) : (
-        <>
-          {/* Summary Banner with Consolidated Totals */}
-          <div className="mb-6 rounded-lg bg-yellow-50 p-4 border-l-4 border-yellow-500 dark:bg-yellow-950 dark:border-yellow-600">
-            <div className="flex flex-wrap items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              <span className="font-semibold text-yellow-800 dark:text-yellow-300">
-                Need to purchase {(() => {
-                  const grouped = new Map();
-                  purchaseNeededItems.forEach(item => {
-                    const key = `${item.materialName}-${item.color}-${item.size}`;
-                    if (!grouped.has(key)) {
-                      grouped.set(key, { shortfall: 0 });
-                    }
-                    grouped.get(key).shortfall += (item.shortfall || 0);
-                  });
-                  return grouped.size;
-                })()} material type(s)
-              </span>
+        <Card className="border-2 border-red-200 shadow-lg dark:border-red-800">
+          <CardHeader className="bg-red-50 border-b border-red-200 dark:bg-red-950 dark:border-red-800">
+            <CardTitle className="flex items-center gap-2 text-2xl font-bold text-red-700 dark:text-red-400">
+              <ShoppingCart className="h-6 w-6" />
+              ITEMS NEED TO PURCHASE
               <Badge variant="destructive" className="ml-2">
-                Total: {purchaseNeededItems.reduce((sum, item) => sum + (item.shortfall || 0), 0)} units
+                {purchaseNeededItems.length} material(s)
               </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 overflow-visible">
+            {loadingPurchaseNeeded ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                <p>Checking stock levels...</p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-6 rounded-lg bg-yellow-50 p-4 border-l-4 border-yellow-500 dark:bg-yellow-950 dark:border-yellow-600">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    <span className="font-semibold text-yellow-800 dark:text-yellow-300">
+                      Need to purchase {purchaseNeededItems.length} material type(s)
+                    </span>
+                    <Badge variant="destructive" className="ml-2">
+                      Total: {purchaseNeededItems.reduce((sum, item) => sum + (item.shortfall || 0), 0)} units
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-100 dark:bg-gray-800">
+                        <TableHead className="font-bold">Image</TableHead>
+                        <TableHead className="font-bold">Material Name</TableHead>
+                        <TableHead className="font-bold">Color</TableHead>
+                        <TableHead className="font-bold">Size</TableHead>
+                        <TableHead className="font-bold text-right">Required</TableHead>
+                        <TableHead className="font-bold text-right">Issued</TableHead>
+                        <TableHead className="font-bold text-right">Remaining</TableHead>
+                        <TableHead className="font-bold text-right">Stock</TableHead>
+                        <TableHead className="font-bold text-right">TO BUY</TableHead>
+                        <TableHead className="font-bold text-center">Used In</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {purchaseNeededItems.map((item, index) => {
+                        const imageUrl = item.imageUrl ? normalizeImagePath(item.imageUrl) : null;
+                        
+                        return (
+                          <TableRow key={index} className="hover:bg-red-50 dark:hover:bg-red-950/50">
+                            <TableCell>
+                              {imageUrl ? (
+                                <div className="relative group">
+                                  <div className="relative h-16 w-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0">
+                                    <Image
+                                      src={imageUrl}
+                                      alt="Material"
+                                      fill
+                                      className="object-cover"
+                                      sizes="64px"
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="icon"
+                                    className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md border-2 border-white dark:border-gray-800 p-0 z-10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleImageClick(imageUrl, item.materialName);
+                                    }}
+                                    title="Preview image"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                  <ImageIcon className="h-6 w-6 text-gray-400" />
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4 text-red-500 dark:text-red-400" />
+                                {item.materialName}
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.color}</TableCell>
+                            <TableCell>{item.size}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {item.requiredQuantity}
+                            </TableCell>
+                            <TableCell className="text-right">{item.alreadyIssued}</TableCell>
+                            <TableCell className="text-right text-orange-600 dark:text-orange-400 font-medium">
+                              {item.remainingNeeded}
+                            </TableCell>
+                            <TableCell className="text-right text-blue-600 dark:text-blue-400">
+                              {item.availableStock}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="destructive" className="text-base px-3 py-1">
+                                {item.shortfall}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className="text-[9px]">
+                                {item.itemDescription || 'N/A'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== SECTION 2: MATERIAL ISSUANCE PROGRESS ========== */}
+      <Card className="border-2 border-green-200 shadow-lg dark:border-green-800">
+        <CardHeader className="bg-green-50 border-b border-green-200 dark:bg-green-950 dark:border-green-800">
+          <CardTitle className="flex items-center gap-2 text-xl font-bold text-green-700 dark:text-green-400">
+            <CheckCircle className="h-6 w-6" />
+            Material Issuance Status
+            <Badge className={allIssued ? 'bg-green-500' : 'bg-yellow-500'} variant="default">
+              {allIssued ? 'All Issued ✓' : 'Pending Issuance'}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {/* Progress Bar */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium">Issuance Progress</span>
+              <span className="text-sm font-bold">{progress.percentage}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3 dark:bg-gray-700">
+              <div
+                className={`h-3 rounded-full transition-all duration-500 ${
+                  progress.percentage === 100 ? 'bg-green-500' : 'bg-blue-500'
+                }`}
+                style={{ width: `${Math.min(progress.percentage, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-muted-foreground">
+                {progress.issued} units issued
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {progress.total} units total
+              </span>
             </div>
           </div>
 
-          {/* Consolidated Purchase List Table with Images */}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-100 dark:bg-gray-800">
-                  <TableHead className="font-bold">Image</TableHead>
-                  <TableHead className="font-bold">Material Name</TableHead>
-                  <TableHead className="font-bold">Color</TableHead>
-                  <TableHead className="font-bold">Size</TableHead>
-                  <TableHead className="font-bold text-right">Total Required</TableHead>
-                  <TableHead className="font-bold text-right">Total Issued</TableHead>
-                  <TableHead className="font-bold text-right">Total Remaining</TableHead>
-                  <TableHead className="font-bold text-right">Stock Available</TableHead>
-                  <TableHead className="font-bold text-right">TO BUY</TableHead>
-                  <TableHead className="font-bold text-center">Used In</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(() => {
-                  // Group identical materials
-                  const groupedMap = new Map();
-                  
-                  purchaseNeededItems.forEach((item) => {
-                    const key = `${item.materialName}-${item.color}-${item.size}`;
-                    
-                    if (!groupedMap.has(key)) {
-                      groupedMap.set(key, {
-                        ...item,
-                        requiredQuantity: 0,
-                        alreadyIssued: 0,
-                        remainingNeeded: 0,
-                        shortfall: 0,
-                        usedIn: new Set(),
-                        items: []
-                      });
-                    }
-                    
-                    const entry = groupedMap.get(key);
-                    entry.requiredQuantity += (item.requiredQuantity || 0);
-                    entry.alreadyIssued += (item.alreadyIssued || 0);
-                    entry.remainingNeeded += (item.remainingNeeded || 0);
-                    entry.shortfall += (item.shortfall || 0);
-                    if (item.itemDescription) {
-                      entry.usedIn.add(item.itemDescription);
-                    }
-                    entry.items.push(item);
-                  });
-                  
-                  // Sort by material name
-                  return Array.from(groupedMap.values())
-                    .sort((a, b) => a.materialName.localeCompare(b.materialName))
-                    .map((groupedItem, index) => {
-                      const imageUrl = groupedItem.imageUrl ? normalizeImagePath(groupedItem.imageUrl) : null;
-                      const usedInList = Array.from(groupedItem.usedIn);
-                      
-                      return (
-                        <TableRow key={index} className="hover:bg-red-50 dark:hover:bg-red-950/50">
-                          <TableCell>
-                            {imageUrl ? (
-                              <div className="relative group">
-                                <div className="relative h-16 w-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0">
-                                  <Image
-                                    src={imageUrl}
-                                    alt="Material"
-                                    fill
-                                    className="object-cover"
-                                    sizes="64px"
-                                  />
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  size="icon"
-                                  className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md border-2 border-white dark:border-gray-800 p-0 z-10"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleImageClick(imageUrl, 'Material');
-                                  }}
-                                  title="Preview image"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
-                                <ImageIcon className="h-6 w-6 text-gray-400" />
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <Package className="h-4 w-4 text-red-500 dark:text-red-400" />
-                              {groupedItem.materialName}
-                              {groupedItem.items.length > 1 && (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0">
-                                  ×{groupedItem.items.length}
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>{groupedItem.color}</TableCell>
-                          <TableCell>{groupedItem.size}</TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {groupedItem.requiredQuantity}
-                          </TableCell>
-                          <TableCell className="text-right">{groupedItem.alreadyIssued}</TableCell>
-                          <TableCell className="text-right text-orange-600 dark:text-orange-400 font-medium">
-                            {groupedItem.remainingNeeded}
-                          </TableCell>
-                          <TableCell className="text-right text-blue-600 dark:text-blue-400">
-                            {groupedItem.availableStock}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant="destructive" className="text-base px-3 py-1">
-                              {groupedItem.shortfall}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex flex-wrap justify-center gap-1">
-                              {usedInList.slice(0, 2).map((itemName) => (
-                                <Badge key={String(itemName)} variant="outline" className="text-[9px]">
-                                  {String(itemName)}
-                                </Badge>
-                              ))}
-                              {usedInList.length > 2 && (
-                                <Badge variant="outline" className="text-[9px]">
-                                  +{usedInList.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
+          {/* Materials List with Issue Buttons */}
+          <div className="space-y-4">
+            {proformaInvoice?.items?.map((item) => {
+              if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+              
+              return (
+                <div key={item.id} className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/30 p-3 border-b">
+                    <h4 className="font-semibold text-sm flex items-center justify-between">
+                      <span>
+                        {item?.item?.name || item?.itemname || item?.category?.name || 'Unnamed Item'}
+                        {item.size && item.size !== "" && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Size: {item.size}
+                          </Badge>
+                        )}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {item.proformaItemMaterials.length} material(s)
+                      </Badge>
+                    </h4>
+                  </div>
+                  <div className="p-3 w-full overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Material</TableHead>
+                          <TableHead className="text-xs">Image</TableHead>
+                          <TableHead className="text-xs">Color</TableHead>
+                          <TableHead className="text-xs">Size</TableHead>
+                          <TableHead className="text-xs text-right">Required</TableHead>
+                          <TableHead className="text-xs text-right">Issued</TableHead>
+                          <TableHead className="text-xs text-right">Remaining</TableHead>
+                          <TableHead className="text-xs">Stock</TableHead>
+                          <TableHead className="text-xs">Status / Issues</TableHead>
+                          <TableHead className="text-xs text-center">Action</TableHead>
                         </TableRow>
-                      );
-                    });
-                })()}
-              </TableBody>
-            </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {item.proformaItemMaterials.map((material) => {
+                          const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
+                          const alreadyIssued = material.givenquantity || 0;
+                          const remaining = totalRequired - alreadyIssued;
+                          const isFullyIssued = remaining <= 0;
+                          const materialImage = getMaterialImage(material);
+                          
+                          return (
+                            <TableRow key={material.id} className={isFullyIssued ? 'bg-green-50 dark:bg-green-950/30' : ''}>
+                              <TableCell className="text-sm">
+                                <p className="font-medium">{material.material?.name || ''}</p>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {materialImage ? (
+                                  <div className="relative group">
+                                    <div className="relative h-12 w-12 rounded overflow-hidden border border-gray-200 dark:border-gray-600 shrink-0 cursor-pointer">
+                                      <Image
+                                        src={materialImage}
+                                        alt={material.material?.name || 'Material'}
+                                        fill
+                                        className="object-cover"
+                                        sizes="48px"
+                                      />
+                                      <div 
+                                        className="absolute inset-0 bg-black/0 hover:bg-black/30 transition-all flex items-center justify-center"
+                                        onClick={() => handleImageClick(materialImage, material.material?.name || 'Material')}
+                                      >
+                                        <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="h-12 w-12 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                    <ImageIcon className="h-5 w-5 text-gray-400" />
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {material.material?.color ? (
+                                  <span className="flex items-center gap-1.5">
+                                    <span 
+                                      className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200 shrink-0" 
+                                      style={{ backgroundColor: material.material.color.toLowerCase() }}
+                                    />
+                                    {material.material.color}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm">{material.material?.size || '-'}</TableCell>
+                              <TableCell className="text-sm text-right font-semibold">
+                                {totalRequired}
+                              </TableCell>
+                              <TableCell className="text-sm text-right">
+                                {alreadyIssued > 0 ? (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {alreadyIssued}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm text-right">
+                                {remaining > 0 ? (
+                                  <span className="text-orange-600 font-medium">{remaining}</span>
+                                ) : (
+                                  <span className="text-green-600 font-medium">✓</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {getStockDisplay(material)}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <div className="flex flex-col gap-1">
+                                  {getMaterialStatusBadge(material.status)}
+                                  {material.materialIssues && material.materialIssues.length > 0 ? (
+                                    <div className="space-y-2 mt-1">
+                                      {material.materialIssues.map((issue, index) => (
+                                        <div key={issue.id || index} className="border-l-2 border-primary/20 pl-2">
+                                          {issue.givenTo && (
+                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                              <User className="h-3 w-3" />
+                                              <span className="font-medium">Accepter:</span> {issue.givenTo.name}
+                                            </span>
+                                          )}
+                                          {issue.issuedBy && (
+                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                              <User className="h-3 w-3" />
+                                              <span className="font-medium">Issued By:</span> {issue.issuedBy.name}
+                                            </span>
+                                          )}
+                                          {issue.issuedAt && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                              📅 {formatDate(issue.issuedAt)}
+                                            </span>
+                                          )}
+                                          {issue.quantity && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                              📦 Qty: {issue.quantity} units
+                                            </span>
+                                          )}
+                                          {issue.note && (
+                                            <span className="text-[10px] text-muted-foreground block truncate max-w-37.5">
+                                              📝 {issue.note}
+                                            </span>
+                                          )}
+                                          {index < material.materialIssues.length - 1 && (
+                                            <div className="border-b border-dashed border-gray-200 dark:border-gray-700 my-1" />
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">No issues recorded</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm text-center">
+                                {remaining > 0 && material.status !== MaterialIssueStatus.CANCELLED ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-xs h-8"
+                                    onClick={() => handleIssueMaterialClick(material)}
+                                    disabled={isProcessing}
+                                  >
+                                    {isProcessing ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      'Issue'
+                                    )}
+                                  </Button>
+                                ) : material.status === MaterialIssueStatus.CANCELLED ? (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Cancelled
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="default" className="text-xs bg-green-500">
+                                    Done
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </>
-      )}
-    </CardContent>
-  </Card>
-)}
+        </CardContent>
+      </Card>
 
       {/* Project Overview Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -846,10 +1045,10 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
           <CardContent>
             <div className="space-y-2">
               <Badge variant={purchasingStatusConfig.variant} className="px-3 py-1 text-sm">
-                {purchasingStatusConfig.label}
+                {allIssued ? 'Completed ✓' : purchasingStatusConfig.label}
               </Badge>
               <p className="text-xs text-muted-foreground mt-1">
-                {purchasingStatusConfig.description}
+                {allIssued ? 'All materials have been issued' : purchasingStatusConfig.description}
               </p>
             </div>
           </CardContent>
@@ -872,16 +1071,13 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                 {purchasingStages.map((stage) => {
                   const stageConfig = getStatusConfig(stage.stage);
                   const isActive = stage.status === 'ACTIVE' || stage.status === 'IN_PROGRESS';
-                  const isCompleted = stage.status === 'COMPLETED';
+                  const isCompleted = stage.status === 'COMPLETED' || allIssued;
                   
                   return (
                     <div key={stage.id} className="space-y-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            isCompleted ? 'bg-green-100' : 
-                            isActive ? 'bg-purple-100' : 'bg-gray-100'
-                          }`}>
+                          <div className={`p-2 rounded-lg ${isCompleted ? 'bg-green-100' : isActive ? 'bg-purple-100' : 'bg-gray-100'}`}>
                             {stageConfig && <stageConfig.icon className={`h-6 w-6 ${stageConfig.color}`} />}
                           </div>
                           <div>
@@ -890,20 +1086,10 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                           </div>
                         </div>
                         <Badge
-                          variant={
-                            isCompleted
-                              ? 'default'
-                              : isActive
-                              ? 'outline'
-                              : 'secondary'
-                          }
-                          className={`px-3 py-1 ${
-                            isCompleted ? 'bg-green-500' : 
-                            isActive ? 'border-purple-500 text-purple-700' : ''
-                          }`}
+                          variant={isCompleted ? 'default' : isActive ? 'outline' : 'secondary'}
+                          className={`px-3 py-1 ${isCompleted ? 'bg-green-500' : isActive ? 'border-purple-500 text-purple-700' : ''}`}
                         >
-                          {isCompleted ? 'Completed' : 
-                           isActive ? 'In Progress' : 'Pending'}
+                          {isCompleted ? 'Completed' : isActive ? 'In Progress' : 'Pending'}
                         </Badge>
                       </div>
 
@@ -956,20 +1142,6 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                                 </div>
                               ) : (
                                 <p className="text-sm text-muted-foreground">End date not scheduled</p>
-                              )}
-
-                              {stage.startDate && stage.endDate && (
-                                <div className="mt-3 pt-3 border-t">
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                      <p className="text-xs text-muted-foreground">Duration</p>
-                                      <p className="font-medium">
-                                        {Math.ceil((new Date(stage.endDate).getTime() - new Date(stage.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
                               )}
                             </div>
                           </div>
@@ -1033,8 +1205,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                         <TableBody>
                           {proformaInvoice.items.map((item) => (
                             <TableRow key={item.id}>
-                              <TableCell>                            {item.item?.name || item.itemname|| item.category?.name || ''}
-</TableCell>
+                              <TableCell>{item?.item?.name || item?.itemname || item?.category?.name || ''}</TableCell>
                               <TableCell>{item.size || ''}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>
@@ -1070,235 +1241,364 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   )}
                 </TabsContent>
 
-               <TabsContent value="materials" className="space-y-4 mt-4">
-  {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
-    <div className="space-y-4">
-      {/* Materials Summary Card */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="bg-primary/5 p-3 border-b">
-          <h4 className="font-semibold text-sm md:text-base flex items-center gap-2">
-            <Package className="h-4 w-4 md:h-5 md:w-5" />
-            Materials Summary
-            <Badge variant="secondary" className="text-xs">
-              {(() => {
-                // Get unique materials across all items
-                const uniqueMaterials = new Map();
-                proformaInvoice.items.forEach(item => {
-                  if (item.proformaItemMaterials) {
-                    item.proformaItemMaterials.forEach(material => {
-                      if (material.material?.id) {
-                        const key = material.material.id;
-                        if (!uniqueMaterials.has(key)) {
-                          uniqueMaterials.set(key, {
-                            material: material.material,
-                            totalQuantity: 0,
-                            totalAdditional: 0,
-                            items: new Set()
-                          });
-                        }
-                        const entry = uniqueMaterials.get(key);
-                        entry.totalQuantity += (material.quantity || 0);
-                        entry.totalAdditional += (material.additionalQuantity || 0);
-                        entry.items.add(item?.item?.name || item?.itemname || 'Unnamed');
-                      }
-                    });
-                  }
-                });
-                return uniqueMaterials.size;
-              })()} types
-            </Badge>
-          </h4>
-        </div>
-        <div className="p-3 w-full overflow-x-auto">
-          <div className="min-w-150 md:min-w-full">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs md:text-sm">Material</TableHead>
-                  <TableHead className="text-xs md:text-sm">Color</TableHead>
-                  <TableHead className="text-xs md:text-sm">Size</TableHead>
-                  <TableHead className="text-xs md:text-sm text-right">Total Qty</TableHead>
-                  <TableHead className="text-xs md:text-sm text-right">Add. Qty</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(() => {
-                  // Group materials by ID
-                  const groupedMaterials = new Map();
-                  proformaInvoice.items.forEach(item => {
-                    if (item.proformaItemMaterials) {
-                      item.proformaItemMaterials.forEach(material => {
-                        if (material.material?.id) {
-                          const key = material.material.id;
-                          if (!groupedMaterials.has(key)) {
-                            groupedMaterials.set(key, {
-                              material: material.material,
-                              totalQuantity: 0,
-                              totalAdditional: 0,
-                              notes: [],
-                              items: new Set()
-                            });
-                          }
-                          const entry = groupedMaterials.get(key);
-                          entry.totalQuantity += (material.quantity || 0);
-                          entry.totalAdditional += (material.additionalQuantity || 0);
-                          if (material.note) {
-                            entry.notes.push(material.note);
-                          }
-                          const itemName = item?.item?.name || item?.itemname || 'Unnamed';
-                          const itemSize = item?.size || '';
-                          const identifier = itemSize ? `${itemName} (${itemSize})` : itemName;
-                          entry.items.add(identifier);
-                        }
-                      });
-                    }
-                  });
-
-                  return Array.from(groupedMaterials.values())
-                    .sort((a, b) => a.material.name.localeCompare(b.material.name))
-                    .map((group) => (
-                      <TableRow key={group.material.id}>
-                        <TableCell className="text-sm font-medium">
-                          {group.material.name}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {group.material.color ? (
-                            <span className="flex items-center gap-1.5">
-                              <span 
-                                className="inline-block w-3 h-3 rounded-full border border-slate-200 shrink-0" 
-                                style={{ backgroundColor: group.material.color.toLowerCase() }}
-                              />
-                              {group.material.color}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {group.material.size || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-right font-semibold">
-                          {group.totalQuantity}
-                        </TableCell>
-                        <TableCell className="text-sm text-right">
-                          {group.totalAdditional > 0 ? (
+                <TabsContent value="materials" className="space-y-4 mt-4">
+                  {proformaInvoice.items && proformaInvoice.items.some(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0) ? (
+                    <div className="space-y-4">
+                      {/* Materials Summary Card */}
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="bg-primary/5 p-3 border-b">
+                          <h4 className="font-semibold text-sm md:text-base flex items-center gap-2">
+                            <Package className="h-4 w-4 md:h-5 md:w-5" />
+                            Materials Summary
                             <Badge variant="secondary" className="text-xs">
-                              +{group.totalAdditional}
+                              {(() => {
+                                const uniqueMaterials = new Map();
+                                proformaInvoice.items.forEach(item => {
+                                  if (item.proformaItemMaterials) {
+                                    item.proformaItemMaterials.forEach(material => {
+                                      if (material.material?.id) {
+                                        const key = material.material.id;
+                                        if (!uniqueMaterials.has(key)) {
+                                          uniqueMaterials.set(key, {
+                                            material: material.material,
+                                            totalQuantity: 0,
+                                            totalAdditional: 0,
+                                            items: new Set()
+                                          });
+                                        }
+                                        const entry = uniqueMaterials.get(key);
+                                        entry.totalQuantity += (material.quantity || 0);
+                                        entry.totalAdditional += (material.additionalQuantity || 0);
+                                        entry.items.add(item?.item?.name || item?.itemname || 'Unnamed');
+                                      }
+                                    });
+                                  }
+                                });
+                                return uniqueMaterials.size;
+                              })()} types
                             </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">0</span>
-                          )}
-                        </TableCell>
-                       
-                      </TableRow>
-                    ));
-                })()}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </div>
+                          </h4>
+                        </div>
+                        <div className="p-3 w-full overflow-x-auto">
+                          <div className="min-w-150 md:min-w-full">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-xs md:text-sm">Image</TableHead>
+                                  <TableHead className="text-xs md:text-sm">Material</TableHead>
+                                  <TableHead className="text-xs md:text-sm">Color</TableHead>
+                                  <TableHead className="text-xs md:text-sm">Size</TableHead>
+                                  <TableHead className="text-xs md:text-sm text-right">Total Qty</TableHead>
+                                  <TableHead className="text-xs md:text-sm text-right">Issued</TableHead>
+                                  <TableHead className="text-xs md:text-sm text-right">Remaining</TableHead>
+                                  <TableHead className="text-xs md:text-sm text-center">Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {(() => {
+                                  const groupedMaterials = new Map();
+                                  proformaInvoice.items.forEach(item => {
+                                    if (item.proformaItemMaterials) {
+                                      item.proformaItemMaterials.forEach(material => {
+                                        if (material.material?.id) {
+                                          const key = material.material.id;
+                                          if (!groupedMaterials.has(key)) {
+                                            groupedMaterials.set(key, {
+                                              material: material.material,
+                                              totalQuantity: 0,
+                                              totalIssued: 0,
+                                              status: material.status,
+                                              items: new Set()
+                                            });
+                                          }
+                                          const entry = groupedMaterials.get(key);
+                                          entry.totalQuantity += (material.quantity || 0) + (material.additionalQuantity || 0);
+                                          entry.totalIssued += (material.givenquantity || 0);
+                                          const itemName = item?.item?.name || item?.itemname || 'Unnamed';
+                                          const itemSize = item?.size || '';
+                                          const identifier = itemSize ? `${itemName} (${itemSize})` : itemName;
+                                          entry.items.add(identifier);
+                                        }
+                                      });
+                                    }
+                                  });
 
-      {/* Collapsible Breakdown by Product */}
-      <details className="space-y-4">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900 flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
-          <ChevronRight className="h-3.5 w-3.5" />
-          View Breakdown by Product
-        </summary>
-        <div className="space-y-4 pt-4">
-          {proformaInvoice.items.map((item) => {
-            if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
-            
-            return (
-              <div key={item.id} className="border rounded-lg overflow-hidden">
-                <div className="bg-muted/30 p-3 border-b">
-                  <h4 className="font-semibold text-sm md:text-base flex items-center justify-between">
-                    <span>
-                      {item?.item?.name || item?.itemname || item?.category?.name || 'Unnamed Item'}
-                      {item.size && item.size !== "" && (
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          Size: {item.size}
-                        </Badge>
-                      )}
-                    </span>
-                    <Badge variant="secondary" className="text-xs">
-                      {item.proformaItemMaterials.length} material(s)
-                    </Badge>
-                  </h4>
-                </div>
-                <div className="p-3 w-full overflow-x-auto">
-                  <div className="min-w-125 md:min-w-full">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs md:text-sm">Material</TableHead>
-                          <TableHead className="text-xs md:text-sm">Color</TableHead>
-                          <TableHead className="text-xs md:text-sm">Size</TableHead>
-                          <TableHead className="text-xs md:text-sm">Qty</TableHead>
-                          <TableHead className="text-xs md:text-sm">Add. Qty</TableHead>
-                          <TableHead className="text-xs md:text-sm">Note</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {item.proformaItemMaterials.map((material) => (
-                          <TableRow key={material.id}>
-                            <TableCell className="text-sm">
-                              <p className="font-medium">
-                                {material.material?.name || ''}
-                              </p>
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {material.material?.color ? (
-                                <span className="flex items-center gap-1.5">
-                                  <span 
-                                    className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200 shrink-0" 
-                                    style={{ backgroundColor: material.material.color.toLowerCase() }}
-                                  />
-                                  {material.material.color}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm">{material.material?.size || '-'}</TableCell>
-                            <TableCell className="text-sm">
-                              <Badge variant="outline" className="text-xs">{material.quantity}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {(material?.additionalQuantity ?? 0) > 0 ? (
-                                <Badge variant="secondary" className="text-xs">
-                                  +{material.additionalQuantity}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">0</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {material.note && material.note !== "" ? (
-                                <p className="text-sm line-clamp-2">{material.note}</p>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </details>
-    </div>
-  ) : (
-    <div className="text-center py-8">
-      <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
-      <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
-    </div>
-  )}
-</TabsContent>
+                                  return Array.from(groupedMaterials.values())
+                                    .sort((a, b) => a.material.name.localeCompare(b.material.name))
+                                    .map((group) => {
+                                      const isFullyIssued = group.totalIssued >= group.totalQuantity;
+                                      const imageUrl = group.material.imageUrl ? normalizeImagePath(group.material.imageUrl) : null;
+                                      
+                                      return (
+                                        <TableRow key={group.material.id}>
+                                          <TableCell className="text-sm">
+                                            {imageUrl ? (
+                                              <div className="relative h-10 w-10 rounded overflow-hidden border border-gray-200 dark:border-gray-600 cursor-pointer">
+                                                <Image
+                                                  src={imageUrl}
+                                                  alt={group.material.name}
+                                                  fill
+                                                  className="object-cover"
+                                                  sizes="40px"
+                                                  onClick={() => handleImageClick(imageUrl, group.material.name)}
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div className="h-10 w-10 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                                <ImageIcon className="h-4 w-4 text-gray-400" />
+                                              </div>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-sm font-medium">
+                                            {group.material.name}
+                                          </TableCell>
+                                          <TableCell className="text-sm">
+                                            {group.material.color ? (
+                                              <span className="flex items-center gap-1.5">
+                                                <span 
+                                                  className="inline-block w-3 h-3 rounded-full border border-slate-200 shrink-0" 
+                                                  style={{ backgroundColor: group.material.color.toLowerCase() }}
+                                                />
+                                                {group.material.color}
+                                              </span>
+                                            ) : (
+                                              <span className="text-muted-foreground">-</span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-sm">
+                                            {group.material.size || '-'}
+                                          </TableCell>
+                                          <TableCell className="text-sm text-right font-semibold">
+                                            {group.totalQuantity}
+                                          </TableCell>
+                                          <TableCell className="text-sm text-right">
+                                            {group.totalIssued}
+                                          </TableCell>
+                                          <TableCell className="text-sm text-right">
+                                            {group.totalQuantity - group.totalIssued > 0 ? (
+                                              <span className="text-orange-600">
+                                                {group.totalQuantity - group.totalIssued}
+                                              </span>
+                                            ) : (
+                                              <span className="text-green-600">✓</span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-sm text-center">
+                                            {isFullyIssued ? (
+                                              <Badge className="bg-green-500 text-white">Fully Issued</Badge>
+                                            ) : group.totalIssued > 0 ? (
+                                              <Badge className="bg-yellow-500 text-white">Partially Issued</Badge>
+                                            ) : (
+                                              <Badge variant="outline">Pending</Badge>
+                                            )}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    });
+                                })()}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Collapsible Breakdown by Product */}
+                      <details className="space-y-4">
+                        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900 flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
+                          <ChevronRight className="h-3.5 w-3.5" />
+                          View Breakdown by Product
+                        </summary>
+                        <div className="space-y-4 pt-4">
+                          {proformaInvoice.items.map((item) => {
+                            if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
+                            
+                            return (
+                              <div key={item.id} className="border rounded-lg overflow-hidden">
+                                <div className="bg-muted/30 p-3 border-b">
+                                  <h4 className="font-semibold text-sm md:text-base flex items-center justify-between">
+                                    <span>
+                                      {item?.item?.name || item?.itemname || item?.category?.name || 'Unnamed Item'}
+                                      {item.size && item.size !== "" && (
+                                        <Badge variant="outline" className="ml-2 text-xs">
+                                          Size: {item.size}
+                                        </Badge>
+                                      )}
+                                    </span>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {item.proformaItemMaterials.length} material(s)
+                                    </Badge>
+                                  </h4>
+                                </div>
+                                <div className="p-3 w-full overflow-x-auto">
+                                  <div className="min-w-125 md:min-w-full">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead className="text-xs md:text-sm">Image</TableHead>
+                                          <TableHead className="text-xs md:text-sm">Material</TableHead>
+                                          <TableHead className="text-xs md:text-sm">Color</TableHead>
+                                          <TableHead className="text-xs md:text-sm">Size</TableHead>
+                                          <TableHead className="text-xs md:text-sm text-right">Qty</TableHead>
+                                          <TableHead className="text-xs md:text-sm text-right">Issued</TableHead>
+                                          <TableHead className="text-xs md:text-sm text-right">Remaining</TableHead>
+                                          <TableHead className="text-xs md:text-sm">Status / Issues</TableHead>
+                                          <TableHead className="text-xs md:text-sm text-center">Action</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {item.proformaItemMaterials.map((material) => {
+                                          const totalRequired = (material.quantity || 0) + (material.additionalQuantity || 0);
+                                          const alreadyIssued = material.givenquantity || 0;
+                                          const remaining = totalRequired - alreadyIssued;
+                                          const isFullyIssued = remaining <= 0;
+                                          const materialImage = getMaterialImage(material);
+                                          
+                                          return (
+                                            <TableRow key={material.id} className={isFullyIssued ? 'bg-green-50 dark:bg-green-950/30' : ''}>
+                                              <TableCell className="text-sm">
+                                                {materialImage ? (
+                                                  <div className="relative h-10 w-10 rounded overflow-hidden border border-gray-200 dark:border-gray-600 cursor-pointer">
+                                                    <Image
+                                                      src={materialImage}
+                                                      alt={material.material?.name || 'Material'}
+                                                      fill
+                                                      className="object-cover"
+                                                      sizes="40px"
+                                                      onClick={() => handleImageClick(materialImage, material.material?.name || 'Material')}
+                                                    />
+                                                  </div>
+                                                ) : (
+                                                  <div className="h-10 w-10 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-200 dark:border-gray-600">
+                                                    <ImageIcon className="h-4 w-4 text-gray-400" />
+                                                  </div>
+                                                )}
+                                              </TableCell>
+                                              <TableCell className="text-sm">
+                                                <p className="font-medium">{material.material?.name || ''}</p>
+                                              </TableCell>
+                                              <TableCell className="text-sm">
+                                                {material.material?.color ? (
+                                                  <span className="flex items-center gap-1.5">
+                                                    <span 
+                                                      className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200 shrink-0" 
+                                                      style={{ backgroundColor: material.material.color.toLowerCase() }}
+                                                    />
+                                                    {material.material.color}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-muted-foreground">-</span>
+                                                )}
+                                              </TableCell>
+                                              <TableCell className="text-sm">{material.material?.size || '-'}</TableCell>
+                                              <TableCell className="text-sm text-right font-semibold">
+                                                {totalRequired}
+                                              </TableCell>
+                                              <TableCell className="text-sm text-right">
+                                                {alreadyIssued > 0 ? (
+                                                  <Badge variant="secondary" className="text-xs">
+                                                    {alreadyIssued}
+                                                  </Badge>
+                                                ) : (
+                                                  <span className="text-muted-foreground">0</span>
+                                                )}
+                                              </TableCell>
+                                              <TableCell className="text-sm text-right">
+                                                {remaining > 0 ? (
+                                                  <span className="text-orange-600 font-medium">{remaining}</span>
+                                                ) : (
+                                                  <span className="text-green-600 font-medium">✓</span>
+                                                )}
+                                              </TableCell>
+                                              <TableCell className="text-sm">
+                                                <div className="flex flex-col gap-1">
+                                                  {getMaterialStatusBadge(material.status)}
+                                                  {material.materialIssues && material.materialIssues.length > 0 ? (
+                                                    <div className="space-y-2 mt-1">
+                                                      {material.materialIssues.map((issue, index) => (
+                                                        <div key={issue.id || index} className="border-l-2 border-primary/20 pl-2">
+                                                          {issue.givenTo && (
+                                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                              <User className="h-3 w-3" />
+                                                              <span className="font-medium">Accepter:</span> {issue.givenTo.name}
+                                                            </span>
+                                                          )}
+                                                          {issue.issuedBy && (
+                                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                              <User className="h-3 w-3" />
+                                                              <span className="font-medium">Issued By:</span> {issue.issuedBy.name}
+                                                            </span>
+                                                          )}
+                                                          {issue.issuedAt && (
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                              📅 {formatDate(issue.issuedAt)}
+                                                            </span>
+                                                          )}
+                                                          {issue.quantity && (
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                              📦 Qty: {issue.quantity} units
+                                                            </span>
+                                                          )}
+                                                          {issue.note && (
+                                                            <span className="text-[10px] text-muted-foreground block truncate max-w-37.5">
+                                                              📝 {issue.note}
+                                                            </span>
+                                                          )}
+                                                          {index < material.materialIssues.length - 1 && (
+                                                            <div className="border-b border-dashed border-gray-200 dark:border-gray-700 my-1" />
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ) : (
+                                                    <span className="text-xs text-muted-foreground">No issues recorded</span>
+                                                  )}
+                                                </div>
+                                              </TableCell>
+                                              <TableCell className="text-sm text-center">
+                                                {remaining > 0 && material.status !== MaterialIssueStatus.CANCELLED ? (
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="text-xs h-8"
+                                                    onClick={() => handleIssueMaterialClick(material)}
+                                                    disabled={isProcessing}
+                                                  >
+                                                    {isProcessing ? (
+                                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                      'Issue'
+                                                    )}
+                                                  </Button>
+                                                ) : material.status === MaterialIssueStatus.CANCELLED ? (
+                                                  <Badge variant="destructive" className="text-xs">
+                                                    Cancelled
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="default" className="text-xs bg-green-500">
+                                                    Done
+                                                  </Badge>
+                                                )}
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Box className="mx-auto h-10 w-10 md:h-12 md:w-12 text-muted-foreground/50" />
+                      <p className="mt-4 text-muted-foreground text-sm md:text-base">No materials found</p>
+                    </div>
+                  )}
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
@@ -1390,7 +1690,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
 
       {/* Issue Material Dialog */}
       <Dialog open={isIssueDialogOpen} onOpenChange={setIsIssueDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Issue Material</DialogTitle>
             <DialogDescription>
@@ -1402,7 +1702,6 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             <div className="space-y-2">
               <Label>Material Details</Label>
               <div className="bg-muted/30 p-3 rounded-lg space-y-1">
-                {/* Show material image in dialog */}
                 {selectedMaterial?.material?.imageUrl && (
                   <div className="flex justify-center mb-2">
                     <div 
@@ -1431,19 +1730,14 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                   <span className="font-medium">Material:</span> {selectedMaterial?.material?.name}
                 </p>
                 <p className="text-sm">
-                  <span className="font-medium">Required Quantity:</span> {(selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)} units
+                  <span className="font-medium">Total Required:</span> {(selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)} units
                 </p>
                 <p className="text-sm">
-                  <span className="font-medium">Base Quantity:</span> {selectedMaterial?.quantity || 0} units
+                  <span className="font-medium">Already Issued:</span> {selectedMaterial?.givenquantity || 0} units
                 </p>
                 <p className="text-sm">
-                  <span className="font-medium">Additional Quantity:</span> {selectedMaterial?.additionalQuantity || 0} units
+                  <span className="font-medium">Remaining:</span> {((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)} units
                 </p>
-                {(selectedMaterial?.givenquantity || 0) > 0 && (
-                  <p className="text-sm">
-                    <span className="font-medium">Already Issued:</span> {selectedMaterial?.givenquantity} units
-                  </p>
-                )}
                 {selectedMaterial?.material?.color && (
                   <p className="text-sm">
                     <span className="font-medium">Color:</span> {selectedMaterial.material.color}
@@ -1465,7 +1759,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                     type="radio"
                     value="full"
                     checked={issueType === 'full'}
-                    onChange={(e) => setIssueType(e.target.value as 'full' | 'partial')}
+                    onChange={() => setIssueType('full')}
                     className="w-4 h-4"
                   />
                   <span className="text-sm">Full Issue</span>
@@ -1475,7 +1769,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                     type="radio"
                     value="partial"
                     checked={issueType === 'partial'}
-                    onChange={(e) => setIssueType(e.target.value as 'full' | 'partial')}
+                    onChange={() => setIssueType('partial')}
                     className="w-4 h-4"
                   />
                   <span className="text-sm">Partial Issue</span>
@@ -1484,25 +1778,20 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
             </div>
 
             {issueType === 'partial' && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="givenQuantity">Given Quantity *</Label>
-                  <Input
-                    id="givenQuantity"
-                    type="number"
-                    min={0}
-                    value={givenQuantity}
-                    onChange={(e) => setGivenQuantity(parseInt(e.target.value) || 0)}
-                    placeholder="Enter quantity to issue"
-                  />
-                </div>
-
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-blue-900">Total to Issue:</p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {givenQuantity + additionalQuantity} units
-                  </p>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="givenQuantity">Quantity to Issue *</Label>
+                <Input
+                  id="givenQuantity"
+                  type="number"
+                  min={0}
+                  max={((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)}
+                  value={givenQuantity}
+                  onChange={(e) => setGivenQuantity(parseInt(e.target.value) || 0)}
+                  placeholder="Enter quantity to issue"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Max: {((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)} units
+                </p>
               </div>
             )}
 
@@ -1517,7 +1806,7 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                 <div className={`p-3 rounded-lg border ${
                   stockData.totalQuantity >= (issueType === 'full' 
                     ? ((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)
-                    : givenQuantity + additionalQuantity)
+                    : givenQuantity)
                     ? 'bg-green-50 border-green-200'
                     : 'bg-red-50 border-red-200'
                 }`}>
@@ -1526,13 +1815,22 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                     <span className={`text-lg font-bold ${
                       stockData.totalQuantity >= (issueType === 'full'
                         ? ((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)
-                        : givenQuantity + additionalQuantity)
+                        : givenQuantity)
                         ? 'text-green-600'
                         : 'text-red-600'
                     }`}>
                       {stockData.totalQuantity} units
                     </span>
                   </div>
+                  {stockData.totalQuantity < ((issueType === 'full'
+                    ? ((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)
+                    : givenQuantity)) && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Insufficient stock! Shortfall: {((issueType === 'full'
+                        ? ((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)
+                        : givenQuantity)) - stockData.totalQuantity} units
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="p-3 rounded-lg border border-yellow-200 bg-yellow-50">
@@ -1556,6 +1854,18 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="issueNote">Note (Optional)</Label>
+              <Textarea
+                id="issueNote"
+                value={issueNote}
+                onChange={(e) => setIssueNote(e.target.value)}
+                placeholder="Add any notes about this issuance..."
+                className="resize-none"
+                rows={2}
+              />
+            </div>
           </div>
 
           <DialogFooter>
@@ -1572,11 +1882,11 @@ const PurchaseProjectDetailPage: React.FC<ProjectDetailProps> = ({ id }) => {
                 isProcessing ||
                 !selectedUserId ||
                 !stockData ||
-                (issueType === 'partial' && (givenQuantity + additionalQuantity) <= 0) ||
+                (issueType === 'partial' && givenQuantity <= 0) ||
                 (issueType === 'full' && ((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0) - (selectedMaterial?.givenquantity || 0)) <= 0) ||
                 (issueType === 'full' 
                   ? ((selectedMaterial?.quantity || 0) + (selectedMaterial?.additionalQuantity || 0)) - (selectedMaterial?.givenquantity || 0)
-                  : givenQuantity + additionalQuantity) > (stockData?.totalQuantity || 0)
+                  : givenQuantity) > (stockData?.totalQuantity || 0)
               }
               className="gap-2"
             >

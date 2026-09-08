@@ -237,3 +237,4 @@ export const validateBankAccountQuick = async (
     message: 'Account number format is valid'
   };
 };
+

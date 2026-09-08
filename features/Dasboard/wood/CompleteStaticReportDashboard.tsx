@@ -259,6 +259,7 @@ const CompleteStaticReportDashboard: React.FC = () => {
         startDate,
         endDate,
       });
+      console.log(data)
       setReportData(data);
       toast.success('Report data refreshed');
     } catch (error: any) {

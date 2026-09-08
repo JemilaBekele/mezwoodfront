@@ -407,6 +407,7 @@ const DualTime: React.FC<{ date?: string | Date | null }> = ({ date }) => {
       
             {[
               { label: 'Requested', value: project.requestedDelivery ? formatDate(project.requestedDelivery) : 'Not set', ethValue: project.requestedDelivery ? formatDateEth(project.requestedDelivery) : '', note: 'customer ask' },
+              { label: 'New Requested', value: project.newRequestedDelivery     ? formatDate(project.newRequestedDelivery    ) : 'Not set', ethValue: project.newRequestedDelivery ? formatDateEth(project.newRequestedDelivery) : '', note: 'customer ask' },
               { label: 'Calculated', value: project.calculatedDelivery ? formatDate(project.calculatedDelivery) : 'Pending', ethValue: project.calculatedDelivery ? formatDateEth(project.calculatedDelivery) : '', note: 'auto-scheduled' },
               ...(project.manualDelivery ? [{ label: 'Manual', value: formatDate(project.manualDelivery), ethValue: formatDateEth(project.manualDelivery), note: 'override' }] : []),
               ...(project.finalDelivery ? [{ label: 'Final', value: formatDate(project.finalDelivery), ethValue: formatDateEth(project.finalDelivery), note: 'committed' }] : []),

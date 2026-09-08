@@ -209,6 +209,19 @@ export const getMaterialStockById = async (
     throw error;
   }
 };
+export const getMaterialStockknow = async (
+  materialId: string,
+
+) => {
+  try {
+    const response = await axiosInstance.get<MaterialStockResponse>(
+      `/Material/Stock/all/avilable/know/${materialId}`
+    );
+    return response.data.data;
+  } catch (error) {
+    throw error;
+  }
+};
 // ✅ Get material stock by material ID
 export const getMaterialStockreserveId = async (
   materialId: string,

@@ -81,7 +81,8 @@ export interface IProject {
   status: ProjectStatus;
   difficulty: DifficultyLevel;
   scheduleMode?: ScheduleMode;     // AUTO | MANUAL | LOCKED (default AUTO)
-  requestedDelivery?: string;      // ISO string — the customer's asked-for date (reference)
+  requestedDelivery?: string;      
+  newRequestedDelivery ?: string;        // ISO string — the customer's asked-for date (reference)
   calculatedDelivery?: string;     // auto-scheduled date from the engine
   manualDelivery?: string;         // ISO string — manager override
   finalDelivery?: string;          // ISO string — committed/actual delivery date
