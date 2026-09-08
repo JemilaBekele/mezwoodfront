@@ -1227,7 +1227,7 @@ const formatDescription = (text: string, limit = 80) => {
     {isPaymentRestricted && (
       <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
         <div className="flex items-start gap-2">
-          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-medium text-red-700">Payment Required</p>
             <p className="text-sm text-red-600">
@@ -1697,7 +1697,7 @@ const formatDescription = (text: string, limit = 80) => {
                           {group.material.color ? (
                             <span className="flex items-center gap-1.5">
                               <span 
-                                className="inline-block w-3 h-3 rounded-full border border-slate-200 flex-shrink-0" 
+                                className="inline-block w-3 h-3 rounded-full border border-slate-200 shrink-0" 
                                 style={{ backgroundColor: group.material.color.toLowerCase() }}
                               />
                               {group.material.color}
@@ -1783,7 +1783,7 @@ const formatDescription = (text: string, limit = 80) => {
                               {material.material?.color ? (
                                 <span className="flex items-center gap-1.5">
                                   <span 
-                                    className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200 flex-shrink-0" 
+                                    className="inline-block w-2.5 h-2.5 rounded-full border border-slate-200 shrink-0" 
                                     style={{ backgroundColor: material.material.color.toLowerCase() }}
                                   />
                                   {material.material.color}
@@ -1886,7 +1886,7 @@ const formatDescription = (text: string, limit = 80) => {
                     {proformaInvoice.attachments.map((attachment) => (
                       <div key={attachment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
                           <div className="flex-1 min-w-0">
                             <a 
                               href={normalizeImagePath(attachment.fileUrl)} 
@@ -1903,7 +1903,7 @@ const formatDescription = (text: string, limit = 80) => {
                             )}
                           </div>
                         </div>
-                        <div className="flex gap-2 flex-shrink-0">
+                        <div className="flex gap-2 shrink-0">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2044,7 +2044,7 @@ const formatDescription = (text: string, limit = 80) => {
             {selectedWorkLog && (
               <div className="mt-2 p-2 bg-muted rounded-md">
                 <p className="text-sm">Units: {selectedWorkLog.doneUnits.toFixed(4)}</p>
-                {selectedWorkLog.note && <p className="text-sm mt-1 break-words">Note: {selectedWorkLog.note}</p>}
+                {selectedWorkLog.note && <p className="text-sm mt-1 wrap-break-word">Note: {selectedWorkLog.note}</p>}
               </div>
             )}
           </AlertDialogDescription>

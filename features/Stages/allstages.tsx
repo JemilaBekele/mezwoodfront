@@ -27,7 +27,6 @@ import {
   CheckCircle,
   Signal,
   BarChart3,
-  AlertCircle,
   CheckCheck,
   XCircle,
 } from 'lucide-react';
