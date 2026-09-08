@@ -17,7 +17,7 @@ export function OrgSwitcher() {
             <GalleryVerticalEnd className='size-4' />
           </div>
           <div className='flex flex-col gap-0.5 leading-none'>
-            <span className='font-semibold'>Stock Management</span>
+            <span className='font-semibold'>RoseWood</span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
