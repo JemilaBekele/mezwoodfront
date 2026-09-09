@@ -35,11 +35,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Package, Percent } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { CalendarDays, Loader2, Package, Percent } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { addNewRequestedDeliveryDate } from '@/service/Project';
 
 interface ProjectCellActionProps {
   data: IProject;
@@ -84,7 +93,12 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
   const remainingUnits = Math.max(0, plannedUnits - actualUnits);
   const remainingPercentage = plannedUnits > 0 ? (remainingUnits / plannedUnits) * 100 : 0;
   const isCompleted = remainingUnits <= 0.000001;
+  // Requested delivery date modal
+  const [deliveryDateOpen, setDeliveryDateOpen] = useState(false);
+  const [newDeliveryDate, setNewDeliveryDate] = useState('');
+  const [loading, setLoading] = useState(false);
 
+  
   const resetForm = () => {
     setInputType('units');
     setDoneUnits('');
@@ -225,10 +239,119 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
       setIsCompletingAll(false);
     }
   };
+  const onAddRequestedDeliveryDate = async () => {
+    if (!data?.id) {
+      toast.error('Project ID is missing.');
+      return;
+    }
 
+    if (!newDeliveryDate) {
+      toast.error('Please select a requested delivery date.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await addNewRequestedDeliveryDate(
+        data.id,
+        newDeliveryDate
+      );
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success(
+        result.message || 'Requested delivery date added successfully'
+      );
+
+      setDeliveryDateOpen(false);
+      setNewDeliveryDate('');
+
+      router.refresh();
+    } catch (error: any) {
+      toast.error(
+        error?.message || 'Failed to add requested delivery date'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <>
+
+  <Dialog
+        open={deliveryDateOpen}
+        onOpenChange={(open) => {
+          if (!loading) {
+            setDeliveryDateOpen(open);
+
+            if (!open) {
+              setNewDeliveryDate('');
+            }
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-106.25">
+          <DialogHeader>
+            <DialogTitle>New Requested Delivery Date</DialogTitle>
+
+            <DialogDescription>
+              Select the new requested delivery date for this project.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="newDeliveryDate">
+                Delivery Date
+              </Label>
+
+              <Input
+                id="newDeliveryDate"
+                type="date"
+                value={newDeliveryDate}
+                onChange={(e) =>
+                  setNewDeliveryDate(e.target.value)
+                }
+                disabled={loading}
+                min={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeliveryDateOpen(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="button"
+              onClick={onAddRequestedDeliveryDate}
+              disabled={loading || !newDeliveryDate}
+            >
+              {loading ? 'Saving...' : 'Save Date'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <DropdownMenu modal={false}>
+
+           <DropdownMenuItem
+              onClick={() => setDeliveryDateOpen(true)}
+              className="gap-2"
+            >
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              Requested Delivery Date
+            </DropdownMenuItem>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="h-8 w-8 p-0">
             <IconDotsVertical className="h-4 w-4" />

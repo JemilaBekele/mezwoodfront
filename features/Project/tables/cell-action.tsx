@@ -262,10 +262,7 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
             )}
           </PermissionGuard>
 
-          {/* Requested Delivery Date */}
-          <PermissionGuard
-            requiredPermission={PERMISSIONS.PROJECT.VIEW.name}
-          >
+      
             <DropdownMenuItem
               onClick={() => setDeliveryDateOpen(true)}
               className="gap-2"
@@ -273,7 +270,6 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
               Requested Delivery Date
             </DropdownMenuItem>
-          </PermissionGuard>
 
           {/* Delete */}
           <PermissionGuard
