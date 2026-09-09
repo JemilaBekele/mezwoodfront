@@ -676,8 +676,7 @@ const DeliveryDateComparisonReport: React.FC = () => {
                       New Requested Date {getSortIcon('newRequestedDate')}
                     </TableHead>
                     <TableHead>Days Until Requested</TableHead>
-                    <TableHead>Difference</TableHead>
-                    <TableHead>Earlier</TableHead>
+                  
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -726,22 +725,8 @@ const DeliveryDateComparisonReport: React.FC = () => {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={status.status === 'delayed' ? 'destructive' : status.status === 'warning' ? 'secondary' : 'outline'}
-                            className="text-xs"
-                          >
-                            {Math.abs(differenceInDays)} days {differenceInDays > 0 ? 'late' : differenceInDays < 0 ? 'early' : 'same'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={getEarlierBadgeColor(whichIsEarlier) as any}
-                            className="text-xs"
-                          >
-                            {whichIsEarlier || 'Same date'}
-                          </Badge>
-                        </TableCell>
+                     
+                       
                       </TableRow>
                     );
                   })}
