@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import {
@@ -25,13 +27,16 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
-  Trash2
+  Trash2,
+  CheckCircle2,
+  PlusCircle
 } from 'lucide-react';
 import { IPurchase, PaymentStatus, PurchaseItem } from '@/models/purchase';
 import {
   getPurchaseId,
   acceptPurchase,
-  getStockCorrectionsByPurchaseId
+  getStockCorrectionsByPurchaseId,
+  acceptPurchaseItem
 } from '@/service/purchase';
 import {
   Table,
@@ -54,6 +59,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 import { deleteStockCorrection } from '@/service/StockCorrection';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
@@ -80,6 +93,12 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showStatusAlert, setShowStatusAlert] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<PaymentStatus | null>(null);
+
+  // Accept item dialog state
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<PurchaseItem | null>(null);
+  const [acceptQuantity, setAcceptQuantity] = useState<number | ''>('');
+  const [accepting, setAccepting] = useState(false);
 
   useEffect(() => {
     const fetchPurchaseData = async () => {
@@ -115,12 +134,9 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
   };
 
   const handleStatusChange = (value: PaymentStatus) => {
-    // If the selected status is the same as current, don't do anything
     if (value === purchase?.paymentStatus) {
       return;
     }
-    
-    // Set the selected status and show confirmation dialog
     setSelectedStatus(value);
     setPendingStatus(value);
     setShowStatusAlert(true);
@@ -137,7 +153,6 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
     try {
       const updatedPurchase = await acceptPurchase(id, pendingStatus);
 
-      // Preserve the existing items when updating the purchase
       setPurchase((prevPurchase) => ({
         ...updatedPurchase,
         items: prevPurchase?.items || updatedPurchase.items || []
@@ -146,14 +161,11 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
       setSelectedStatus(pendingStatus);
       toast.success(`Payment status updated to ${pendingStatus} successfully`);
 
-      // If status was changed to APPROVED, trigger a refresh
       if (pendingStatus === PaymentStatus.APPROVED) {
-        // Force a refresh of the data
         setRefreshTrigger((prev) => prev + 1);
       }
     } catch (error) {
       toast.error('Failed to update payment status');
-      // Reset the selected status to the original if update fails
       if (purchase) {
         setSelectedStatus(purchase.paymentStatus);
       }
@@ -165,7 +177,6 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
   };
 
   const handleStatusUpdateCancel = () => {
-    // Reset the selected status back to the original purchase status
     if (purchase) {
       setSelectedStatus(purchase.paymentStatus);
     }
@@ -179,7 +190,6 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
       await deleteStockCorrection(correctionId);
       toast.success('Stock correction deleted successfully');
 
-      // Refresh the stock corrections list
       if (id) {
         await fetchStockCorrections(id);
       }
@@ -196,12 +206,95 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
     }
   };
 
+  // ---- Accept Item Handlers ----
+  const openAcceptDialog = (item: PurchaseItem) => {
+    setSelectedItem(item);
+    // ✅ Input is always empty — user is entering an ADDITIONAL amount
+    setAcceptQuantity('');
+    setAcceptDialogOpen(true);
+  };
+
+  const handleAcceptItemConfirm = async () => {
+    if (!selectedItem?.id) {
+      toast.error('Purchase item ID is missing');
+      return;
+    }
+
+    if (acceptQuantity === '' || acceptQuantity === null) {
+      toast.error('Please enter a quantity to add');
+      return;
+    }
+
+    const qty = Number(acceptQuantity);
+
+    if (!Number.isInteger(qty) || qty <= 0) {
+      toast.error('Quantity to add must be a positive integer');
+      return;
+    }
+
+    const previousAccepted = selectedItem.acceptquantity ?? 0;
+    const remaining = (selectedItem.quantity || 0) - previousAccepted;
+
+    if (qty > remaining) {
+      toast.error(
+        `You can add up to ${remaining} more (already accepted ${previousAccepted} of ${selectedItem.quantity})`
+      );
+      return;
+    }
+
+    setAccepting(true);
+    try {
+      // Backend sums previous + new
+      await acceptPurchaseItem(selectedItem.id, {
+        acceptquantity: qty
+      });
+
+      // ✅ Update local state by ADDING to previous value (matches backend)
+      setPurchase((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: (prev.items || []).map((it) => {
+            if (it.id !== selectedItem.id) return it;
+            const prevAccepted = it.acceptquantity ?? 0;
+            const newTotal =
+              prevAccepted > 0 ? prevAccepted + qty : qty;
+            return {
+              ...it,
+              acceptquantity: newTotal,
+              isfullyaccepted: newTotal === it.quantity
+            };
+          })
+        };
+      });
+
+      toast.success(
+        `Added ${qty} to accepted quantity for ${
+          selectedItem.material?.name || 'item'
+        }`
+      );
+      setAcceptDialogOpen(false);
+      setSelectedItem(null);
+      setAcceptQuantity('');
+    } catch (error) {
+      toast.error('Failed to accept purchase item');
+    } finally {
+      setAccepting(false);
+    }
+  };
+
+  const handleAcceptDialogCancel = () => {
+    setAcceptDialogOpen(false);
+    setSelectedItem(null);
+    setAcceptQuantity('');
+  };
+
   const getStatusAlertMessage = () => {
     if (!pendingStatus || !purchase) return { title: '', description: '' };
-    
+
     const currentStatus = purchase.paymentStatus;
     const newStatus = pendingStatus;
-    
+
     if (newStatus === PaymentStatus.APPROVED) {
       return {
         title: 'Confirm Approval',
@@ -218,7 +311,7 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
         description: `Are you sure you want to change the status back to PENDING? This will ${currentStatus === PaymentStatus.APPROVED ? 'reverse inventory updates and' : ''} set the purchase back to pending.`
       };
     }
-    
+
     return {
       title: 'Confirm Status Change',
       description: `Are you sure you want to change the payment status from ${currentStatus} to ${newStatus}?`
@@ -242,11 +335,16 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
     );
   }
 
-  // Calculate financial details safely
   const subtotal =
     purchase.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
 
   const grandTotal = purchase.grandTotal || subtotal;
+
+  // Compute derived dialog values
+  const dialogPrevAccepted = selectedItem?.acceptquantity ?? 0;
+  const dialogRemaining = (selectedItem?.quantity || 0) - dialogPrevAccepted;
+  const dialogNewTotal =
+    dialogPrevAccepted + (Number(acceptQuantity) || 0);
 
   return (
     <div className='container mx-auto space-y-6 p-4 md:p-8'>
@@ -259,7 +357,7 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
               {getStatusAlertMessage().description}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleStatusUpdateCancel}>
               Cancel
@@ -270,8 +368,8 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                 pendingStatus === PaymentStatus.REJECTED
                   ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                   : pendingStatus === PaymentStatus.APPROVED
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : ''
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : ''
               }
             >
               {updating ? (
@@ -286,6 +384,88 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Accept Item Dialog */}
+      <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {dialogPrevAccepted > 0 ? 'Add Acceptance' : 'Accept Purchase Item'}
+            </DialogTitle>
+            <DialogDescription>
+              Enter the quantity you want to <span className='font-medium'>add</span> for{' '}
+              <span className='font-medium'>
+                {selectedItem?.material?.name || 'this material'}
+              </span>
+              . Ordered quantity:{' '}
+              <span className='font-medium'>{selectedItem?.quantity}</span>.
+              {dialogPrevAccepted > 0 && (
+                <>
+                  {' '}
+                  Already accepted:{' '}
+                  <span className='font-medium'>{dialogPrevAccepted}</span>.
+                  Remaining:{' '}
+                  <span className='font-medium'>{dialogRemaining}</span>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='space-y-2 py-2'>
+            <Label htmlFor='acceptquantity'>Quantity to Add</Label>
+            <Input
+              id='acceptquantity'
+              type='number'
+              min={0}
+              max={dialogRemaining}
+              value={acceptQuantity}
+              onChange={(e) =>
+                setAcceptQuantity(
+                  e.target.value === '' ? '' : Number(e.target.value)
+                )
+              }
+              placeholder='Enter quantity to add'
+            />
+
+            {/* Live preview of the new total */}
+            {selectedItem && acceptQuantity !== '' && Number(acceptQuantity) > 0 && (
+              <p className='text-sm text-muted-foreground'>
+                New total will be:{' '}
+                <span className='font-medium'>
+                  {dialogNewTotal}
+                </span>{' '}
+                / {selectedItem.quantity}
+                {dialogNewTotal === selectedItem.quantity && (
+                  <span className='ml-2 text-green-600 inline-flex items-center gap-1'>
+                    <CheckCircle2 className='h-4 w-4' />
+                    Fully accepted
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={handleAcceptDialogCancel}
+              disabled={accepting}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAcceptItemConfirm} disabled={accepting}>
+              {accepting ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  Saving...
+                </>
+              ) : (
+                'Confirm'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Status Update Section */}
       <Card className='shadow-lg'>
@@ -465,24 +645,80 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                     <TableHead>Material</TableHead>
                     <TableHead>Unit</TableHead>
                     <TableHead>Quantity</TableHead>
+                    <TableHead>Accepted Qty</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Unit Price</TableHead>
                     <TableHead>Total Price</TableHead>
+                    <TableHead className='text-right'>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchase.items.map((item: PurchaseItem, index) => (
-                    <TableRow key={item.id || item.materialId || index}>
-                      <TableCell className='font-medium'>
-                        {item.material?.name || 'Unknown Material'}
-                      </TableCell>
-                      <TableCell>
-                        {item?.unitOfMeasure?.name || 'Unknown Unit'}
-                      </TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>{(item.unitPrice || 0).toFixed(2)}</TableCell>
-                      <TableCell>{(item.totalPrice || 0).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {purchase.items.map((item: PurchaseItem, index) => {
+                    const remaining =
+                      (item.quantity || 0) - (item.acceptquantity || 0);
+
+                    return (
+                      <TableRow key={item.id || item.materialId || index}>
+                        <TableCell className='font-medium'>
+                          {item.material?.name || 'Unknown Material'}
+                        </TableCell>
+                        <TableCell>
+                          {item?.unitOfMeasure?.name || 'Unknown Unit'}
+                        </TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>
+                          {item.acceptquantity ?? (
+                            <span className='text-muted-foreground'>—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.isfullyaccepted ? (
+                            <Badge
+                              variant='default'
+                              className='bg-green-600 hover:bg-green-700'
+                            >
+                              <CheckCircle2 className='mr-1 h-3 w-3' />
+                              Fully Accepted
+                            </Badge>
+                          ) : item.acceptquantity ? (
+                            <Badge variant='secondary'>
+                              Partially Accepted
+                            </Badge>
+                          ) : (
+                            <Badge variant='outline'>Pending</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {(item.unitPrice || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          {(item.totalPrice || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell className='text-right'>
+                          {!item.isfullyaccepted && (
+                            <PermissionGuard
+                              requiredPermission={
+                                PERMISSIONS.PURCHASE.ACCEPT.name
+                              }
+                            >
+                              <Button
+                                variant='default'
+                                size='sm'
+                                className='bg-green-600 hover:bg-green-700'
+                                onClick={() => openAcceptDialog(item)}
+                                disabled={!item.id}
+                              >
+                                <PlusCircle className='mr-1 h-4 w-4' />
+                                {item.acceptquantity != null
+                                  ? `Accept +${remaining}`
+                                  : 'Accept'}
+                              </Button>
+                            </PermissionGuard>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -545,7 +781,8 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                     <div className='mb-4 flex items-start justify-between'>
                       <div>
                         <h4 className='font-semibold'>
-                          Stock Correction #{correction.shortCode || correction.id.slice(-6)}
+                          Stock Correction #
+                          {correction.shortCode || correction.id.slice(-6)}
                         </h4>
                         <div className='mt-2 flex flex-wrap gap-4'>
                           <Badge variant='outline' className='capitalize'>
@@ -669,8 +906,16 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                                   {item.material?.name || 'Unknown Material'}
                                 </TableCell>
                                 <TableCell>
-                                  <span className={item.quantity < 0 ? 'text-red-500 font-medium' : 'text-green-500 font-medium'}>
-                                    {item.quantity > 0 ? `+${item.quantity}` : item.quantity}
+                                  <span
+                                    className={
+                                      item.quantity < 0
+                                        ? 'text-red-500 font-medium'
+                                        : 'text-green-500 font-medium'
+                                    }
+                                  >
+                                    {item.quantity > 0
+                                      ? `+${item.quantity}`
+                                      : item.quantity}
                                   </span>
                                 </TableCell>
                                 <TableCell>

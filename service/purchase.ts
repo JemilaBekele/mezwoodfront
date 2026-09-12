@@ -130,6 +130,21 @@ export const updatePurchase = async (
     throw error;
   }
 };
+export const acceptPurchaseItem = async (
+  id: string,
+  { acceptquantity }: { acceptquantity: number }
+) => {
+  try {
+    const response = await axiosInstance.patch(
+      `/purchase-items/${id}/accept`,
+      { acceptquantity }
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
 export const acceptPurchase = async (
   id: string,
   paymentStatus: string,

@@ -228,6 +228,9 @@ export const PERMISSIONS = {
     CREATE: {
       name: 'CREATE_PURCHASE',
     },
+     ACCEPT_PURCHASE_ITEM: {
+      name: 'ACCEPT_PURCHASE',
+    },
     VIEW_ALL: {
       name: 'VIEW_ALL_PURCHASES',
     },

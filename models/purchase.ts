@@ -11,6 +11,8 @@ export interface PurchaseItem {
   unitOfMeasure?: IUnitOfMeasure;
 
   quantity: number;
+    acceptquantity?: number;
+  isfullyaccepted: boolean;
   unitPrice: number;
   totalPrice: number;
   id?: string;
