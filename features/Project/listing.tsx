@@ -25,7 +25,6 @@ import {
   CheckCheck,
   XCircle,
   User,
-  Download,
   FileSpreadsheet,
 } from "lucide-react";
 import { DataTable } from "@/components/ui/table/newdatatable";
@@ -295,8 +294,10 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
           const s = search.toLowerCase().trim();
           if (s === '') return true;
           
-          const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
+                   const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
           const customerName = project.customer?.name || '';
+          const customerPhone1 = project.customer?.phone1 || '';
+          const customerPhone2 = project.customer?.phone2 || '';
           const statusText = getStatusDisplayText(project.status);
           const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
           const difficultyText = getDifficultyDisplayText(project.difficulty);
@@ -305,6 +306,8 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
           const match =
             String(invoiceNumber).toLowerCase().includes(s) ||
             String(customerName).toLowerCase().includes(s) ||
+            String(customerPhone1).toLowerCase().includes(s) ||
+            String(customerPhone2).toLowerCase().includes(s) ||
             statusText.toLowerCase().includes(s) ||
             designStatusText.toLowerCase().includes(s) ||
             difficultyText.toLowerCase().includes(s) ||
@@ -432,21 +435,25 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       const s = search.toLowerCase().trim();
       if (s === '') return true;
       
-      const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
+            const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
       const customerName = project.customer?.name || '';
+      const customerPhone1 = project.customer?.phone1 || project.invoice?.customer?.phone1 || '';
+const customerPhone2 = project.customer?.phone2 || project.invoice?.customer?.phone2 || '';
       const statusText = getStatusDisplayText(project.status);
       const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
       const difficultyText = getDifficultyDisplayText(project.difficulty);
       const designerName = project.designBy?.name || '';
-      
+        
       const match =
         String(invoiceNumber).toLowerCase().includes(s) ||
         String(customerName).toLowerCase().includes(s) ||
+        String(customerPhone1).toLowerCase().includes(s) ||
+        String(customerPhone2).toLowerCase().includes(s) ||
         statusText.toLowerCase().includes(s) ||
         designStatusText.toLowerCase().includes(s) ||
         difficultyText.toLowerCase().includes(s) ||
         designerName.toLowerCase().includes(s);
-      
+
       if (!match) return false;
     }
 
@@ -564,7 +571,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
                 window.location.href = url;
               }}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-45">
                 <SelectValue placeholder="All Designers" />
               </SelectTrigger>
               <SelectContent>

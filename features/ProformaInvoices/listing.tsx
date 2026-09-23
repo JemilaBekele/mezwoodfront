@@ -188,15 +188,27 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
   }
 
   // ── Data ─────────────────────────────────────────────────────
-  const filteredData = invoicesData.filter((item) => {
+   const filteredData = invoicesData.filter((item) => {
     // Search filter
     if (search) {
-      const s = search.toLowerCase();
+      const s = search.toLowerCase().trim();
+      if (s === '') return true;
+
+      const piNumber = item.piNumber || '';
+      const customerName = item.customer?.name || '';
+      const customerPhone1 = item.customer?.phone1 || '';
+      const customerPhone2 = item.customer?.phone2 || '';
+      const paymentStatusText = getPaymentStatusDisplayText(item.paymentStatus);
+      const statusText = getStatusDisplayText(item.status);
+
       const match =
-        item.piNumber?.toLowerCase().includes(s) ||
-        item.customer?.name?.toLowerCase().includes(s) ||
-        getPaymentStatusDisplayText(item.paymentStatus).toLowerCase().includes(s) ||
-        getStatusDisplayText(item.status).toLowerCase().includes(s);
+        String(piNumber).toLowerCase().includes(s) ||
+        String(customerName).toLowerCase().includes(s) ||
+        String(customerPhone1).toLowerCase().includes(s) ||
+        String(customerPhone2).toLowerCase().includes(s) ||
+        paymentStatusText.toLowerCase().includes(s) ||
+        statusText.toLowerCase().includes(s);
+
       if (!match) return false;
     }
     

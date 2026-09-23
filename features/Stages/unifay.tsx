@@ -1521,7 +1521,7 @@ const formatDescription = (text: string, limit = 80) => {
                               </span>
                             </div>
                           )}
-                              <TableCell>
+                              <div>
                                                           <div className="space-y-1">
                                                             <p className="font-medium text-sm">{formatDescription(item.description)}</p>
                                                             {item.additionalDescription && (
@@ -1530,7 +1530,7 @@ const formatDescription = (text: string, limit = 80) => {
                                                               </p>
                                                             )}
                                                           </div>
-                                                        </TableCell>
+                                                        </div>
                         </div>
                       ))}
                     </div>

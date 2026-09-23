@@ -90,16 +90,7 @@ export const getAllProformaInvoices = async ({
 
     const response = await axiosInstance.get<ProformaInvoicesResponse>(
       `/proforma-invoices`,
-      {
-        params: {
-        
-          search,
-          status,
-          customerId,
-          sortBy,
-          sortOrder
-        }
-      }
+     
     );
     const invoices = response.data.invoices ?? [];
     return {

@@ -343,70 +343,70 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
         </DialogContent>
       </Dialog>
 
-      <DropdownMenu modal={false}>
+   <DropdownMenu modal={false}>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost" className="h-8 w-8 p-0">
+      <IconDotsVertical className="h-4 w-4" />
+    </Button>
+  </DropdownMenuTrigger>
 
-           <DropdownMenuItem
-              onClick={() => setDeliveryDateOpen(true)}
-              className="gap-2"
-            >
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              Requested Delivery Date
-            </DropdownMenuItem>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <IconDotsVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
+  <DropdownMenuContent align="end">
+    <DropdownMenuLabel>Actions</DropdownMenuLabel>
 
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+    <DropdownMenuItem
+      onClick={() => setDeliveryDateOpen(true)}
+      className="gap-2"
+    >
+      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+      Requested Delivery Date
+    </DropdownMenuItem>
 
-          <DropdownMenuItem
-            onClick={() =>
-              router.push(`/dashboard/Stage/delivery/view?id=${data.id}`)
-            }
-          >
-            <IconEdit className="mr-2 h-4 w-4" />
-            View Details
-          </DropdownMenuItem>
+    <DropdownMenuItem
+      onClick={() =>
+        router.push(`/dashboard/Stage/delivery/view?id=${data.id}`)
+      }
+    >
+      <IconEdit className="mr-2 h-4 w-4" />
+      View Details
+    </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
+    <DropdownMenuSeparator />
 
-          {stage && !isCompleted && (
-            <>
-              <DropdownMenuItem
-                onClick={() => setShowAddDialog(true)}
-                className="text-blue-600 focus:text-blue-600"
-              >
-                <IconPlus className="mr-2 h-4 w-4" />
-                Add Work Log
-              </DropdownMenuItem>
+    {stage && !isCompleted && (
+      <>
+        <DropdownMenuItem
+          onClick={() => setShowAddDialog(true)}
+          className="text-blue-600 focus:text-blue-600"
+        >
+          <IconPlus className="mr-2 h-4 w-4" />
+          Add Work Log
+        </DropdownMenuItem>
 
-              <DropdownMenuItem
-                onClick={() => setShowCompleteDialog(true)}
-                className="text-green-600 focus:text-green-600"
-              >
-                <IconCheck className="mr-2 h-4 w-4" />
-                Complete All Units ({remainingUnits.toFixed(2)} remaining)
-              </DropdownMenuItem>
-            </>
-          )}
+        <DropdownMenuItem
+          onClick={() => setShowCompleteDialog(true)}
+          className="text-green-600 focus:text-green-600"
+        >
+          <IconCheck className="mr-2 h-4 w-4" />
+          Complete All Units ({remainingUnits.toFixed(2)} remaining)
+        </DropdownMenuItem>
+      </>
+    )}
 
-          {stage && isCompleted && (
-            <DropdownMenuItem disabled className="text-muted-foreground">
-              <IconCheck className="mr-2 h-4 w-4" />
-              Already Completed
-            </DropdownMenuItem>
-          )}
+    {stage && isCompleted && (
+      <DropdownMenuItem disabled className="text-muted-foreground">
+        <IconCheck className="mr-2 h-4 w-4" />
+        Already Completed
+      </DropdownMenuItem>
+    )}
 
-          {!stage && (
-            <DropdownMenuItem disabled className="text-muted-foreground">
-              <IconX className="mr-2 h-4 w-4" />
-              No DELIVERY Works Stage
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+    {!stage && (
+      <DropdownMenuItem disabled className="text-muted-foreground">
+        <IconX className="mr-2 h-4 w-4" />
+        No DELIVERY Works Stage
+      </DropdownMenuItem>
+    )}
+  </DropdownMenuContent>
+</DropdownMenu>
 
       {/* Add Work Log Dialog */}
       <AlertDialog open={showAddDialog} onOpenChange={(open) => {
