@@ -23,12 +23,12 @@ import {
   FileX,
   Loader2,
 } from "lucide-react";
-import { DataTable } from "@/components/ui/table/newdatatable";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
 import {  getAllProformaInvoicesmy } from "@/service/ProformaInvoice";
-import { proformaInvoiceColumns } from "./tables/columns";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ProformaInvoiceCard } from "./listing";
 
 type ProformaInvoiceListingPageProps = object;
 
@@ -91,8 +91,10 @@ function StatusRowHeader({ title, icon: Icon }: { title: string; icon: React.Com
 
 // ─── Main Listing ───────────────────────────────────────────────
 export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingPageProps) {
-  const { page, search, limit, startDate, endDate } = useTableQueryParams();
+  const { page, search, startDate, endDate } = useTableQueryParams();
   const searchParams = useSearchParams();
+  // Always show 20 PIs per page (ignores ?limit=10 left in the URL by other tables/filters)
+  const limit = 20;
   const paymentStatusFilter = searchParams.get("paymentStatus") || "all";
   const statusFilter = searchParams.get("status") || "all";
   const [invoicesData, setInvoicesData] = useState<any[]>([]);
@@ -107,10 +109,11 @@ export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingP
         setLoading(true);
         setError(null);
 
+        // Load all of my PIs once; paging, search and status filters happen client-side below
+        // (the API paginates too, so requesting page N here would double-paginate)
         const { proformaInvoices } = await getAllProformaInvoicesmy({
-          page,
-          limit,
-          search,
+          page: 1,
+          limit: 10000,
         });
 
         if (cancelled) return;
@@ -126,7 +129,7 @@ export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingP
 
     loadInvoices();
     return () => { cancelled = true; };
-  }, [endDate, limit, page, search, startDate]);
+  }, [endDate, startDate]);
 
   // ── Helpers ──────────────────────────────────────────────────
   const getPaymentStatusDisplayText = useCallback((status: string): string => {
@@ -233,6 +236,7 @@ export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingP
   const total = invoicesData.length;
   const filteredCount = filteredData.length;
   const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
+  const totalPages = Math.ceil(filteredCount / limit);
   const hasFilter = paymentStatusFilter !== "all" || statusFilter !== "all";
 
   // ── Render ───────────────────────────────────────────────────
@@ -393,7 +397,7 @@ export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingP
         </div>
       )}
 
-      {/* ── Table ─────────────────────────────────────────── */}
+      {/* ── Image List ────────────────────────────────────── */}
       {total === 0 && !hasFilter ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
           <FileText className="h-8 w-8 text-muted-foreground/40" />
@@ -403,18 +407,58 @@ export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingP
           </p>
         </div>
       ) : (
-        <DataTable
-          data={paginatedData}
-          totalItems={filteredCount}
-          columns={proformaInvoiceColumns}
-          currentPage={page}
-          itemsPerPage={limit}
-          searchValue={search}
-          paymentStatusFilter={paymentStatusFilter}
-          statusFilter={statusFilter}
-          startDate={startDate}
-          endDate={endDate}
-        />
+        <>
+          <p className="text-sm text-muted-foreground">
+            Showing {filteredCount > 0 ? (page - 1) * limit + 1 : 0}-
+            {Math.min(page * limit, filteredCount)} of {filteredCount} invoices
+          </p>
+
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {paginatedData.length > 0 ? (
+              paginatedData.map((invoice) => (
+                <ProformaInvoiceCard
+                  key={invoice.id}
+                  invoice={invoice}
+                  onDeleted={(id) => setInvoicesData((prev) => prev.filter((i) => i.id !== id))}
+                />
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
+                No invoices found matching your criteria.
+              </div>
+            )}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              {page > 1 ? (
+                <Button variant="outline" asChild>
+                  <Link href={buildQueryStringLocal({ page: String(page - 1) })}>Previous</Link>
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>Previous</Button>
+              )}
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5 || page <= 3) pageNum = i + 1;
+                else if (page >= totalPages - 2) pageNum = totalPages - 4 + i;
+                else pageNum = page - 2 + i;
+                return (
+                  <Button key={pageNum} variant={page === pageNum ? "default" : "outline"} asChild>
+                    <Link href={buildQueryStringLocal({ page: String(pageNum) })}>{pageNum}</Link>
+                  </Button>
+                );
+              })}
+              {page < totalPages ? (
+                <Button variant="outline" asChild>
+                  <Link href={buildQueryStringLocal({ page: String(page + 1) })}>Next</Link>
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>Next</Button>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

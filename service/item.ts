@@ -79,6 +79,7 @@ export const getItems = async () => {
 export const getItemslist = async () => {
   try {
     const response = await axiosInstance.get<ItemsResponse>(`/items/get/all/list/pos/all`);
+    console.log("pos",response.data)
     return response.data.items;
   } catch (error) {
     throw error;
