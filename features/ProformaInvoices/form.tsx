@@ -33,6 +33,7 @@ import { IProductCategory, IProductType, ISize } from '@/models/productConfigura
 import { Modal } from '@/components/ui/modal';
 import CreateCustomerModal from './customer';
 import { CustomerSelect } from './customermodal';
+import { MiniCalculator } from './mini-calculator';
 
 interface ProformaInvoiceFormValues {
   customerId: string;
@@ -2133,6 +2134,7 @@ const ConfirmationModal = ({
             </FormLabel>
             <FormControl>
 <div>
+  <div className="flex items-center gap-2">
   <Input
     type="number"
     inputMode="decimal"
@@ -2187,6 +2189,25 @@ const ConfirmationModal = ({
         : ''
     }`}
   />
+  <MiniCalculator
+    initialValue={Number(field.value || 0)}
+    onApply={(value) => {
+      if (value <= 0 || value > 999999999.99) {
+        toast.error('Unit price must be between 0.01 and 999,999,999.99');
+        return;
+      }
+      field.onChange(value);
+      calculateItemAmount(itemIndex);
+      if (priceAutoFilled.get(itemIndex)) {
+        setPriceAutoFilled((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(itemIndex);
+          return newMap;
+        });
+      }
+    }}
+  />
+  </div>
 
   <p className="mt-1 text-xs text-muted-foreground">
     Format:{' '}
