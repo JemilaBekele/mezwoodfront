@@ -5,11 +5,8 @@ import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import {
   ColumnDef,
-  ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   SortingState,
   useReactTable,
@@ -26,7 +23,9 @@ import {
   FileText,
   ShoppingCart,
   Calculator,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Phone,
+  Loader2
 } from 'lucide-react';
 import { utils, writeFile } from 'xlsx';
 
@@ -101,6 +100,27 @@ const isSale = (item: any): item is ISell => {
   return item.type === 'SALE' ;
 };
 
+// ─── Money helpers (proforma: total / amountPaid, sale: grandTotal / totalPaid) ──
+const getTotal = (item: any): number =>
+  Number(isProformaInvoice(item) ? item.total : item.grandTotal) || 0;
+
+const getPaid = (item: any): number =>
+  Number(item.totalPaid ?? item.amountPaid) || 0;
+
+const getBalance = (item: any): number =>
+  item.balance !== undefined && item.balance !== null
+    ? Number(item.balance) || 0
+    : getTotal(item) - getPaid(item);
+
+// Proforma rows carry piNumber (the API also mirrors it into invoiceNo), sales carry invoiceNo
+const getInvoiceNo = (item: any): string => item.piNumber || item.invoiceNo || '';
+
+const getCustomerPhone = (item: any): string =>
+  [item.customer?.phone1, item.customer?.phone2].filter(Boolean).join(' / ');
+
+const formatETB = (amount: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'ETB' }).format(amount);
+
 export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
   {
     id: 'select',
@@ -142,14 +162,10 @@ export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
     }
   },
   {
-    accessorKey: 'invoiceNo',
+    id: 'invoiceNo',
+    accessorFn: (row) => getInvoiceNo(row),
     header: 'Invoice No',
-    cell: ({ row }) => {
-      const invoiceNo = isProformaInvoice(row.original) 
-        ? row.original.piNumber 
-        : row.original.invoiceNo;
-      return <div className='font-medium'>{invoiceNo || '-'}</div>;
-    }
+    cell: ({ row }) => <div className='font-medium'>{getInvoiceNo(row.original) || '-'}</div>
   },
   {
     accessorKey: 'createdAt',
@@ -172,28 +188,84 @@ export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
     }
   },
   {
-    accessorKey: 'customer',
+    id: 'customer',
+    accessorFn: (row) => row.customer?.name || '',
     header: 'Customer',
     cell: ({ row }) => {
-      const customer = row.original.customer;
-      return <div>{customer?.name || '-'}</div>;
+      const phone = getCustomerPhone(row.original);
+      return (
+        <div>
+          <div>{row.original.customer?.name || '-'}</div>
+          {phone && (
+            <div className='inline-flex items-center gap-1 text-xs text-muted-foreground'>
+              <Phone className='h-3 w-3' />
+              {phone}
+            </div>
+          )}
+        </div>
+      );
     }
   },
   {
-    accessorKey: 'total',
-    header: () => <div className='text-right'>Total Amount</div>,
+    id: 'total',
+    accessorFn: (row) => getTotal(row),
+    header: ({ column }) => (
+      <Button
+        variant='ghost'
+        className='ml-auto flex'
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      >
+        Total Amount
+        <ArrowUpDown className='ml-2 h-4 w-4' />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <div className='text-right font-medium'>{formatETB(getTotal(row.original))}</div>
+    )
+  },
+  {
+    id: 'totalPaid',
+    accessorFn: (row) => getPaid(row),
+    header: ({ column }) => (
+      <Button
+        variant='ghost'
+        className='ml-auto flex'
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      >
+        Total Paid
+        <ArrowUpDown className='ml-2 h-4 w-4' />
+      </Button>
+    ),
+    cell: ({ row }) => (
+      <div className='text-right font-medium text-green-700 dark:text-green-400'>
+        {formatETB(getPaid(row.original))}
+      </div>
+    )
+  },
+  {
+    id: 'balance',
+    accessorFn: (row) => getBalance(row),
+    header: ({ column }) => (
+      <Button
+        variant='ghost'
+        className='ml-auto flex'
+        onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      >
+        Balance
+        <ArrowUpDown className='ml-2 h-4 w-4' />
+      </Button>
+    ),
     cell: ({ row }) => {
-      let amount = 0;
-      if (isProformaInvoice(row.original)) {
-        amount = row.original.total || 0;
-      } else {
-        amount = row.original.grandTotal || 0;
-      }
-      const formatted = new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'ETB'
-      }).format(amount);
-      return <div className='text-right font-medium'>{formatted}</div>;
+      const balance = getBalance(row.original);
+      return (
+        <div
+          className={`text-right font-medium ${
+            balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+          }`}
+        >
+          {formatETB(balance)}
+        </div>
+      );
     }
   },
   {
@@ -253,7 +325,7 @@ export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
           {status?.replace(/_/g, ' ') || '-'}
         </Badge>
       );
-    } else {  
+    } else {
       status = row.original.status;
       const getSaleStatusVariant = (status: SaleStatus) => {
         switch (status) {
@@ -280,15 +352,14 @@ export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
   }
 },
   {
-    accessorKey: 'preparedBy',
+    id: 'createdBy',
+    accessorFn: (row) =>
+      (isProformaInvoice(row) ? row.preparedBy?.name : row.createdBy?.name) || '',
     header: 'Created By',
     cell: ({ row }) => {
-      let createdBy = null;
-      if (isProformaInvoice(row.original)) {
-        createdBy = row.original.preparedBy;
-      } else {
-        createdBy = row.original.createdBy;
-      }
+      const createdBy = isProformaInvoice(row.original)
+        ? row.original.preparedBy
+        : row.original.createdBy;
       return <div>{createdBy?.name || '-'}</div>;
     }
   },
@@ -309,7 +380,7 @@ export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
           <DropdownMenuContent align='end'>
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
-      
+
             {isSale(item) && (
               <>
                 <DropdownMenuItem
@@ -320,22 +391,22 @@ export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
                   <Eye className='mr-2 h-4 w-4' />
                   View Sale
                 </DropdownMenuItem>
-           
+
               </>
             )}
           {  isProformaInvoice(item) && (
               <>
-               
+
                 <DropdownMenuItem
                   onClick={() =>
                     router.push(`/dashboard/ProformaInvoice/view?id=${item.id}`)
                   }
                 >
-                  View PI 
+                  View PI
                 </DropdownMenuItem>
               </>
             )}
-        
+
           </DropdownMenuContent>
         </DropdownMenu>
       );
@@ -343,18 +414,53 @@ export const getCombinedColumns = (router: any): ColumnDef<any>[] => [
   }
 ];
 
+// Filters the server query uses - only changed by "Apply Filters" / "Clear Filters"
+interface IAppliedFilters {
+  type: 'proforma' | 'sale' | 'all';
+  startDate: string;
+  endDate: string;
+  status: string;
+  paymentStatus: string;
+  seller: string;
+  customer: string;
+  searchTerm: string;
+}
+
+const EMPTY_FILTERS: IAppliedFilters = {
+  type: 'all',
+  startDate: '',
+  endDate: '',
+  status: 'all',
+  paymentStatus: 'all',
+  seller: 'all',
+  customer: 'all',
+  searchTerm: ''
+};
+
+const buildQuery = (f: IAppliedFilters, page: number, limit: number) => {
+  const filters: any = { type: f.type, page, limit };
+  if (f.startDate) filters.startDate = f.startDate;
+  if (f.endDate) filters.endDate = f.endDate;
+  if (f.status !== 'all') filters.status = f.status;
+  if (f.paymentStatus !== 'all') filters.paymentStatus = f.paymentStatus;
+  if (f.seller !== 'all') filters.createdById = f.seller;
+  if (f.customer !== 'all') filters.customerId = f.customer;
+  if (f.searchTerm.trim()) filters.searchTerm = f.searchTerm.trim();
+  return filters;
+};
+
 export function ProformaSalesDataTable() {
   const router = useRouter();
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<IProformaSalesResponse['summary'] | null>(null);
 
-  // Filter states
+  // Filter form states (what the user is editing)
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -363,170 +469,101 @@ export function ProformaSalesDataTable() {
   const [selectedSeller, setSelectedSeller] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // Filters actually sent to the server
+  const [appliedFilters, setAppliedFilters] = useState<IAppliedFilters>(EMPTY_FILTERS);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalItems, setTotalItems] = useState<number>(0);
   const itemsPerPage = 20;
 
-  // Table filter states
+  // Table type filter (on the loaded page)
   const [tableTypeFilter, setTableTypeFilter] = useState<'all' | 'PROFORMA' | 'SALE'>('all');
-  const [filteredData, setFilteredData] = useState<any[]>([]);
 
   // Commission calculation states
   const [commissionPercent, setCommissionPercent] = useState<number>(2);
   const [commissionResult, setCommissionResult] = useState<number>(0);
   const [totalAmount, setTotalAmount] = useState<number>(0);
-  const [isCalculating, setIsCalculating] = useState<boolean>(false);
 
   // Dropdown data
   const [sellers, setSellers] = useState<IEmployee[]>([]);
   const [customers, setCustomers] = useState<ICustomer[]>([]);
 
-  const columns = getCombinedColumns(router);
+  const columns = React.useMemo(() => getCombinedColumns(router), [router]);
 
-  // Apply table type filter to data
-  useEffect(() => {
-    if (tableTypeFilter === 'all') {
-      setFilteredData(data);
-    } else if (tableTypeFilter === 'PROFORMA') {
-      const filtered = data.filter(item => isProformaInvoice(item));
-      setFilteredData(filtered);
-    } else {
-      const filtered = data.filter(item => isSale(item));
-      setFilteredData(filtered);
-    }
+  const filteredData = React.useMemo(() => {
+    if (tableTypeFilter === 'PROFORMA') return data.filter((item) => isProformaInvoice(item));
+    if (tableTypeFilter === 'SALE') return data.filter((item) => isSale(item));
+    return data;
   }, [data, tableTypeFilter]);
 
-  // Calculate total amount and commission for both Proforma and Sales
-  const calculateCommission = useCallback(() => {
-    if (!selectedSeller || selectedSeller === 'all') {
-      toast.info('Please select a seller to calculate commission');
-      setCommissionResult(0);
-      setTotalAmount(0);
-      return;
-    }
-
-    setIsCalculating(true);
-
-    // Filter data by selected seller (use filteredData based on table filter)
-    const filteredDataBySeller = filteredData.filter((item) => {
-      if (isProformaInvoice(item)) {
-        // For Proforma invoices, check preparedBy
-        return item.preparedBy?.id === selectedSeller;
-      } else if (isSale(item)) {
-        // For Sales, check createdBy
-        return item.createdBy?.id === selectedSeller;
-      }
-      return false;
-    });
-
-    if (filteredDataBySeller.length === 0) {
-      toast.warning(`No documents found for the selected seller`);
-      setTotalAmount(0);
-      setCommissionResult(0);
-      setIsCalculating(false);
-      return;
-    }
-
-    // Calculate total amount from both Proforma and Sales
-    const total = filteredDataBySeller.reduce((sum, item) => {
-      let amount = 0;
-      if (isProformaInvoice(item)) {
-        amount = item.total || 0;
-      } else if (isSale(item)) {
-        amount = item.grandTotal || 0;
-      }
-      return sum + amount;
-    }, 0);
-
-    setTotalAmount(total);
-    
-    // Calculate commission
-    const commission = (total * commissionPercent) / 100;
-    setCommissionResult(commission);
-    
-    setIsCalculating(false);
-    
-    // Show success message
-    toast.success(`Commission calculated: ${new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'ETB'
-    }).format(commission)}`);
-    
-  }, [filteredData, selectedSeller, commissionPercent]);
-
-  // Define fetchCombinedData with proper dependencies
-  const fetchCombinedData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const filters: any = {
-        type: selectedType as 'proforma' | 'sale' | 'all',
-        page: currentPage,
-        limit: itemsPerPage
-      };
-      
-      if (startDate) filters.startDate = startDate;
-      if (endDate) filters.endDate = endDate;
-      if (selectedStatus && selectedStatus !== 'all') filters.status = selectedStatus;
-      if (selectedPaymentStatus && selectedPaymentStatus !== 'all') filters.paymentStatus = selectedPaymentStatus;
-      if (selectedSeller && selectedSeller !== 'all') filters.createdById = selectedSeller;
-      if (selectedCustomer && selectedCustomer !== 'all') filters.customerId = selectedCustomer;
-      if (searchTerm) filters.searchTerm = searchTerm;
-
-      const response: IProformaSalesResponse = await getAllProformaInvoicesAndSales(filters);
-      
-      setData(response.data);
-      setSummary(response.summary);
-      setTotalPages(response.pagination.totalPages);
-      setTotalItems(response.pagination.totalItems);
-      
-      // Reset commission when new data is loaded
-      setCommissionResult(0);
-      setTotalAmount(0);
-      setTableTypeFilter('all'); // Reset table filter when new data loads
-    } catch (error) {
-      console.error('Error fetching combined data:', error);
-      toast.error('Failed to fetch data');
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedType, currentPage, startDate, endDate, selectedStatus, selectedPaymentStatus, selectedSeller, selectedCustomer, searchTerm]);
-
-  // Fetch initial data
+  // Load dropdown data once
   useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setLoading(true);
-        const [employeesData, customersData] = await Promise.all([
-          getAllEmploy(),
-          getCustomer()
-        ]);
-
+    Promise.all([getAllEmploy(), getCustomer()])
+      .then(([employeesData, customersData]) => {
         setSellers(employeesData || []);
         setCustomers(customersData || []);
-        
-        // Fetch initial combined data
-        await fetchCombinedData();
+      })
+      .catch((error) => {
+        console.error('Error fetching dropdown data:', error);
+        toast.error('Failed to load sellers and customers');
+      });
+  }, []);
+
+  // Fetch whenever the applied filters or the page change
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCombinedData = async () => {
+      try {
+        setLoading(true);
+        const response: IProformaSalesResponse = await getAllProformaInvoicesAndSales(
+          buildQuery(appliedFilters, currentPage, itemsPerPage)
+        );
+        if (cancelled) return;
+        if ((response as any).success === false) {
+          toast.error((response as any).error || 'Failed to fetch data');
+        }
+        setData(response.data || []);
+        setSummary(response.summary);
+        setTotalPages(response.pagination?.totalPages || 1);
+        setTotalItems(response.pagination?.totalItems || 0);
+        setRowSelection({});
       } catch (error) {
-        console.error('Error fetching initial data:', error);
-        toast.error('Failed to load data');
+        console.error('Error fetching combined data:', error);
+        if (!cancelled) {
+          toast.error('Failed to fetch data');
+          setData([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
-
-    fetchInitialData();
-  }, [fetchCombinedData]);
+    fetchCombinedData();
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedFilters, currentPage]);
 
   // Apply filters
-  const applyFilters = async () => {
+  const applyFilters = () => {
+    setAppliedFilters({
+      type: selectedType as IAppliedFilters['type'],
+      startDate,
+      endDate,
+      status: selectedStatus,
+      paymentStatus: selectedPaymentStatus,
+      seller: selectedSeller,
+      customer: selectedCustomer,
+      searchTerm
+    });
     setCurrentPage(1);
-    await fetchCombinedData();
+    setTableTypeFilter('all');
+    setCommissionResult(0);
+    setTotalAmount(0);
   };
 
   // Clear all filters
-  const clearFilters = async () => {
+  const clearFilters = () => {
     setStartDate('');
     setEndDate('');
     setSelectedType('all');
@@ -535,79 +572,129 @@ export function ProformaSalesDataTable() {
     setSelectedSeller('all');
     setSelectedCustomer('all');
     setSearchTerm('');
-    setCurrentPage(1);
     setCommissionPercent(2);
     setCommissionResult(0);
     setTotalAmount(0);
     setTableTypeFilter('all');
-    
-    setTimeout(async () => {
-      await fetchCombinedData();
-    }, 100);
+    setAppliedFilters(EMPTY_FILTERS);
+    setCurrentPage(1);
   };
 
-  // Handle page change
-  const handlePageChange = async (newPage: number) => {
-    setCurrentPage(newPage);
-    await fetchCombinedData();
-  };
+  // Commission on the total of ALL records of the applied seller (every page)
+  const calculateCommission = useCallback(() => {
+    if (!selectedSeller || selectedSeller === 'all') {
+      toast.info('Please select a seller to calculate commission');
+      return;
+    }
+    if (appliedFilters.seller !== selectedSeller) {
+      toast.info('Click "Apply Filters" first so the list shows this seller');
+      return;
+    }
+    const total = Number(summary?.totalAmount) || 0;
+    if (total === 0) {
+      toast.warning('No documents found for the selected seller');
+      setTotalAmount(0);
+      setCommissionResult(0);
+      return;
+    }
+    const commission = (total * commissionPercent) / 100;
+    setTotalAmount(total);
+    setCommissionResult(commission);
+    toast.success(`Commission calculated: ${formatETB(commission)}`);
+  }, [selectedSeller, appliedFilters.seller, summary, commissionPercent]);
 
-  // Export to Excel
-  const exportToExcel = () => {
-    const dataToExport = filteredData;
-    
-    const exportData = dataToExport.map((item) => {
-      const isProforma = isProformaInvoice(item);
-      return {
-        'Type': isProforma ? 'PROFORMA' : 'SALE',
-        'Invoice No': isProforma ? (item as IProformaInvoice).piNumber : (item as ISell).invoiceNo,
+  // Export ALL records that match the applied filters (not only the current page)
+  const exportToExcel = async () => {
+    try {
+      setExporting(true);
+      const response = await getAllProformaInvoicesAndSales(
+        buildQuery(appliedFilters, 1, Math.max(totalItems, 1))
+      );
+      let rows: any[] = response.data || [];
+      if (tableTypeFilter === 'PROFORMA') rows = rows.filter((item) => isProformaInvoice(item));
+      if (tableTypeFilter === 'SALE') rows = rows.filter((item) => isSale(item));
+
+      if (rows.length === 0) {
+        toast.warning('No records to export');
+        return;
+      }
+
+      const exportData = rows.map((item) => ({
+        'Type': isProformaInvoice(item) ? 'PROFORMA' : 'SALE',
+        'Invoice No': getInvoiceNo(item) || '-',
         'Date': item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB') : '-',
         'Customer': item.customer?.name || '-',
-        'Total Amount': isProforma ? (item as IProformaInvoice).total : (item as ISell).grandTotal,
+        'Customer Phone': getCustomerPhone(item) || '-',
+        'Total Amount': getTotal(item),
+        'Total Paid': getPaid(item),
+        'Balance': getBalance(item),
         'Payment Status': item.paymentStatus?.replace(/_/g, ' ') || '-',
-        'Status': isProforma ? (item as IProformaInvoice).status : (item as ISell).saleStatus,
-        'Created By': isProforma 
-          ? (item as IProformaInvoice).preparedBy?.name 
-          : (item as ISell).createdBy?.name || '-'
-      };
-    });
+        'Status': item.status?.replace(/_/g, ' ') || '-',
+        'Created By':
+          (isProformaInvoice(item) ? item.preparedBy?.name : item.createdBy?.name) || '-'
+      }));
 
-    const worksheet = utils.json_to_sheet(exportData);
-    const workbook = utils.book_new();
-    utils.book_append_sheet(workbook, worksheet, 'Proforma & Sales Data');
-    writeFile(workbook, `proforma-sales-data-${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast.success('Export completed successfully');
+      // Totals row
+      exportData.push({
+        'Type': 'TOTAL',
+        'Invoice No': '',
+        'Date': '',
+        'Customer': '',
+        'Customer Phone': '',
+        'Total Amount': rows.reduce((sum, item) => sum + getTotal(item), 0),
+        'Total Paid': rows.reduce((sum, item) => sum + getPaid(item), 0),
+        'Balance': rows.reduce((sum, item) => sum + getBalance(item), 0),
+        'Payment Status': '',
+        'Status': '',
+        'Created By': ''
+      });
+
+      const worksheet = utils.json_to_sheet(exportData);
+      worksheet['!cols'] = [
+        { wch: 10 }, { wch: 16 }, { wch: 12 }, { wch: 24 }, { wch: 22 },
+        { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 24 }, { wch: 18 }
+      ];
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, 'Proforma & Sales Data');
+      writeFile(workbook, `proforma-sales-data-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success(`Exported ${rows.length} records`);
+    } catch (error) {
+      console.error('Error exporting:', error);
+      toast.error('Failed to export');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const table = useReactTable({
     data: filteredData,
     columns,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {
       sorting,
-      columnFilters,
       columnVisibility,
       rowSelection
     }
   });
-const totalAmountFromAllItems = React.useMemo(() => {
-  return filteredData.reduce((sum, item) => {
-    let amount = 0;
-    if (isProformaInvoice(item)) {
-      amount = item.total || 0;
-    } else if (isSale(item)) {
-      amount = item.grandTotal || 0;
-    }
-    return sum + amount;
-  }, 0);
-}, [filteredData]);
+
+  // Totals of the rows shown on this page
+  const pageTotals = React.useMemo(
+    () =>
+      filteredData.reduce(
+        (acc, item) => ({
+          total: acc.total + getTotal(item),
+          paid: acc.paid + getPaid(item),
+          balance: acc.balance + getBalance(item)
+        }),
+        { total: 0, paid: 0, balance: 0 }
+      ),
+    [filteredData]
+  );
+
   // Get counts for filter buttons using the fixed type guards
   const proformaCount = data.filter(item => isProformaInvoice(item)).length;
   const saleCount = data.filter(item => isSale(item)).length;
@@ -617,41 +704,47 @@ const totalAmountFromAllItems = React.useMemo(() => {
       {/* Filters Section */}
       <Card>
         <CardHeader>
-          <div className='flex items-center justify-between'>
+          <div className='flex flex-wrap items-start justify-between gap-4'>
             <div>
               <CardTitle>Filters & Search</CardTitle>
               <CardDescription>
                 Filter proforma invoices and sales by various criteria
               </CardDescription>
             </div>
-            
-            {/* Summary and Commission Section */}
-            <div className='flex items-center gap-6'>
-              {/* Summary Section */}
-             {summary && (
-  <div className='flex items-center gap-4'>
-    <div className='flex flex-col items-end'>
-      <div className='text-sm font-medium text-gray-600'>
-        Total Amount: {new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'ETB'
-        }).format(totalAmountFromAllItems)}  {/* ← Changed here */}
-      </div>
-      <div className='text-sm font-medium text-gray-600'>
-        Proforma: {summary.proformaCount}
-      </div>
-      <div className='text-sm font-medium text-gray-600'>
-        Sales: {summary.salesCount}
-      </div>
-      <div className='text-lg font-bold text-blue-700'>
-        Total: {summary.totalCount}
-      </div>
-    </div>
-  </div>
-)}
-              
-         
-            </div>
+
+            {/* Summary - totals of all filtered records */}
+            {summary && (
+              <div className='grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3'>
+                <div>
+                  <p className='text-muted-foreground'>Total Amount</p>
+                  <p className='font-semibold'>{formatETB(Number(summary.totalAmount) || 0)}</p>
+                </div>
+                <div>
+                  <p className='text-muted-foreground'>Total Paid</p>
+                  <p className='font-semibold text-green-700 dark:text-green-400'>
+                    {formatETB(Number(summary.totalPaid) || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className='text-muted-foreground'>Balance</p>
+                  <p className='font-semibold text-red-600 dark:text-red-400'>
+                    {formatETB(Number(summary.totalBalance) || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className='text-muted-foreground'>Proforma</p>
+                  <p className='font-semibold'>{summary.proformaCount}</p>
+                </div>
+                <div>
+                  <p className='text-muted-foreground'>Sales</p>
+                  <p className='font-semibold'>{summary.salesCount}</p>
+                </div>
+                <div>
+                  <p className='text-muted-foreground'>Total</p>
+                  <p className='text-lg font-bold text-blue-700 dark:text-blue-400'>{summary.totalCount}</p>
+                </div>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className='space-y-4'>
@@ -679,7 +772,7 @@ const totalAmountFromAllItems = React.useMemo(() => {
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
-            
+
             <div className='space-y-2'>
               <Label htmlFor='end-date'>End Date</Label>
               <Input
@@ -694,9 +787,12 @@ const totalAmountFromAllItems = React.useMemo(() => {
               <Label htmlFor='search'>Search</Label>
               <Input
                 id='search'
-                placeholder='Search by invoice or customer...'
+                placeholder='Invoice no, customer or phone...'
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyFilters();
+                }}
               />
             </div>
 
@@ -711,7 +807,7 @@ const totalAmountFromAllItems = React.useMemo(() => {
                   <SelectItem value='PENDING'>Pending</SelectItem>
                   <SelectItem value='PARTIAL'>Partial</SelectItem>
                   <SelectItem value='PAID'>Paid</SelectItem>
-                  <SelectItem value='UNPAID'>Unpaid</SelectItem>
+                  <SelectItem value='CANCELLED'>Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -724,13 +820,15 @@ const totalAmountFromAllItems = React.useMemo(() => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value='all'>All Statuses</SelectItem>
-                  <SelectItem value='APPROVED_CREATE_PROJECT'>Proforma: Approved create project</SelectItem>
                   <SelectItem value='PENDING_ST'>Proforma: Pending</SelectItem>
                   <SelectItem value='APPROVED_ST'>Proforma: Approved</SelectItem>
                   <SelectItem value='SENT_TO_CLIENT'>Proforma: Sent to Client</SelectItem>
+                  <SelectItem value='REVISION'>Proforma: Revision</SelectItem>
                   <SelectItem value='APPROVED_CLIENT'>Proforma: Client Approved</SelectItem>
+                  <SelectItem value='APPROVED_CREATE_PROJECT'>Proforma: Approved create project</SelectItem>
                   <SelectItem value='NOT_APPROVED'>Sale: Not Approved</SelectItem>
                   <SelectItem value='APPROVED'>Sale: Approved</SelectItem>
+                  <SelectItem value='PARTIALLY_DELIVERED'>Sale: Partially Delivered</SelectItem>
                   <SelectItem value='DELIVERED'>Sale: Delivered</SelectItem>
                   <SelectItem value='CANCELLED'>Cancelled</SelectItem>
                 </SelectContent>
@@ -773,7 +871,7 @@ const totalAmountFromAllItems = React.useMemo(() => {
           </div>
 
           {/* Commission Calculator Section with Calculate Button */}
-          <div className='flex items-center justify-between gap-4 p-4  rounded-lg'>
+          <div className='flex flex-wrap items-center justify-between gap-4 rounded-lg p-4'>
             <div className='flex items-center gap-4'>
               <div className='flex items-center gap-2'>
                 <Label htmlFor='commission' className='font-semibold'>
@@ -792,34 +890,28 @@ const totalAmountFromAllItems = React.useMemo(() => {
               </div>
               <Button
                 onClick={calculateCommission}
-                disabled={isCalculating || !selectedSeller || selectedSeller === 'all' || loading}
+                disabled={!selectedSeller || selectedSeller === 'all' || loading}
                 className='bg-green-600 hover:bg-green-700'
               >
                 <Calculator className='mr-2 h-4 w-4' />
-                {isCalculating ? 'Calculating...' : 'Calculate Commission'}
+                Calculate Commission
               </Button>
             </div>
-            
+
             {/* Commission Result Badge */}
             {commissionResult > 0 && (
               <div className='flex items-center gap-3'>
-                <div className='text-sm text-gray-600'>
-                  Total Amount: {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'ETB'
-                  }).format(totalAmount)}
+                <div className='text-sm text-muted-foreground'>
+                  Total Amount: {formatETB(totalAmount)}
                 </div>
-                <Badge variant='secondary' className='text-sm px-3 py-1'>
-                  Commission: {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'ETB'
-                  }).format(commissionResult)}
+                <Badge variant='secondary' className='px-3 py-1 text-sm'>
+                  Commission: {formatETB(commissionResult)}
                 </Badge>
               </div>
             )}
           </div>
 
-          <div className='flex gap-2'>
+          <div className='flex flex-wrap gap-2'>
             <Button onClick={applyFilters} disabled={loading}>
               <Filter className='mr-2 h-4 w-4' />
               Apply Filters
@@ -828,13 +920,17 @@ const totalAmountFromAllItems = React.useMemo(() => {
               <X className='mr-2 h-4 w-4' />
               Clear Filters
             </Button>
-            <Button 
-              variant='outline' 
+            <Button
+              variant='outline'
               onClick={exportToExcel}
-              disabled={data.length === 0}
+              disabled={exporting || loading || totalItems === 0}
             >
-              <Download className='mr-2 h-4 w-4' />
-              Export Excel
+              {exporting ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : (
+                <Download className='mr-2 h-4 w-4' />
+              )}
+              {exporting ? 'Exporting...' : 'Export Excel'}
             </Button>
           </div>
         </CardContent>
@@ -850,14 +946,14 @@ const totalAmountFromAllItems = React.useMemo(() => {
                 View and manage all proforma invoices and sales in one place
               </CardDescription>
             </div>
-            <div className='text-sm text-gray-500'>
+            <div className='text-sm text-muted-foreground'>
               Showing {filteredData.length} of {totalItems} records
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {/* Table Type Filter Buttons */}
-          <div className='flex items-center gap-2 mb-4 pb-2 border-b'>
+          <div className='mb-4 flex items-center gap-2 border-b pb-2'>
             <Button
               variant={tableTypeFilter === 'all' ? 'default' : 'outline'}
               size='sm'
@@ -889,12 +985,13 @@ const totalAmountFromAllItems = React.useMemo(() => {
 
           <div className='flex items-center py-4'>
             <Input
-              placeholder='Quick filter by invoice...'
+              placeholder='Quick filter by invoice, customer or phone...'
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 if (e.target.value === '') {
-                  applyFilters();
+                  setAppliedFilters((prev) => ({ ...prev, searchTerm: '' }));
+                  setCurrentPage(1);
                 }
               }}
               className='max-w-sm'
@@ -932,7 +1029,7 @@ const totalAmountFromAllItems = React.useMemo(() => {
             </DropdownMenu>
           </div>
 
-          <div className='overflow-hidden rounded-md border'>
+          <div className='overflow-x-auto rounded-md border'>
             <Table>
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -951,29 +1048,48 @@ const totalAmountFromAllItems = React.useMemo(() => {
                 ))}
               </TableHeader>
               <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && 'selected'}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className='h-24 text-center'>
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : table.getRowModel().rows?.length ? (
+                  <>
+                    {table.getRowModel().rows.map((row) => (
+                      <TableRow
+                        key={row.id}
+                        data-state={row.getIsSelected() && 'selected'}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                    {/* Page totals row */}
+                    <TableRow className='bg-muted/50 font-semibold'>
+                      {table.getVisibleLeafColumns().map((column) => (
+                        <TableCell key={column.id} className='text-right'>
+                          {column.id === 'type' && <span className='float-left'>Page total</span>}
+                          {column.id === 'total' && formatETB(pageTotals.total)}
+                          {column.id === 'totalPaid' && formatETB(pageTotals.paid)}
+                          {column.id === 'balance' && formatETB(pageTotals.balance)}
                         </TableCell>
                       ))}
                     </TableRow>
-                  ))
+                  </>
                 ) : (
                   <TableRow>
                     <TableCell
                       colSpan={columns.length}
                       className='h-24 text-center'
                     >
-                      {loading ? 'Loading...' : 'No results found.'}
+                      No results found.
                     </TableCell>
                   </TableRow>
                 )}
@@ -984,14 +1100,14 @@ const totalAmountFromAllItems = React.useMemo(() => {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className='flex items-center justify-between space-x-2 py-4'>
-              <div className='text-muted-foreground text-sm'>
+              <div className='text-sm text-muted-foreground'>
                 Page {currentPage} of {totalPages}
               </div>
               <div className='space-x-2'>
                 <Button
                   variant='outline'
                   size='sm'
-                  onClick={() => handlePageChange(currentPage - 1)}
+                  onClick={() => setCurrentPage((p) => p - 1)}
                   disabled={currentPage === 1 || loading}
                 >
                   Previous
@@ -999,7 +1115,7 @@ const totalAmountFromAllItems = React.useMemo(() => {
                 <Button
                   variant='outline'
                   size='sm'
-                  onClick={() => handlePageChange(currentPage + 1)}
+                  onClick={() => setCurrentPage((p) => p + 1)}
                   disabled={currentPage === totalPages || loading}
                 >
                   Next

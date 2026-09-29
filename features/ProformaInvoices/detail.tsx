@@ -101,6 +101,7 @@ import { getCustomer } from '@/service/customer';
 import { ProformaInvoicePDFGenerator } from './pdf';
 import { ProformaInvoicePrinter } from './print';
 import { SendToClientButton } from './sendtoclient';
+import { PaymentRowActions } from './payment-row-actions';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { PERMISSIONS } from '@/stores/permissions';
 
@@ -179,6 +180,17 @@ const ProformaInvoiceDetailPage: React.FC<ProformaInvoiceDetailProps> = ({ id })
 
     fetchInvoiceData();
   }, [id, customers]);
+
+  // Reload the invoice after a payment is edited or deleted (totals change on the server)
+  const reloadInvoice = async () => {
+    if (!id) return;
+    try {
+      const invoiceData = await getProformaInvoiceById(id);
+      setInvoice(invoiceData);
+    } catch (error: any) {
+      console.error('Error reloading invoice:', error);
+    }
+  };
 
   // Fetch customers
   useEffect(() => {
@@ -473,56 +485,56 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
         label: 'Pending Approval',
         variant: 'secondary' as const,
         icon: AlertCircle,
-        badgeClass: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
-        textClass: 'text-amber-600',
+        badgeClass: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40',
+        textClass: 'text-amber-600 dark:text-amber-400',
         dotClass: 'bg-amber-500',
       },
       [PIStatus.APPROVED_ST]: {
         label: 'Approved',
         variant: 'default' as const,
         icon: Check,
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
-        textClass: 'text-emerald-600',
+        badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40',
+        textClass: 'text-emerald-600 dark:text-emerald-400',
         dotClass: 'bg-emerald-500',
       },
       [PIStatus.APPROVED_CREATE_PROJECT]: {
         label: 'Approved - Create Project',
         variant: 'default' as const,
         icon: ArrowRight,
-        badgeClass: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100',
-        textClass: 'text-teal-600',
+        badgeClass: 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/40',
+        textClass: 'text-teal-600 dark:text-teal-400',
         dotClass: 'bg-teal-500',
       },
       [PIStatus.SENT_TO_CLIENT]: {
         label: 'Sent to Client',
         variant: 'outline' as const,
         icon: Mail,
-        badgeClass: 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100',
-        textClass: 'text-sky-600',
+        badgeClass: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/40',
+        textClass: 'text-sky-600 dark:text-sky-400',
         dotClass: 'bg-sky-500',
       },
       [PIStatus.REVISION]: {
         label: 'Under Revision',
         variant: 'destructive' as const,
         icon: RefreshCw,
-        badgeClass: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
-        textClass: 'text-orange-600',
+        badgeClass: 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/40',
+        textClass: 'text-orange-600 dark:text-orange-400',
         dotClass: 'bg-orange-500',
       },
       [PIStatus.APPROVED_CLIENT]: {
         label: 'Client Approved',
         variant: 'default' as const,
         icon: FileCheck,
-        badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
-        textClass: 'text-indigo-600',
+        badgeClass: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40',
+        textClass: 'text-indigo-600 dark:text-indigo-400',
         dotClass: 'bg-indigo-500',
       },
       [PIStatus.CANCELLED]: {
         label: 'Cancelled',
         variant: 'destructive' as const,
         icon: FileX,
-        badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
-        textClass: 'text-rose-600',
+        badgeClass: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/40',
+        textClass: 'text-rose-600 dark:text-rose-400',
         dotClass: 'bg-rose-500',
       },
     };
@@ -530,8 +542,8 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
       label: status,
       variant: 'outline' as const,
       icon: Info,
-      badgeClass: 'bg-slate-50 text-slate-700 border-slate-200',
-      textClass: 'text-slate-600',
+      badgeClass: 'bg-slate-50 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800',
+      textClass: 'text-slate-600 dark:text-slate-300',
       dotClass: 'bg-slate-400',
     };
   };
@@ -539,13 +551,13 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
   const getPaymentBadgeClass = (status: string) => {
     switch (status) {
       case 'PAID':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        return 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800';
       case 'PARTIAL':
-        return 'bg-amber-100 text-amber-800 border-amber-300';
+        return 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 border-amber-300 dark:border-amber-800';
       case 'PENDING':
-        return 'bg-rose-100 text-rose-800 border-rose-300';
+        return 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-400 border-rose-300 dark:border-rose-800';
       default:
-        return 'bg-slate-100 text-slate-800 border-slate-300';
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700';
     }
   };
 
@@ -590,10 +602,10 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
     return (
       <div className="flex h-[70vh] flex-col items-center justify-center space-y-4">
         <div className="relative flex items-center justify-center">
-          <div className="h-14 w-14 rounded-full border-4 border-slate-200 border-t-slate-900 animate-spin"></div>
-          <FileText className="absolute h-6 w-6 text-slate-700" />
+          <div className="h-14 w-14 rounded-full border-4 border-slate-200 dark:border-slate-800 border-t-slate-900 animate-spin"></div>
+          <FileText className="absolute h-6 w-6 text-slate-700 dark:text-slate-300" />
         </div>
-        <p className="text-sm font-medium tracking-wide text-slate-500">Loading proforma invoice details...</p>
+        <p className="text-sm font-medium tracking-wide text-slate-500 dark:text-slate-400">Loading proforma invoice details...</p>
       </div>
     );
   }
@@ -601,11 +613,11 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
   if (!invoice) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center space-y-4 text-center">
-        <div className="rounded-full bg-rose-50 p-4 text-rose-500">
+        <div className="rounded-full bg-rose-50 dark:bg-rose-950/40 p-4 text-rose-500">
           <AlertCircle className="h-10 w-10" />
         </div>
-        <h2 className="text-xl font-semibold text-slate-900">Invoice Not Found</h2>
-        <p className="text-sm text-slate-500 max-w-md">The requested proforma invoice could not be found or may have been deleted.</p>
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Invoice Not Found</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">The requested proforma invoice could not be found or may have been deleted.</p>
         <Button onClick={() => router.push('/dashboard/ProformaInvoice')} variant="outline" className="mt-2">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Invoices
@@ -640,28 +652,28 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
     <div className="mx-auto max-w-7xl space-y-8 p-4 md:p-8 animate-in fade-in duration-500">
       
       {/* Top Navigation & Breadcrumb */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 dark:border-slate-800 pb-5">
         <div className="flex items-center space-x-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.push('/dashboard/ProformaInvoice')}
-            className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+            className="h-9 w-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-card text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 shadow-sm"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="space-y-0.5">
-            <div className="flex items-center space-x-2 text-xs font-medium text-slate-500">
-              <span className="cursor-pointer hover:text-slate-800" onClick={() => router.push('/dashboard/ProformaInvoice')}>Proforma Invoices</span>
-              <ChevronRight className="h-3 w-3 text-slate-400" />
-              <span className="font-mono text-slate-700">#{invoice.piNumber}</span>
+            <div className="flex items-center space-x-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="cursor-pointer hover:text-slate-800 dark:hover:text-slate-100" onClick={() => router.push('/dashboard/ProformaInvoice')}>Proforma Invoices</span>
+              <ChevronRight className="h-3 w-3 text-slate-400 dark:text-slate-400" />
+              <span className="font-mono text-slate-700 dark:text-slate-300">#{invoice.piNumber}</span>
             </div>
             <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 font-mono">
                 #{invoice.piNumber}
               </h1>
               {isStoreInvoice && (
-                <Badge variant="outline" className="rounded-full border-blue-200 bg-blue-50 text-blue-700 text-xs px-2.5 py-0.5 font-medium flex items-center gap-1">
+                <Badge variant="outline" className="rounded-full border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 text-xs px-2.5 py-0.5 font-medium flex items-center gap-1">
                   <Store className="h-3 w-3" />
                   Store Invoice
                 </Badge>
@@ -683,9 +695,9 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
             <Button
               onClick={handleCreateDeliveryEstimation}
               variant="outline"
-              className="h-9 rounded-lg border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm font-medium text-xs px-3"
+              className="h-9 rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-card text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 shadow-sm font-medium text-xs px-3"
             >
-              <Package className="mr-1.5 h-3.5 w-3.5 text-slate-500" />
+              <Package className="mr-1.5 h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
               Estimate
             </Button>
           </PermissionGuard>
@@ -706,58 +718,58 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
       {/* Status Update Alert Dialog - SHOW WARNING BUT ALLOW ACTION */}
 <AlertDialog open={showStatusAlert} onOpenChange={setShowStatusAlert}>
-  <AlertDialogContent className={`rounded-xl border border-slate-200 shadow-xl max-w-md ${alertMessage.balanceWarning ? 'border-red-500 border-4' : ''}`}>
+  <AlertDialogContent className={`rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-md ${alertMessage.balanceWarning ? 'border-red-500 border-4' : ''}`}>
     <AlertDialogHeader>
-      <AlertDialogTitle className={`flex items-center gap-2 ${alertMessage.balanceWarning ? 'text-red-700' : 'text-slate-900'}`}>
+      <AlertDialogTitle className={`flex items-center gap-2 ${alertMessage.balanceWarning ? 'text-red-700 dark:text-red-400' : 'text-slate-900 dark:text-slate-100'}`}>
         {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && alertMessage.balanceWarning && (
-          <AlertTriangle className="h-6 w-6 text-red-600 animate-pulse" />
+          <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400 animate-pulse" />
         )}
         {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && !alertMessage.balanceWarning && (
-          <ArrowRight className="h-5 w-5 text-emerald-600" />
+          <ArrowRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
         )}
         {pendingStatus === PIStatus.CANCELLED && (
-          <AlertTriangle className="h-5 w-5 text-rose-600" />
+          <AlertTriangle className="h-5 w-5 text-rose-600 dark:text-rose-400" />
         )}
         {pendingStatus === PIStatus.REVISION && (
-          <RefreshCw className="h-5 w-5 text-orange-600" />
+          <RefreshCw className="h-5 w-5 text-orange-600 dark:text-orange-400" />
         )}
         {alertMessage.title}
       </AlertDialogTitle>
-      <AlertDialogDescription className={`${alertMessage.balanceWarning ? 'text-red-700 font-medium text-sm' : 'text-slate-600 text-sm'} mt-1`}>
+      <AlertDialogDescription className={`${alertMessage.balanceWarning ? 'text-red-700 dark:text-red-400 font-medium text-sm' : 'text-slate-600 dark:text-slate-300 text-sm'} mt-1`}>
         {alertMessage.description}
       </AlertDialogDescription>
     </AlertDialogHeader>
     
     {/* BIG RED WARNING FOR NO PAYMENT */}
     {alertMessage.balanceWarning && (
-      <div className="mt-3 p-4 bg-red-50 border-2 border-red-500 rounded-xl">
+      <div className="mt-3 p-4 bg-red-50 dark:bg-red-950/40 border-2 border-red-500 rounded-xl">
         <div className="flex items-start gap-3">
           <div className="bg-red-500 rounded-full p-2 shrink-0 animate-pulse">
             <AlertTriangle className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-red-700">⚠️ NO PAYMENT RECEIVED!</h4>
-            <p className="text-xs text-red-600 font-medium mt-1">
+            <h4 className="text-sm font-bold text-red-700 dark:text-red-400">⚠️ NO PAYMENT RECEIVED!</h4>
+            <p className="text-xs text-red-600 dark:text-red-400 font-medium mt-1">
               Amount Paid: <strong>{formatCurrency(invoice.amountPaid)}</strong>
             </p>
-            <p className="text-xs text-red-600 font-medium">
+            <p className="text-xs text-red-600 dark:text-red-400 font-medium">
               You are about to create a project without any payment received.
             </p>
-            <div className="mt-2 p-2 bg-red-100 rounded-lg border border-red-300">
+            <div className="mt-2 p-2 bg-red-100 dark:bg-red-950/40 rounded-lg border border-red-300 dark:border-red-800">
               <div className="flex justify-between text-xs font-mono">
-                <span className="text-red-700">Total Invoice:</span>
-                <span className="text-red-800 font-bold">{formatCurrency(invoice.total)}</span>
+                <span className="text-red-700 dark:text-red-400">Total Invoice:</span>
+                <span className="text-red-800 dark:text-red-400 font-bold">{formatCurrency(invoice.total)}</span>
               </div>
               <div className="flex justify-between text-xs font-mono">
-                <span className="text-red-700">Amount Paid:</span>
-                <span className="text-red-800 font-bold">{formatCurrency(invoice.amountPaid)}</span>
+                <span className="text-red-700 dark:text-red-400">Amount Paid:</span>
+                <span className="text-red-800 dark:text-red-400 font-bold">{formatCurrency(invoice.amountPaid)}</span>
               </div>
-              <div className="flex justify-between text-xs font-mono border-t border-red-300 pt-1 mt-1">
-                <span className="text-red-700 font-bold">Balance Due:</span>
-                <span className="text-red-800 font-bold">{formatCurrency(invoice.balance)}</span>
+              <div className="flex justify-between text-xs font-mono border-t border-red-300 dark:border-red-800 pt-1 mt-1">
+                <span className="text-red-700 dark:text-red-400 font-bold">Balance Due:</span>
+                <span className="text-red-800 dark:text-red-400 font-bold">{formatCurrency(invoice.balance)}</span>
               </div>
             </div>
-            <p className="text-xs text-red-700 font-bold mt-2">
+            <p className="text-xs text-red-700 dark:text-red-400 font-bold mt-2">
               Are you sure you want to proceed?
             </p>
           </div>
@@ -766,8 +778,8 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
     )}
     
     {pendingStatus === PIStatus.CANCELLED && !alertMessage.balanceWarning && (
-      <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-lg">
-        <p className="text-xs text-rose-700 flex items-center gap-2">
+      <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg">
+        <p className="text-xs text-rose-700 dark:text-rose-400 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           Warning: Cancelling this invoice is permanent and cannot be undone.
         </p>
@@ -775,8 +787,8 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
     )}
     
     {pendingStatus === PIStatus.APPROVED_CREATE_PROJECT && !alertMessage.balanceWarning && (
-      <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-        <p className="text-xs text-emerald-700 flex items-center gap-2">
+      <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+        <p className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <Info className="h-4 w-4 shrink-0" />
           You will be automatically redirected to project setup after confirmation.
         </p>
@@ -785,7 +797,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
     
     <AlertDialogFooter className="mt-4">
       <AlertDialogCancel 
-        className="rounded-lg border-slate-200"
+        className="rounded-lg border-slate-200 dark:border-slate-800"
         onClick={() => {
           setShowStatusAlert(false);
           setPendingStatus(null);
@@ -803,7 +815,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
             ? 'rounded-lg bg-rose-600 hover:bg-rose-700 text-white'
             : pendingStatus === PIStatus.APPROVED_CREATE_PROJECT
             ? 'rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white'
-            : 'rounded-lg bg-slate-900 hover:bg-slate-800 text-white'
+            : 'rounded-lg bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white'
         }
       >
         {updatingStatus ? (
@@ -822,36 +834,36 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
       {/* Payment Confirmation Alert Dialog */}
       {!isStoreInvoice && (
         <AlertDialog open={showPaymentAlert} onOpenChange={setShowPaymentAlert}>
-          <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl max-w-md">
+          <AlertDialogContent className="rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-md">
             <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-slate-900">
-                <Banknote className="h-5 w-5 text-emerald-600" />
+              <AlertDialogTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                <Banknote className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 {paymentAlert.title}
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-slate-600 text-sm">
+              <AlertDialogDescription className="text-slate-600 dark:text-slate-300 text-sm">
                 {paymentAlert.description}
               </AlertDialogDescription>
             </AlertDialogHeader>
             
-            <div className="mt-3 space-y-2 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+            <div className="mt-3 space-y-2 bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-lg border border-slate-200 dark:border-slate-800">
               {paymentAlert.details.map((detail, index) => (
-                <p key={index} className="text-xs font-mono text-slate-700">
+                <p key={index} className="text-xs font-mono text-slate-700 dark:text-slate-300">
                   {detail}
                 </p>
               ))}
             </div>
             
             {paymentAlert.isFullyPaid && (
-              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <p className="text-xs text-emerald-700 flex items-center gap-2 font-medium">
-                  <Check className="h-4 w-4 text-emerald-600" />
+              <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2 font-medium">
+                  <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   This payment will fully settle the invoice balance.
                 </p>
               </div>
             )}
             
             <AlertDialogFooter className="mt-4">
-              <AlertDialogCancel className="rounded-lg border-slate-200">Cancel</AlertDialogCancel>
+              <AlertDialogCancel className="rounded-lg border-slate-200 dark:border-slate-800">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handlePaymentConfirm}
                 disabled={addingPayment}
@@ -875,22 +887,22 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         
         {/* Status & Control Card */}
-        <Card className="rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+        <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Current Status</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Current Status</span>
                 <span className={`h-2.5 w-2.5 rounded-full ${statusConfig.dotClass} animate-pulse`} />
               </div>
               <div className="mt-2 flex items-center space-x-2.5">
                 <statusConfig.icon className={`h-6 w-6 ${statusConfig.textClass}`} />
-                <h3 className="text-xl font-bold tracking-tight text-slate-900">{statusConfig.label}</h3>
+                <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{statusConfig.label}</h3>
               </div>
-              <p className="text-xs text-slate-500 mt-1">Created on {formatDate(invoice.createdAt)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Created on {formatDate(invoice.createdAt)}</p>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Change Status</label>
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 block">Change Status</label>
               
          
               
@@ -899,17 +911,17 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                 onValueChange={handleStatusChange} 
                 disabled={updatingStatus || invoice.status === PIStatus.APPROVED_CREATE_PROJECT}
               >
-                <SelectTrigger className={`w-full h-9 rounded-lg border-slate-300 bg-white text-slate-900 text-xs font-medium focus:ring-slate-900 ${showNoPaymentWarning() ? 'border-red-500 border-2 bg-red-50' : ''}`}>
+                <SelectTrigger className={`w-full h-9 rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-card text-slate-900 dark:text-slate-100 text-xs font-medium focus:ring-slate-900 dark:focus:ring-slate-300 ${showNoPaymentWarning() ? 'border-red-500 border-2 bg-red-50 dark:bg-red-950/40' : ''}`}>
                   <SelectValue placeholder="Update status" />
                 </SelectTrigger>
-                <SelectContent className="rounded-lg border-slate-200 bg-white text-slate-900">
+                <SelectContent className="rounded-lg border-slate-200 dark:border-slate-800 bg-white dark:bg-card text-slate-900 dark:text-slate-100">
                   {Object.values(PIStatus).map((status) => {
                     const isBlocked = isStatusChangeBlocked(status);
                     return (
                       <SelectItem 
                         key={status} 
                         value={status} 
-                        className={`text-xs focus:bg-slate-50 focus:text-slate-900 ${isBlocked ? 'text-red-600 bg-red-50 font-bold' : ''}`}
+                        className={`text-xs focus:bg-slate-50 dark:focus:bg-slate-800/40 focus:text-slate-900 dark:focus:text-slate-100 ${isBlocked ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 font-bold' : ''}`}
                         // NOT DISABLED - always selectable
                       >
                         {isBlocked && '⚠️ '}
@@ -926,57 +938,57 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
         </Card>
 
         {/* Total Financial Stat Card */}
-        <Card className="rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+        <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Grand Total</p>
-                <h2 className="text-3xl font-black text-slate-900 font-mono tracking-tight mt-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Grand Total</p>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight mt-1">
                   {formatCurrency(invoice.total)}
                 </h2>
               </div>
-              <div className="rounded-xl bg-slate-100 p-2.5 text-slate-700">
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-800 p-2.5 text-slate-700 dark:text-slate-300">
                 <DollarSign className="h-5 w-5" />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 text-xs">
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
               <div>
-                <span className="text-slate-400 text-[10px] font-semibold uppercase block">Subtotal</span>
-                <span className="font-mono font-bold text-slate-700">{formatCurrency(invoice.subtotal)}</span>
+                <span className="text-slate-400 dark:text-slate-400 text-[10px] font-semibold uppercase block">Subtotal</span>
+                <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{formatCurrency(invoice.subtotal)}</span>
               </div>
               <div>
-                <span className="text-slate-400 text-[10px] font-semibold uppercase block">VAT</span>
-                <span className="font-mono font-bold text-slate-700">{formatCurrency(invoice.vat || 0)}</span>
+                <span className="text-slate-400 dark:text-slate-400 text-[10px] font-semibold uppercase block">VAT</span>
+                <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{formatCurrency(invoice.vat || 0)}</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Payment Balance Progress Stat Card */}
-        <Card className="rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+        <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Payment Balance</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Payment Balance</p>
                 <div className="flex items-baseline space-x-2 mt-1">
-                  <span className={`text-2xl font-black font-mono ${showNoPaymentWarning() ? 'text-red-600' : 'text-emerald-700'}`}>
+                  <span className={`text-2xl font-black font-mono ${showNoPaymentWarning() ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
                     {formatCurrency(invoice.amountPaid)}
                   </span>
-                  <span className="text-xs text-slate-400 font-mono">paid</span>
+                  <span className="text-xs text-slate-400 dark:text-slate-400 font-mono">paid</span>
                 </div>
               </div>
-              <div className={`rounded-xl p-2.5 ${showNoPaymentWarning() ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+              <div className={`rounded-xl p-2.5 ${showNoPaymentWarning() ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'}`}>
                 <CreditCard className="h-5 w-5" />
               </div>
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 text-[11px] font-medium">Balance Due: <strong className={`font-mono font-bold ${showNoPaymentWarning() ? 'text-red-700' : 'text-amber-700'}`}>{formatCurrency(invoice.balance)}</strong></span>
-                <span className="font-mono font-bold text-emerald-700">{paidPercent.toFixed(0)}%</span>
+                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium">Balance Due: <strong className={`font-mono font-bold ${showNoPaymentWarning() ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{formatCurrency(invoice.balance)}</strong></span>
+                <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">{paidPercent.toFixed(0)}%</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                 <div 
                   className={`h-full transition-all duration-500 rounded-full ${showNoPaymentWarning() ? 'bg-red-500' : 'bg-emerald-500'}`}
                   style={{ width: `${paidPercent}%` }}
@@ -990,43 +1002,43 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
       {/* Main Tabs Navigation */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <div className="border-b border-slate-200">
+        <div className="border-b border-slate-200 dark:border-slate-800">
           <TabsList className="h-11 bg-transparent p-0 space-x-2">
             <TabsTrigger 
               value="overview" 
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 data-[state=active]:border-slate-900 dark:data-[state=active]:border-slate-100 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:bg-transparent"
             >
               <FileText className="mr-2 h-3.5 w-3.5 inline" /> Overview
             </TabsTrigger>
             <TabsTrigger 
               value="items" 
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 data-[state=active]:border-slate-900 dark:data-[state=active]:border-slate-100 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:bg-transparent"
             >
               <Package className="mr-2 h-3.5 w-3.5 inline" /> Items ({totalItemsCount})
             </TabsTrigger>
             <TabsTrigger 
               value="materials" 
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 data-[state=active]:border-slate-900 dark:data-[state=active]:border-slate-100 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:bg-transparent"
             >
               <Box className="mr-2 h-3.5 w-3.5 inline" /> Materials
             </TabsTrigger>
             <TabsTrigger 
               value="attachments" 
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 data-[state=active]:border-slate-900 dark:data-[state=active]:border-slate-100 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:bg-transparent"
             >
               <Paperclip className="mr-2 h-3.5 w-3.5 inline" /> Attachments ({invoice.attachments?.length || 0})
             </TabsTrigger>
             {!isStoreInvoice && (
               <TabsTrigger 
                 value="payments" 
-                className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+                className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 data-[state=active]:border-slate-900 dark:data-[state=active]:border-slate-100 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:bg-transparent"
               >
                 <Banknote className="mr-2 h-3.5 w-3.5 inline" /> Payments
               </TabsTrigger>
             )}
             <TabsTrigger 
               value="logs" 
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 data-[state=active]:bg-transparent"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 data-[state=active]:border-slate-900 dark:data-[state=active]:border-slate-100 data-[state=active]:text-slate-900 dark:data-[state=active]:text-slate-100 data-[state=active]:bg-transparent"
             >
               <History className="mr-2 h-3.5 w-3.5 inline" /> Audit Logs ({invoice.piLogs?.length || 0})
             </TabsTrigger>
@@ -1038,15 +1050,15 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             
             {/* Client Data Card */}
-            <Card className="rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+            <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm lg:col-span-2">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4 text-slate-500" />
-                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800">Client Information</CardTitle>
+                    <User className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">Client Information</CardTitle>
                   </div>
                   {selectedCustomer?.tinNumber && (
-                    <Badge variant="outline" className="font-mono text-xs border-slate-300 bg-white text-slate-700">
+                    <Badge variant="outline" className="font-mono text-xs border-slate-300 dark:border-slate-700 bg-white dark:bg-card text-slate-700 dark:text-slate-300">
                       TIN: {selectedCustomer.tinNumber}
                     </Badge>
                   )}
@@ -1056,61 +1068,61 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                 {selectedCustomer ? (
                   <div className="space-y-6">
                     <div className="flex items-start space-x-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 font-bold text-white shadow-sm">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 dark:bg-slate-700 font-bold text-white shadow-sm">
                         {getCustomerInitials(selectedCustomer.name)}
                       </div>
                       <div className="space-y-1">
-                        <h3 className="text-lg font-bold text-slate-900">{selectedCustomer.name}</h3>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{selectedCustomer.name}</h3>
                         {selectedCustomer.companyName && (
-                          <p className="text-sm text-slate-600 font-medium flex items-center gap-1.5">
-                            <Building className="h-3.5 w-3.5 text-slate-400" />
+                          <p className="text-sm text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
+                            <Building className="h-3.5 w-3.5 text-slate-400 dark:text-slate-400" />
                             {selectedCustomer.companyName}
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-sm">
                       {selectedCustomer.phone1 && (
-                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                          <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-3">
+                          <Phone className="h-4 w-4 text-slate-400 dark:text-slate-400 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-semibold uppercase text-slate-400">Primary Phone</p>
-                            <p className="font-mono text-xs font-semibold text-slate-800">{selectedCustomer.phone1}</p>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-400">Primary Phone</p>
+                            <p className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">{selectedCustomer.phone1}</p>
                           </div>
                         </div>
                       )}
                       {selectedCustomer.phone2 && (
-                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                          <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-3">
+                          <Phone className="h-4 w-4 text-slate-400 dark:text-slate-400 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-semibold uppercase text-slate-400">Secondary Phone</p>
-                            <p className="font-mono text-xs font-semibold text-slate-800">{selectedCustomer.phone2}</p>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-400">Secondary Phone</p>
+                            <p className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">{selectedCustomer.phone2}</p>
                           </div>
                         </div>
                       )}
                       {selectedCustomer.email && (
-                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                          <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-3">
+                          <Mail className="h-4 w-4 text-slate-400 dark:text-slate-400 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-semibold uppercase text-slate-400">Email Address</p>
-                            <p className="text-xs font-medium text-slate-800">{selectedCustomer.email}</p>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-400">Email Address</p>
+                            <p className="text-xs font-medium text-slate-800 dark:text-slate-100">{selectedCustomer.email}</p>
                           </div>
                         </div>
                       )}
                       {selectedCustomer.address && (
-                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                          <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div className="flex items-center space-x-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-3">
+                          <MapPin className="h-4 w-4 text-slate-400 dark:text-slate-400 shrink-0" />
                           <div>
-                            <p className="text-[10px] font-semibold uppercase text-slate-400">Physical Address</p>
-                            <p className="text-xs font-medium text-slate-800">{selectedCustomer.address}</p>
+                            <p className="text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-400">Physical Address</p>
+                            <p className="text-xs font-medium text-slate-800 dark:text-slate-100">{selectedCustomer.address}</p>
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-sm font-mono text-slate-400">
+                  <div className="py-8 text-center text-sm font-mono text-slate-400 dark:text-slate-400">
                     No customer data associated with this invoice
                   </div>
                 )}
@@ -1118,24 +1130,24 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
             </Card>
 
             {/* Personnel & Governance Card */}
-            <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-                <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-slate-500" />
+            <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                   Governance & Personnel
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6 space-y-4 divide-y divide-slate-100">
+              <CardContent className="p-6 space-y-4 divide-y divide-slate-100 dark:divide-slate-800">
                 {invoice.preparedBy && (
                   <div className="pt-2 first:pt-0 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prepared By</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Prepared By</p>
                     <div className="flex items-center space-x-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
                         {(invoice.preparedBy.name || invoice.preparedBy.email || 'P')[0].toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">{invoice.preparedBy.name || 'Staff'}</p>
-                        <p className="text-xs text-slate-500">{invoice.preparedBy.email}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{invoice.preparedBy.name || 'Staff'}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{invoice.preparedBy.email}</p>
                       </div>
                     </div>
                   </div>
@@ -1143,32 +1155,32 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
                 {invoice.approvedBy ? (
                   <div className="pt-4 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Approved By</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Approved By</p>
                     <div className="flex items-center space-x-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-xs font-bold text-emerald-800 dark:text-emerald-400">
                         {(invoice.approvedBy.name || invoice.approvedBy.email || 'A')[0].toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">{invoice.approvedBy.name || 'Approver'}</p>
-                        <p className="text-xs text-slate-500">{invoice.approvedBy.email}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{invoice.approvedBy.name || 'Approver'}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{invoice.approvedBy.email}</p>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="pt-4 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Approval Status</p>
-                    <p className="text-xs text-slate-500 italic">Pending formal sign-off</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Approval Status</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic">Pending formal sign-off</p>
                   </div>
                 )}
 
                 <div className="pt-4 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Invoice Type:</span>
-                    <span className="font-semibold text-slate-800">{isStoreInvoice ? 'Store Sales' : 'Standard Project'}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Invoice Type:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">{isStoreInvoice ? 'Store Sales' : 'Standard Project'}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Created Date:</span>
-                    <span className="font-mono text-slate-800">{formatDate(invoice.createdAt)}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Created Date:</span>
+                    <span className="font-mono text-slate-800 dark:text-slate-100">{formatDate(invoice.createdAt)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -1177,35 +1189,35 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
           </div>
 
           {/* Financial Breakdown Card */}
-          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-slate-500" />
+          <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 Financial Calculation Tree
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Subtotal Amount</p>
-                  <p className="text-xl font-bold font-mono text-slate-800 mt-1">{formatCurrency(invoice.subtotal)}</p>
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Subtotal Amount</p>
+                  <p className="text-xl font-bold font-mono text-slate-800 dark:text-slate-100 mt-1">{formatCurrency(invoice.subtotal)}</p>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">VAT ({subtotal > 0 ? ((vat / subtotal) * 100).toFixed(0) : '0'}%)</p>
-                  <p className="text-xl font-bold font-mono text-slate-800 mt-1">{formatCurrency(vat)}</p>
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">VAT ({subtotal > 0 ? ((vat / subtotal) * 100).toFixed(0) : '0'}%)</p>
+                  <p className="text-xl font-bold font-mono text-slate-800 dark:text-slate-100 mt-1">{formatCurrency(vat)}</p>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900 text-white shadow-sm">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Grand Total</p>
+                <div className="p-4 rounded-xl bg-slate-900 dark:bg-slate-700 text-white shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Grand Total</p>
                   <p className="text-xl font-bold font-mono text-white mt-1">{formatCurrency(invoice.total)}</p>
                 </div>
                 {!isStoreInvoice ? (
-                  <div className={`p-4 rounded-xl border ${showNoPaymentWarning() ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-100'}`}>
-                    <p className={`text-[10px] font-bold uppercase ${showNoPaymentWarning() ? 'text-red-700' : 'text-emerald-700'}`}>Amount Paid</p>
-                    <p className={`text-xl font-bold font-mono mt-1 ${showNoPaymentWarning() ? 'text-red-800' : 'text-emerald-800'}`}>{formatCurrency(invoice.amountPaid)}</p>
+                  <div className={`p-4 rounded-xl border ${showNoPaymentWarning() ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800' : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800'}`}>
+                    <p className={`text-[10px] font-bold uppercase ${showNoPaymentWarning() ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>Amount Paid</p>
+                    <p className={`text-xl font-bold font-mono mt-1 ${showNoPaymentWarning() ? 'text-red-800 dark:text-red-400' : 'text-emerald-800 dark:text-emerald-400'}`}>{formatCurrency(invoice.amountPaid)}</p>
                   </div>
                 ) : (
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
-                    <span className="text-xs text-slate-400 font-medium">Store Checkout</span>
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-center">
+                    <span className="text-xs text-slate-400 dark:text-slate-400 font-medium">Store Checkout</span>
                   </div>
                 )}
               </div>
@@ -1215,16 +1227,16 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
         {/* ITEMS TAB */}
         <TabsContent value="items" className="space-y-4">
-          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                <Package className="h-4 w-4 text-slate-500" />
+          <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Package className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 Line Items Breakdown
               </CardTitle>
-              <div className="flex items-center space-x-3 text-xs text-slate-500">
-                <span>Total Items: <strong className="text-slate-800 font-mono">{totalItemsCount}</strong></span>
+              <div className="flex items-center space-x-3 text-xs text-slate-500 dark:text-slate-400">
+                <span>Total Items: <strong className="text-slate-800 dark:text-slate-100 font-mono">{totalItemsCount}</strong></span>
                 <span>•</span>
-                <span>Total Units: <strong className="text-slate-800 font-mono">{totalQtyCount}</strong></span>
+                <span>Total Units: <strong className="text-slate-800 dark:text-slate-100 font-mono">{totalQtyCount}</strong></span>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -1232,55 +1244,55 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-slate-100/70 border-b border-slate-200">
+                  <TableHeader className="bg-slate-100/70 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-12 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">#</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-45">Product </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-25">Size</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Qty</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Unit Price</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right min-w-30">Line Amount</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Materials</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Images</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-50">Description</TableHead>
+                      <TableHead className="w-12 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">#</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 min-w-45">Product </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 min-w-25">Size</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Qty</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Unit Price</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right min-w-30">Line Amount</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Materials</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Images</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 min-w-50">Description</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody className="divide-y divide-slate-100">
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {invoice.items.map((item: IProformaInvoiceItem, index: number) => {
                       const images = getAllImages(item);
                       
                       return (
-                        <TableRow key={item.id || index} className="hover:bg-slate-50/80 transition-colors">
-                          <TableCell className="text-center font-mono text-xs font-semibold text-slate-400">
+                        <TableRow key={item.id || index} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors">
+                          <TableCell className="text-center font-mono text-xs font-semibold text-slate-400 dark:text-slate-400">
                             {index + 1}
                           </TableCell>
-                          <TableCell className="font-semibold text-sm text-slate-900">
+                          <TableCell className="font-semibold text-sm text-slate-900 dark:text-slate-100">
                             {item.item?.name || item.itemname|| item.category?.name || ''}
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-slate-600">
+                          <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-300">
                             {item.size ? (
-                              <Badge variant="outline" className="font-mono text-[11px] border-slate-200 bg-slate-50">
+                              <Badge variant="outline" className="font-mono text-[11px] border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
                                 {item.size}
                               </Badge>
                             ) : '-'}
                           </TableCell>
-                          <TableCell className="font-mono text-xs font-bold text-slate-800 text-right">
+                          <TableCell className="font-mono text-xs font-bold text-slate-800 dark:text-slate-100 text-right">
                             {item.quantity}
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-slate-600 text-right">
+                          <TableCell className="font-mono text-xs text-slate-600 dark:text-slate-300 text-right">
                             {formatCurrency(item.unitPrice)}
                           </TableCell>
-                          <TableCell className="font-mono text-xs font-bold text-slate-900 text-right bg-slate-50/50">
+                          <TableCell className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100 text-right bg-slate-50/50 dark:bg-slate-800/40">
                             {formatCurrency(item.amount)}
                           </TableCell>
                           <TableCell>
                             {item.proformaItemMaterials && item.proformaItemMaterials.length > 0 ? (
-                              <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700 text-[11px] font-medium flex w-fit items-center gap-1">
+                              <Badge variant="outline" className="border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 text-[11px] font-medium flex w-fit items-center gap-1">
                                 <Layers className="h-3 w-3" />
                                 {item.proformaItemMaterials.length} MAT
                               </Badge>
                             ) : (
-                              <span className="text-[11px] font-mono text-slate-400">None</span>
+                              <span className="text-[11px] font-mono text-slate-400 dark:text-slate-400">None</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -1289,7 +1301,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                                 {images.slice(0, 3).map((image, imgIndex) => (
                                   <Dialog key={image.id || imgIndex}>
                                     <DialogTrigger asChild>
-                                      <div className="relative h-9 w-9 rounded-md border border-slate-200 overflow-hidden cursor-pointer hover:border-slate-400 transition-all">
+                                      <div className="relative h-9 w-9 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden cursor-pointer hover:border-slate-400 dark:hover:border-slate-600 transition-all">
                                         <img
                                           src={normalizeImagePath(image.imageUrl)}
                                           alt={`Item thumbnail ${imgIndex + 1}`}
@@ -1298,12 +1310,12 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                                       </div>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-2xl rounded-xl p-0 overflow-hidden">
-                                      <DialogHeader className="p-4 border-b border-slate-100 bg-slate-50">
+                                      <DialogHeader className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
                                         <DialogTitle className="text-sm font-semibold">
                                           Image Preview ({imgIndex + 1} of {images.length})
                                         </DialogTitle>
                                       </DialogHeader>
-                                      <div className="p-4 bg-slate-100 flex items-center justify-center min-h-75">
+                                      <div className="p-4 bg-slate-100 dark:bg-slate-800 flex items-center justify-center min-h-75">
                                         <img
                                           src={normalizeImagePath(image.imageUrl)}
                                           alt={`Full image ${imgIndex + 1}`}
@@ -1320,16 +1332,16 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                                 )}
                               </div>
                             ) : (
-                              <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                              <span className="text-[11px] font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1">
                                 <ImageIcon className="h-3 w-3 text-slate-300" /> No Image
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="max-w-xs text-xs text-slate-600">
+                          <TableCell className="max-w-xs text-xs text-slate-600 dark:text-slate-300">
                             <div className="space-y-1">
                               <p className="wrap-break-word font-medium">{formatDescription(item.description)}</p>
                               {item.additionalDescription && (
-                                <p className="text-[11px] text-slate-400 italic wrap-break-word">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-400 italic wrap-break-word">
                                   {formatDescription(item.additionalDescription)}
                                 </p>
                               )}
@@ -1343,36 +1355,36 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
               </div>
 
               {/* Mobile Card View */}
-              <div className="divide-y divide-slate-100 md:hidden p-4 space-y-4">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800 md:hidden p-4 space-y-4">
                 {invoice.items.map((item: IProformaInvoiceItem, index: number) => (
                   <div key={item.id || index} className="pt-4 first:pt-0 space-y-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-bold text-slate-900">{item.item?.name || item.description}</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-slate-100">{item.item?.name || item.description}</h4>
                         {item.size && (
                           <Badge variant="outline" className="mt-1 text-[10px] font-mono">
                             Size: {item.size}
                           </Badge>
                         )}
                       </div>
-                      <Badge className="bg-slate-900 text-white font-mono text-xs">
+                      <Badge className="bg-slate-900 dark:bg-slate-700 text-white font-mono text-xs">
                         {formatCurrency(item.amount)}
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
                       <div>
-                        <span className="text-slate-400 text-[10px] uppercase font-semibold block">Quantity</span>
-                        <span className="font-mono font-bold text-slate-800">{item.quantity}</span>
+                        <span className="text-slate-400 dark:text-slate-400 text-[10px] uppercase font-semibold block">Quantity</span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{item.quantity}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px] uppercase font-semibold block">Unit Price</span>
-                        <span className="font-mono font-bold text-slate-800">{formatCurrency(item.unitPrice)}</span>
+                        <span className="text-slate-400 dark:text-slate-400 text-[10px] uppercase font-semibold block">Unit Price</span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{formatCurrency(item.unitPrice)}</span>
                       </div>
                     </div>
 
                     {item.additionalDescription && (
-                      <p className="text-xs text-slate-500 italic bg-white p-2 rounded border border-slate-100">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 italic bg-white dark:bg-card p-2 rounded border border-slate-100 dark:border-slate-800">
                         {item.additionalDescription}
                       </p>
                     )}
@@ -1381,19 +1393,19 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
               </div>
 
               {/* Sticky Summary Footer */}
-              <div className="border-t border-slate-200 bg-slate-50 p-4 flex flex-col items-end space-y-1.5 text-xs">
-                <div className="flex justify-between w-full max-w-xs text-slate-600">
+              <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-4 flex flex-col items-end space-y-1.5 text-xs">
+                <div className="flex justify-between w-full max-w-xs text-slate-600 dark:text-slate-300">
                   <span>Subtotal:</span>
-                  <span className="font-mono font-semibold text-slate-900">{formatCurrency(invoice.subtotal)}</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(invoice.subtotal)}</span>
                 </div>
-                <div className="flex justify-between w-full max-w-xs text-slate-600">
+                <div className="flex justify-between w-full max-w-xs text-slate-600 dark:text-slate-300">
                   <span>VAT ({subtotal > 0 ? ((vat / subtotal) * 100).toFixed(0) : '0'}%):</span>
-                  <span className="font-mono font-semibold text-slate-900">{formatCurrency(vat)}</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(vat)}</span>
                 </div>
                 <Separator className="my-1 max-w-xs" />
-                <div className="flex justify-between w-full max-w-xs text-sm font-bold text-slate-900">
+                <div className="flex justify-between w-full max-w-xs text-sm font-bold text-slate-900 dark:text-slate-100">
                   <span>Grand Total:</span>
-                  <span className="font-mono text-base text-slate-900">{formatCurrency(invoice.total)}</span>
+                  <span className="font-mono text-base text-slate-900 dark:text-slate-100">{formatCurrency(invoice.total)}</span>
                 </div>
               </div>
             </CardContent>
@@ -1403,10 +1415,10 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
         {/* MATERIALS TAB */}
        {/* MATERIALS TAB */}
 <TabsContent value="materials" className="space-y-6">
-  <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
-    <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-      <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-        <Box className="h-4 w-4 text-slate-500" />
+  <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm">
+    <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4">
+      <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+        <Box className="h-4 w-4 text-slate-500 dark:text-slate-400" />
         Materials Requirement Summary
       </CardTitle>
     </CardHeader>
@@ -1414,9 +1426,9 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
       
       {/* Materials Count Metric Banner */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Types</p>
-          <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Total Material Types</p>
+          <p className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1">
             {(() => {
               // Get unique materials across all items
               const materialMap = new Map();
@@ -1456,44 +1468,44 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
             })()}
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Material Units</p>
-          <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Total Material Units</p>
+          <p className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1">
             {invoice.items.reduce(
               (total, item) => total + getItemMaterialsTotal(item),
               0
             )}
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 col-span-2 md:col-span-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Items with Specs</p>
-          <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-4 col-span-2 md:col-span-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">Items with Specs</p>
+          <p className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1">
             {invoice.items.filter(item => item.proformaItemMaterials && item.proformaItemMaterials.length > 0).length} / {invoice.items.length}
           </p>
         </div>
       </div>
 
       {/* Grouped Materials Summary Table */}
-      <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <CardHeader className="bg-indigo-50/60 px-5 py-3 border-b border-slate-200">
-          <CardTitle className="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-2">
-            <Layers className="h-3.5 w-3.5 text-indigo-600" />
+      <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm overflow-hidden">
+        <CardHeader className="bg-indigo-50/60 dark:bg-indigo-950/40 px-5 py-3 border-b border-slate-200 dark:border-slate-800">
+          <CardTitle className="text-xs font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-400 flex items-center gap-2">
+            <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
             Consolidated Materials Summary
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-slate-50/60">
+            <TableHeader className="bg-slate-50/60 dark:bg-slate-800/40">
               <TableRow>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Material Name</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Color</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Size</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Qty</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add. Qty</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Material Name</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Color</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Size</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Qty</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Add. Qty</TableHead>
 
               </TableRow>
             </TableHeader>
-            <TableBody className="divide-y divide-slate-100 text-xs">
+            <TableBody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
               {(() => {
                 // Build grouped materials
                 const materialMap = new Map();
@@ -1537,15 +1549,15 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                 return Array.from(materialMap.values())
                   .sort((a, b) => b.totalQuantity - a.totalQuantity)
                   .map((groupedMaterial) => (
-                    <TableRow key={`${groupedMaterial.name}-${groupedMaterial.color}-${groupedMaterial.size}`} className="hover:bg-slate-50/50">
-                      <TableCell className="font-semibold text-slate-800">
+                    <TableRow key={`${groupedMaterial.name}-${groupedMaterial.color}-${groupedMaterial.size}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/60">
+                      <TableCell className="font-semibold text-slate-800 dark:text-slate-100">
                         {groupedMaterial.name}
                       </TableCell>
-                      <TableCell className="text-slate-600">
+                      <TableCell className="text-slate-600 dark:text-slate-300">
                         {groupedMaterial.color !== '-' && (
                           <span className="flex items-center gap-1.5">
                             <span 
-                              className="inline-block w-3 h-3 rounded-full border border-slate-200" 
+                              className="inline-block w-3 h-3 rounded-full border border-slate-200 dark:border-slate-800" 
                               style={{ backgroundColor: groupedMaterial.color.toLowerCase() }}
                             />
                             {groupedMaterial.color}
@@ -1553,11 +1565,11 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                         )}
                         {groupedMaterial.color === '-' && '-'}
                       </TableCell>
-                      <TableCell className="font-mono text-slate-600">
+                      <TableCell className="font-mono text-slate-600 dark:text-slate-300">
                         {groupedMaterial.size}
                       </TableCell>
                       <TableCell>
-                        <Badge className="font-mono text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        <Badge className="font-mono text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
                           {groupedMaterial.totalQuantity} units
                         </Badge>
                       </TableCell>
@@ -1582,7 +1594,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
       {/* Original Item Materials Accordion/Card Breakdown (Collapsible) */}
       <details className="space-y-4">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900 flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60">
           <ChevronRight className="h-3.5 w-3.5" />
           View Breakdown by Product
         </summary>
@@ -1591,11 +1603,11 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
             if (!item.proformaItemMaterials || item.proformaItemMaterials.length === 0) return null;
 
             return (
-              <Card key={item.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <CardHeader className="bg-slate-50/80 px-5 py-3 border-b border-slate-100">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center justify-between">
+              <Card key={item.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50/80 dark:bg-slate-800/40 px-5 py-3 border-b border-slate-100 dark:border-slate-800">
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      <Package className="h-3.5 w-3.5 text-slate-500" />
+                      <Package className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                       {item.item?.name || item.description}
                       {item.size && (
                         <Badge variant="outline" className="ml-2 font-mono text-[10px]">
@@ -1603,33 +1615,33 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                         </Badge>
                       )}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-500">
+                    <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
                       {item.proformaItemMaterials.length} material(s)
                     </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
-                    <TableHeader className="bg-slate-50/40">
+                    <TableHeader className="bg-slate-50/40 dark:bg-slate-800/40">
                       <TableRow>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Material Name</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Color</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Size</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Qty</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add. Qty</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Notes</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Material Name</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Color</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Size</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Qty</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Add. Qty</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Notes</TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody className="divide-y divide-slate-100 text-xs">
+                    <TableBody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {item.proformaItemMaterials.map((material: IProformaItemMaterial) => (
-                        <TableRow key={material.id} className="hover:bg-slate-50/50">
-                          <TableCell className="font-semibold text-slate-800">
+                        <TableRow key={material.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/60">
+                          <TableCell className="font-semibold text-slate-800 dark:text-slate-100">
                             {material.material?.name || '-'}
                           </TableCell>
-                          <TableCell className="text-slate-600">{material.material?.color || '-'}</TableCell>
-                          <TableCell className="font-mono text-slate-600">{material.material?.size || '-'}</TableCell>
+                          <TableCell className="text-slate-600 dark:text-slate-300">{material.material?.color || '-'}</TableCell>
+                          <TableCell className="font-mono text-slate-600 dark:text-slate-300">{material.material?.size || '-'}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="font-mono text-xs border-slate-200">
+                            <Badge variant="outline" className="font-mono text-xs border-slate-200 dark:border-slate-800">
                               {material.quantity} units
                             </Badge>
                           </TableCell>
@@ -1638,7 +1650,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                               +{material?.additionalQuantity || 0}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-slate-500 text-xs">
+                          <TableCell className="text-slate-500 dark:text-slate-400 text-xs">
                             {material.note ? (
                               <span className="line-clamp-1">{material.note}</span>
                             ) : (
@@ -1658,10 +1670,10 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
       {/* Items Without Materials Card */}
       {invoice.items.filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0).length > 0 && (
-        <Card className="rounded-xl border border-slate-200 bg-amber-50/30 shadow-sm">
-          <CardHeader className="py-3 px-5 border-b border-amber-100">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-2">
-              <Info className="h-4 w-4 text-amber-600" />
+        <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-amber-50/30 dark:bg-amber-950/40 shadow-sm">
+          <CardHeader className="py-3 px-5 border-b border-amber-100 dark:border-amber-800">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400 flex items-center gap-2">
+              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               Items Without Specified Materials
             </CardTitle>
           </CardHeader>
@@ -1669,9 +1681,9 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
             {invoice.items
               .filter((item) => !item.proformaItemMaterials || item.proformaItemMaterials.length === 0)
               .map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg border border-amber-200/60 bg-white text-xs">
-                  <span className="font-medium text-slate-800">{item.description}</span>
-                  <Badge variant="outline" className="font-mono border-amber-300 text-amber-800">
+                <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg border border-amber-200/60 dark:border-amber-800 bg-white dark:bg-card text-xs">
+                  <span className="font-medium text-slate-800 dark:text-slate-100">{item.description}</span>
+                  <Badge variant="outline" className="font-mono border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-400">
                     {formatCurrency(item.amount)}
                   </Badge>
                 </div>
@@ -1686,10 +1698,10 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
         {/* ATTACHMENTS TAB */}
         <TabsContent value="attachments" className="space-y-4">
-          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                <Paperclip className="h-4 w-4 text-slate-500" />
+          <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 Attached Documents & Proofs ({invoice.attachments?.length || 0})
               </CardTitle>
             </CardHeader>
@@ -1697,26 +1709,26 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
               {invoice.attachments && invoice.attachments.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {invoice.attachments.map((attachment: IAttachment, index: number) => (
-                    <div key={attachment.id || index} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3 hover:border-slate-300 transition-all">
+                    <div key={attachment.id || index} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 p-4 space-y-3 hover:border-slate-300 dark:hover:border-slate-600 transition-all">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-3">
-                          <div className="rounded-lg bg-slate-900 p-2 text-white">
+                          <div className="rounded-lg bg-slate-900 dark:bg-slate-700 p-2 text-white">
                             <FileText className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-900">Attachment #{index + 1}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">
+                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Attachment #{index + 1}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-400 font-mono">
                               {attachment.createdAt ? formatDate(attachment.createdAt) : 'Added'}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 flex-1 rounded-lg text-xs font-medium border-slate-300"
+                          className="h-8 flex-1 rounded-lg text-xs font-medium border-slate-300 dark:border-slate-700"
                           onClick={() => window.open(normalizeImagePath(attachment.fileUrl), '_blank')}
                         >
                           <Eye className="mr-1.5 h-3.5 w-3.5" /> Preview
@@ -1724,7 +1736,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 flex-1 rounded-lg text-xs font-medium border-slate-300"
+                          className="h-8 flex-1 rounded-lg text-xs font-medium border-slate-300 dark:border-slate-700"
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = normalizeImagePath(attachment.fileUrl);
@@ -1741,7 +1753,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
               ) : (
                 <div className="text-center py-12">
                   <Paperclip className="mx-auto h-10 w-10 text-slate-300" />
-                  <p className="mt-3 text-sm text-slate-500 font-medium">No attachments uploaded for this invoice</p>
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400 font-medium">No attachments uploaded for this invoice</p>
                 </div>
               )}
             </CardContent>
@@ -1751,10 +1763,10 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
         {/* PAYMENTS TAB (Non-Store) */}
         {!isStoreInvoice && (
           <TabsContent value="payments" className="space-y-6">
-            <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-slate-500" />
+            <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm overflow-hidden">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                   Payment Records & History
                 </CardTitle>
                 <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ADD_PAYMENT.name}>
@@ -1770,42 +1782,42 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
               <CardContent className="p-0">
                 
                 {/* Financial Metric Header */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 border-b border-slate-200 bg-slate-50/50">
+                <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
                   <div className="p-4 text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Invoice Total</p>
-                    <p className="text-lg font-bold font-mono text-slate-900 mt-0.5">{formatCurrency(invoice.total)}</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-400">Invoice Total</p>
+                    <p className="text-lg font-bold font-mono text-slate-900 dark:text-slate-100 mt-0.5">{formatCurrency(invoice.total)}</p>
                   </div>
-                  <div className={`p-4 text-center ${showNoPaymentWarning() ? 'bg-red-50' : ''}`}>
-                    <p className={`text-[10px] font-bold uppercase ${showNoPaymentWarning() ? 'text-red-700' : 'text-emerald-700'}`}>Total Paid</p>
-                    <p className={`text-lg font-bold font-mono mt-0.5 ${showNoPaymentWarning() ? 'text-red-800' : 'text-emerald-800'}`}>{formatCurrency(invoice.amountPaid)}</p>
+                  <div className={`p-4 text-center ${showNoPaymentWarning() ? 'bg-red-50 dark:bg-red-950/40' : ''}`}>
+                    <p className={`text-[10px] font-bold uppercase ${showNoPaymentWarning() ? 'text-red-700 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>Total Paid</p>
+                    <p className={`text-lg font-bold font-mono mt-0.5 ${showNoPaymentWarning() ? 'text-red-800 dark:text-red-400' : 'text-emerald-800 dark:text-emerald-400'}`}>{formatCurrency(invoice.amountPaid)}</p>
                   </div>
                   <div className="p-4 text-center">
-                    <p className="text-[10px] font-bold uppercase text-amber-700">Balance Remaining</p>
-                    <p className="text-lg font-bold font-mono text-amber-800 mt-0.5">{formatCurrency(invoice.balance)}</p>
+                    <p className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400">Balance Remaining</p>
+                    <p className="text-lg font-bold font-mono text-amber-800 dark:text-amber-400 mt-0.5">{formatCurrency(invoice.balance)}</p>
                   </div>
                   <div className="p-4 text-center flex flex-col justify-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Settlement Progress</p>
-                    <p className="text-xl font-bold font-mono text-slate-900 mt-0.5">{paidPercent.toFixed(1)}%</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-400">Settlement Progress</p>
+                    <p className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-0.5">{paidPercent.toFixed(1)}%</p>
                   </div>
                 </div>
 
                 {/* Add Payment Modal Dialog */}
                 <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-                  <DialogContent className="rounded-xl border border-slate-200 shadow-xl max-w-md p-0 overflow-hidden">
-                    <DialogHeader className="p-6 border-b border-slate-100 bg-slate-50">
-                      <DialogTitle className="text-base font-bold text-slate-900">Record New Payment</DialogTitle>
-                      <DialogDescription className="text-xs text-slate-500 mt-1">
+                  <DialogContent className="rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-md p-0 overflow-hidden">
+                    <DialogHeader className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+                      <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">Record New Payment</DialogTitle>
+                      <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         Enter details for payment received against invoice balance.
                       </DialogDescription>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-4 bg-white">
+                    <div className="p-6 space-y-4 bg-white dark:bg-card">
                       <div className="space-y-1.5">
-                        <Label htmlFor="amount" className="text-xs font-semibold text-slate-700">Payment Amount (ETB)</Label>
+                        <Label htmlFor="amount" className="text-xs font-semibold text-slate-700 dark:text-slate-300">Payment Amount (ETB)</Label>
                         <Input
                           id="amount"
                           type="text"
-                          className="h-9 rounded-lg border-slate-300 font-mono text-sm"
+                          className="h-9 rounded-lg border-slate-300 dark:border-slate-700 font-mono text-sm"
                           value={paymentData.amountPaid ? paymentData.amountPaid.toLocaleString('en-US') : ""}
                           onChange={(e) => {
                             const rawValue = e.target.value.replace(/,/g, "").replace(/[^\d.]/g, "");
@@ -1816,17 +1828,17 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                           }}
                           placeholder="0.00"
                         />
-                        <p className="text-[11px] text-amber-700 font-mono">
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400 font-mono">
                           Remaining balance due: <strong>{formatCurrency(invoice.balance)}</strong>
                         </p>
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label htmlFor="date" className="text-xs font-semibold text-slate-700">Payment Date</Label>
+                        <Label htmlFor="date" className="text-xs font-semibold text-slate-700 dark:text-slate-300">Payment Date</Label>
                         <Input
                           id="date"
                           type="date"
-                          className="h-9 rounded-lg border-slate-300 text-xs font-mono"
+                          className="h-9 rounded-lg border-slate-300 dark:border-slate-700 text-xs font-mono"
                           value={paymentData.amountDate}
                           onChange={(e) =>
                             setPaymentData({
@@ -1838,9 +1850,9 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label htmlFor="bank" className="text-xs font-semibold text-slate-700">Bank Account</Label>
+                        <Label htmlFor="bank" className="text-xs font-semibold text-slate-700 dark:text-slate-300">Bank Account</Label>
                         {loadingBanks ? (
-                          <div className="flex items-center space-x-2 text-xs text-slate-500 py-1">
+                          <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 py-1">
                             <Loader2 className="h-4 w-4 animate-spin" /> Loading banks...
                           </div>
                         ) : banks.length > 0 ? (
@@ -1850,10 +1862,10 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                               setPaymentData({ ...paymentData, bankId: value })
                             }
                           >
-                            <SelectTrigger className="h-9 rounded-lg border-slate-300 text-xs">
+                            <SelectTrigger className="h-9 rounded-lg border-slate-300 dark:border-slate-700 text-xs">
                               <SelectValue placeholder="Select bank" />
                             </SelectTrigger>
-                            <SelectContent className="rounded-lg border-slate-200">
+                            <SelectContent className="rounded-lg border-slate-200 dark:border-slate-800">
                               {banks.map((bank) => (
                                 <SelectItem key={bank.id} value={bank.id || ''} className="text-xs">
                                   {bank.bankName}
@@ -1862,15 +1874,15 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <p className="text-xs text-rose-600 italic">No bank accounts available</p>
+                          <p className="text-xs text-rose-600 dark:text-rose-400 italic">No bank accounts available</p>
                         )}
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label htmlFor="paidBy" className="text-xs font-semibold text-slate-700">Payer Name</Label>
+                        <Label htmlFor="paidBy" className="text-xs font-semibold text-slate-700 dark:text-slate-300">Payer Name</Label>
                         <Input
                           id="paidBy"
-                          className="h-9 rounded-lg border-slate-300 text-xs"
+                          className="h-9 rounded-lg border-slate-300 dark:border-slate-700 text-xs"
                           value={paymentData.paidBy}
                           onChange={(e) =>
                             setPaymentData({
@@ -1896,41 +1908,54 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                 {/* Payments Table */}
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-slate-100/70 border-b border-slate-200">
+                    <TableHeader className="bg-slate-100/70 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
                       <TableRow>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Amount</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Bank Account</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Paid By</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Recorded By</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Date</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Amount</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Bank Account</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Paid By</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Recorded By</TableHead>
+                        <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ADD_PAYMENT.name} fallback="hide">
+                          <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Actions</TableHead>
+                        </PermissionGuard>
                       </TableRow>
                     </TableHeader>
-                    <TableBody className="divide-y divide-slate-100 text-xs">
+                    <TableBody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                       {invoice.banks && invoice.banks.length > 0 ? (
                         invoice.banks.map((bankRecord: IProformaInvoiceBank) => (
-                          <TableRow key={bankRecord.id} className="hover:bg-slate-50/60">
-                            <TableCell className="font-mono text-slate-600">
+                          <TableRow key={bankRecord.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/60">
+                            <TableCell className="font-mono text-slate-600 dark:text-slate-300">
                               {bankRecord.createdAt ? formatDate(bankRecord.createdAt) : '-'}
                             </TableCell>
-                            <TableCell className="font-mono font-bold text-emerald-700 text-right">
+                            <TableCell className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-right">
                               {formatCurrency(bankRecord.amount || 0)}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="font-mono text-[11px] border-slate-200 bg-slate-50">
+                              <Badge variant="outline" className="font-mono text-[11px] border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
                                 {bankRecord.bank?.bankName || 'Unknown Bank'}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-semibold text-slate-800">
+                            <TableCell className="font-semibold text-slate-800 dark:text-slate-100">
                               {bankRecord.paidBy || '-'}
                             </TableCell>
-                            <TableCell className="text-slate-500">
+                            <TableCell className="text-slate-500 dark:text-slate-400">
                               {bankRecord.createdBy?.name || '-'}
                             </TableCell>
+                            <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.EDIT_PAYMENT.name} fallback="hide">
+                              <TableCell className="text-right">
+                                <PaymentRowActions
+                                  payment={bankRecord}
+                                  banks={banks}
+                                  maxAmount={Number(bankRecord.amount || 0) + Number(invoice.balance || 0)}
+                                  onChanged={reloadInvoice}
+                                />
+                              </TableCell>
+                            </PermissionGuard>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-slate-400 text-xs font-mono">
+                          <TableCell colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-400 text-xs font-mono">
                             No payment transactions recorded yet
                           </TableCell>
                         </TableRow>
@@ -1945,54 +1970,54 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
 
         {/* AUDIT LOGS TAB */}
         <TabsContent value="logs" className="space-y-4">
-          <Card className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                <History className="h-4 w-4 text-slate-500" />
+          <Card className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-6 py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <History className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 Audit Trail & History ({invoice.piLogs?.length || 0})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {invoice.piLogs && invoice.piLogs.length > 0 ? (
                 <Table>
-                  <TableHeader className="bg-slate-100/70 border-b border-slate-200">
+                  <TableHeader className="bg-slate-100/70 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
                     <TableRow>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 w-44">Timestamp</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Action Description</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 w-48">Performed By</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-44">Timestamp</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Action Description</TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-48">Performed By</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody className="divide-y divide-slate-100 text-xs">
+                  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                     {invoice.piLogs.map((log: IPiLog) => {
                       const isStatusChange = log.action.includes('Status changed');
                       const isView = log.action.includes('Viewed');
                       
                       return (
-                        <TableRow key={log.id} className="hover:bg-slate-50/60">
-                          <TableCell className="font-mono text-slate-500 whitespace-nowrap">
+                        <TableRow key={log.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/60">
+                          <TableCell className="font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
                             <div className="flex items-center space-x-1.5">
-                              <Clock className="h-3.5 w-3.5 text-slate-400" />
+                              <Clock className="h-3.5 w-3.5 text-slate-400 dark:text-slate-400" />
                               <span>{formatDate(log.createdAt)}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-slate-800">
+                          <TableCell className="text-slate-800 dark:text-slate-100">
                             <div className="flex items-center space-x-2">
                               {isStatusChange && (
-                                <Badge variant="outline" className="text-[10px] font-semibold uppercase border-blue-200 bg-blue-50 text-blue-700">
+                                <Badge variant="outline" className="text-[10px] font-semibold uppercase border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400">
                                   Status Update
                                 </Badge>
                               )}
                               {isView && (
-                                <Badge variant="outline" className="text-[10px] font-semibold uppercase border-slate-200 bg-slate-50 text-slate-600">
+                                <Badge variant="outline" className="text-[10px] font-semibold uppercase border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300">
                                   View Log
                                 </Badge>
                               )}
                               <span className="font-medium">{log.action}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium text-slate-700">
+                          <TableCell className="font-medium text-slate-700 dark:text-slate-300">
                             <div className="flex items-center space-x-1.5">
-                              <User className="h-3.5 w-3.5 text-slate-400" />
+                              <User className="h-3.5 w-3.5 text-slate-400 dark:text-slate-400" />
                               <span>{log.piuser?.name || log.piuser?.email || 'System'}</span>
                             </div>
                           </TableCell>
@@ -2002,7 +2027,7 @@ const isStatusChangeBlocked = (status: PIStatus): boolean => {
                   </TableBody>
                 </Table>
               ) : (
-                <div className="py-12 text-center text-slate-400 text-xs font-mono">
+                <div className="py-12 text-center text-slate-400 dark:text-slate-400 text-xs font-mono">
                   No activity logs recorded for this invoice
                 </div>
               )}

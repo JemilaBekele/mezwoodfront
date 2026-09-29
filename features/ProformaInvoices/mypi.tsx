@@ -200,6 +200,8 @@ export default function ProformaInvoicemyListingPage({}: ProformaInvoiceListingP
       const match =
         item.piNumber?.toLowerCase().includes(s) ||
         item.customer?.name?.toLowerCase().includes(s) ||
+        item.customer?.phone1?.toLowerCase().includes(s) ||
+        item.customer?.phone2?.toLowerCase().includes(s) ||
         getPaymentStatusDisplayText(item.paymentStatus).toLowerCase().includes(s) ||
         getStatusDisplayText(item.status).toLowerCase().includes(s);
       if (!match) return false;

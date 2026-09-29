@@ -32,6 +32,7 @@ import {
   Wallet,
   Building,
   Smartphone,
+  Phone,
   User,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -235,6 +236,7 @@ export function ProformaInvoiceCard({
 
   const paidBy = getPaidByMethods(invoice.banks);
   const customerName = invoice.customer?.name;
+  const customerPhone = [invoice.customer?.phone1, invoice.customer?.phone2].filter(Boolean).join(" / ");
   const editUrl =
     invoice.status === PIStatus.APPROVED_CREATE_PROJECT
       ? `/dashboard/ProformaInvoice/second/${invoice.id}`
@@ -373,7 +375,15 @@ export function ProformaInvoiceCard({
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-bold uppercase text-muted-foreground">
               {customerName ? customerName.charAt(0) : "?"}
             </div>
-            <span className="line-clamp-1 text-sm font-medium">{customerName || "-"}</span>
+            <div className="min-w-0">
+              <p className="line-clamp-1 text-sm font-medium">{customerName || "-"}</p>
+              {customerPhone && (
+                <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Phone className="h-3 w-3" />
+                  {customerPhone}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-1.5">

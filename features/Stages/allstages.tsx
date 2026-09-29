@@ -4,7 +4,7 @@
 /* eslint-disable react-hooks/error-boundaries */
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { DataTable } from '@/components/ui/table/newdatatable';
+import { StageCardGrid } from '@/features/Stages/stage-card-grid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -408,7 +408,7 @@ export function StageProjectListing({
     const paginatedData = projectsList.slice(startIndex, startIndex + limit);
 
     return (
-      <DataTable
+      <StageCardGrid
         data={paginatedData}
         totalItems={totalItems}
         columns={projectColumns}

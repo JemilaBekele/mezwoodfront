@@ -4,7 +4,7 @@
 /* eslint-disable react-hooks/error-boundaries */
 
 import { useEffect, useState } from 'react';
-import { DataTable } from '@/components/ui/table/data-table';
+import { StageCardGrid } from '@/features/Stages/stage-card-grid';
 import { getAssemblyProjects } from '@/service/Stages';
 import { projectColumns } from './Project/tables/columns';
 
@@ -58,7 +58,7 @@ export default function FinishedAssemblyProjectListingPage(
   }
 
   return (
-    <DataTable
+    <StageCardGrid
       data={projects}
       totalItems={totalCount}
       columns={projectColumns}

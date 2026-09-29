@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/error-boundaries */
 import { useSearchParams } from 'next/navigation';
-import { DataTable } from '@/components/ui/table/data-table';
+import { StageCardGrid } from '@/features/Stages/stage-card-grid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, CalendarDays, CalendarClock } from 'lucide-react';
 import { IProject } from '@/models/Projects';
@@ -106,7 +106,7 @@ export function StageProjectListing({
     const paginatedData = projectsList.slice(startIndex, startIndex + limit);
 
     return (
-      <DataTable
+      <StageCardGrid
         data={paginatedData}
         totalItems={projectsList.length}
       columns={projectColumns(reload)} // 👈 HERE

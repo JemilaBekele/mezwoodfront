@@ -285,6 +285,10 @@ export interface ISummaryInfo {
   proformaCount: number;
   salesCount: number;
   totalCount: number;
+  // Money totals across all filtered records (not only the current page)
+  totalAmount?: number;
+  totalPaid?: number;
+  totalBalance?: number;
   dateRange?: {
     from: string;
     to: string;

@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/error-boundaries */
 
 import { useEffect, useState } from "react";
-import { DataTable } from "@/components/ui/table/data-table";
+import { StageCardGrid } from "@/features/Stages/stage-card-grid";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
 import { UnassignedgetdesignProjects } from "@/service/Stages";
@@ -66,7 +66,7 @@ export default function UnDesignProjectListingPage({}: ProjectListingPageProps) 
   const paginatedData = filteredData.slice(startIndex, startIndex + limit);
 
   return (
-    <DataTable
+    <StageCardGrid
       data={paginatedData}
       totalItems={filteredData.length}
       columns={unassignedProjectColumns(loadProjects)} // 👈 pass reload function

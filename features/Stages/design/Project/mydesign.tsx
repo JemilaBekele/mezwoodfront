@@ -4,7 +4,7 @@ import { projectColumns } from './tables/columns';
 import { mygetdesignProjects } from '@/service/Stages';
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { DataTable } from '@/components/ui/table/data-table';
+import { StageCardGrid } from '@/features/Stages/stage-card-grid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, CalendarDays, CalendarClock, Filter, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { IProject } from '@/models/Projects';
@@ -126,7 +126,7 @@ function StageProjectListing({
     const paginatedData = projectsList.slice(startIndex, startIndex + limit);
 
     return (
-      <DataTable
+      <StageCardGrid
         data={paginatedData}
         totalItems={projectsList.length}
         columns={projectColumns(reload)}

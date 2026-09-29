@@ -44,6 +44,13 @@ export const navItems: NavItem[] = [
         permission: 'VIEW_COMPLETE_STATISTICS_REPORT'
       },
       {
+        title: 'Payments Report',
+        url: '/dashboard/paymentsreport',
+        icon: 'billing',
+        shortcut: ['p', 'r'],
+        permission: 'VIEW_COMBINED_REPORT'
+      },
+      {
         title: 'Sales Trend',
         url: '/dashboard/proformasales',
         icon: 'trendingUp',

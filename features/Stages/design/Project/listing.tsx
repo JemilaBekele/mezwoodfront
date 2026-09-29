@@ -25,7 +25,7 @@ import {
   CheckCheck,
   XCircle,
 } from "lucide-react";
-import { DataTable } from "@/components/ui/table/newdatatable";
+import { StageCardGrid } from "@/features/Stages/stage-card-grid";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
 import { getProjects } from "@/service/Project";
@@ -552,7 +552,7 @@ const filteredData = sortedProjects.filter((project) => {
           </p>
         </div>
       ) : (
-        <DataTable
+        <StageCardGrid
           data={paginatedData}
           totalItems={filteredCount}
           columns={adminprojectColumns}

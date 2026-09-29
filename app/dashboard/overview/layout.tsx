@@ -24,6 +24,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import React from 'react';
 import { OverviewPermissionShell } from './overview-shell';
+import { OverviewInsights } from '@/features/Dasboard/main/insights';
 
 export default function OverViewLayout({
   sales,
@@ -128,6 +129,9 @@ export default function OverViewLayout({
             {/* sales parallel routes */}
             {sales}
           </div>
+
+          {/* Delivery status, pipeline, collections */}
+          <OverviewInsights />
           {/* <div className='col-span-4'>{area_stats}</div>
           <div className='col-span-4 md:col-span-3'>{pie_stats}</div> */}
 

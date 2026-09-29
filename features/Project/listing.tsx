@@ -36,6 +36,7 @@ import {
   Clock,
   GanttChart,
   Trash2,
+  Phone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
@@ -342,6 +343,10 @@ function ProjectCard({
   const designConfig = project.designStatus ? DESIGN_STATUS_CONFIG[project.designStatus] : undefined;
 
   const customerName = project.customer?.name;
+  const customerPhone = [
+    project.customer?.phone1 || project.invoice?.customer?.phone1,
+    project.customer?.phone2 || project.invoice?.customer?.phone2,
+  ].filter(Boolean).join(" / ");
   const designerName = project.designBy?.name;
   const requested = formatShortDate(project.requestedDelivery);
   const newRequested = formatShortDate(project.newRequestedDelivery);
@@ -462,6 +467,12 @@ function ProjectCard({
               <div className="min-w-0">
                 <p className="text-[10px] text-muted-foreground">Customer</p>
                 <p className="truncate text-sm font-medium">{customerName || "-"}</p>
+                {customerPhone && (
+                  <p className="inline-flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+                    <Phone className="h-3 w-3 shrink-0" />
+                    {customerPhone}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex min-w-0 items-center gap-2">
