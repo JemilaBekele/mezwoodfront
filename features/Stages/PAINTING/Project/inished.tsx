@@ -15,7 +15,7 @@ type ProjectListingPageProps = object;
 export default function FinPaintingProjectListingPage(
   {}: ProjectListingPageProps
 ) {
-  const { page, search, limit } = useTableQueryParams();
+  const { page, search, limit } = useTableQueryParams(20);
 
   const [projects, setProjects] = useState<IProject[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -82,6 +82,7 @@ export default function FinPaintingProjectListingPage(
 
   return (
     <StageCardGrid
+        compact
       data={paginatedData}
       totalItems={filteredData.length}
       columns={projectColumns}

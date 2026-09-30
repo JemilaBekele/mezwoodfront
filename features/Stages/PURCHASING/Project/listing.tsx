@@ -13,7 +13,7 @@ type PurchaseProjectListingPageProps = object;
 export default function PurchaseProjectListingPage(
   {}: PurchaseProjectListingPageProps
 ) {
-  const { page, search, limit } = useTableQueryParams();
+  const { page, search, limit } = useTableQueryParams(20);
 
   const [projects, setProjects] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -85,6 +85,7 @@ export default function PurchaseProjectListingPage(
 
   return (
     <StageCardGrid
+        compact
       data={paginatedData}
       totalItems={totalCount}
       columns={projectColumns}

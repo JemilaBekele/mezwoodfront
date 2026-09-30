@@ -9,11 +9,13 @@ import { useTableQueryParams } from "@/hooks/use-table-query-params";
 import { UnassignedgetdesignProjects } from "@/service/Stages";
 import { IProject } from "@/models/Projects";
 import { unassignedProjectColumns } from "./tables/unassigend/columns";
+import { DesignStatusFilter, useDesignStatusFilter } from "./design-status-filter";
 
 type ProjectListingPageProps = object;
 
 export default function UnDesignProjectListingPage({}: ProjectListingPageProps) {
-  const { page, search, limit } = useTableQueryParams();
+  const { page, search, limit } = useTableQueryParams(20);
+  const { designStatus, select, apply } = useDesignStatusFilter();
 
   const [projects, setProjects] = useState<IProject[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -53,7 +55,7 @@ export default function UnDesignProjectListingPage({}: ProjectListingPageProps) 
     };
   }, []);
 
-  const filteredData = projects.filter((project) => {
+  const searchedData = projects.filter((project) => {
     const searchLower = search.toLowerCase();
 
     return (
@@ -62,14 +64,21 @@ export default function UnDesignProjectListingPage({}: ProjectListingPageProps) 
     );
   });
 
+  const filteredData = apply(searchedData);
+
   const startIndex = (page - 1) * limit;
   const paginatedData = filteredData.slice(startIndex, startIndex + limit);
 
   return (
-    <StageCardGrid
-      data={paginatedData}
-      totalItems={filteredData.length}
-      columns={unassignedProjectColumns(loadProjects)} // 👈 pass reload function
-    />
+    <div className="space-y-4">
+      <DesignStatusFilter projects={searchedData} value={designStatus} onChange={select} />
+      <StageCardGrid
+        compact
+        showDesignStatus
+        data={paginatedData}
+        totalItems={filteredData.length}
+        columns={unassignedProjectColumns(loadProjects)} // 👈 pass reload function
+      />
+    </div>
   );
 }

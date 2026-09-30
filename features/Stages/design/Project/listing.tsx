@@ -175,7 +175,7 @@ const TAB_CONFIG = {
 
 // ─── Main Listing ───────────────────────────────────────────────
 export default function ProjectListingPage({}: ProjectListingPageProps) {
-  const { page, search, limit } = useTableQueryParams();
+  const { page, search, limit } = useTableQueryParams(20);
   const searchParams = useSearchParams();
   const statusFilter = searchParams.get("status") || "all";
   const designStatusFilter = searchParams.get("designStatus") || "all";
@@ -553,6 +553,7 @@ const filteredData = sortedProjects.filter((project) => {
         </div>
       ) : (
         <StageCardGrid
+        compact
           data={paginatedData}
           totalItems={filteredCount}
           columns={adminprojectColumns}

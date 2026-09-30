@@ -253,7 +253,7 @@ export function StageProjectListing({
   const searchParams = useSearchParams();
   const page = Number(searchParams.get('page') || 1);
   const search = searchParams.get('q') || '';
-  const limit = Number(searchParams.get('limit') || 10);
+  const limit = Number(searchParams.get('limit') || 20);
   const statusFilter = searchParams.get('status') || 'all';
   const designStatusFilter = searchParams.get('designStatus') || 'all';
   const difficultyFilter = searchParams.get('difficulty') || 'all';
@@ -409,6 +409,7 @@ export function StageProjectListing({
 
     return (
       <StageCardGrid
+        compact
         data={paginatedData}
         totalItems={totalItems}
         columns={projectColumns}

@@ -30,6 +30,7 @@ import {
   Pencil,
   Trash2,
   Wallet,
+  Banknote,
   Building,
   Smartphone,
   Phone,
@@ -47,6 +48,7 @@ import { PERMISSIONS } from "@/stores/permissions";
 import { useAuthStore } from "@/stores/auth.store";
 import { normalizeImagePath } from "@/lib/norm";
 import { IProformaInvoice, IProformaInvoiceBank, PIStatus } from "@/models/ProformaInvoice";
+import { RecordPaymentModal } from "./record-payment-modal";
 
 type ProformaInvoiceListingPageProps = object;
 
@@ -164,9 +166,11 @@ const getPaidByMethods = (banks?: IProformaInvoiceBank[]) => {
 export function ProformaInvoiceCard({
   invoice,
   onDeleted,
+  onUpdated,
 }: {
   invoice: IProformaInvoice;
   onDeleted: (id: string) => void;
+  onUpdated?: (invoice: IProformaInvoice) => void;
 }) {
   const router = useRouter();
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -177,6 +181,7 @@ export function ProformaInvoiceCard({
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [openDeleteModal, setOpenDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   const onConfirmDelete = async () => {
     setDeleting(true);
@@ -474,6 +479,17 @@ export function ProformaInvoiceCard({
               </button>
             </PermissionGuard>
 
+            {!invoice.store && balance > 0 && (
+              <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.ADD_PAYMENT.name} fallback="hide">
+                <button
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700"
+                  onClick={() => setPaymentDialogOpen(true)}
+                >
+                  <Banknote className="h-3.5 w-3.5" /> Pay
+                </button>
+              </PermissionGuard>
+            )}
+
             <PermissionGuard requiredPermission={PERMISSIONS.PROFORMA_INVOICE.DELETE.name} fallback="hide">
               <button
                 className="flex items-center justify-center rounded-lg bg-red-100 px-2 py-1.5 text-red-600 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
@@ -486,6 +502,15 @@ export function ProformaInvoiceCard({
           </div>
         </div>
       </div>
+
+      {paymentDialogOpen && (
+        <RecordPaymentModal
+          invoice={invoice}
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          onPaid={onUpdated}
+        />
+      )}
 
       {/* Image modal */}
       {isModalOpen && images.length > 0 && (
@@ -885,6 +910,9 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
                   key={invoice.id}
                   invoice={invoice}
                   onDeleted={(id) => setInvoicesData((prev) => prev.filter((i) => i.id !== id))}
+                  onUpdated={(updated) =>
+                    setInvoicesData((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)))
+                  }
                 />
               ))
             ) : (

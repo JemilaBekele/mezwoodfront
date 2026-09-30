@@ -6,10 +6,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { StageCardGrid } from '@/features/Stages/stage-card-grid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, CalendarDays, CalendarClock, Filter, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarClock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { IProject } from '@/models/Projects';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { DesignStatusFilter, useDesignStatusFilter } from './design-status-filter';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/error-boundaries */
@@ -25,8 +24,8 @@ interface StageProjectListingProps {
     tomorrow?: string;
     other?: string;
   };
-  showDesignFinishedFilter?: boolean;
-  onToggleFilter?: () => void;
+  designStatus?: string;
+  onDesignStatusChange?: (value: string) => void;
 }
 
 function isToday(date: Date): boolean {
@@ -95,13 +94,13 @@ function StageProjectListing({
     tomorrow: 'No projects due tomorrow',
     other: 'No other projects found'
   },
-  showDesignFinishedFilter = false,
-  onToggleFilter
+  designStatus = 'all',
+  onDesignStatusChange = () => {}
 }: StageProjectListingProps) {
   const searchParams = useSearchParams();
   const page = Number(searchParams.get('page') || 1);
   const search = searchParams.get('q') || '';
-  const limit = Number(searchParams.get('limit') || 10);
+  const limit = Number(searchParams.get('limit') || 20);
 
   const { todayProjects, tomorrowProjects, otherProjects } = useMemo(
     () => categorizeProjects(projects, search),
@@ -110,16 +109,23 @@ function StageProjectListing({
 
   const defaultTab = todayProjects.length > 0 ? 'today' : tomorrowProjects.length > 0 ? 'tomorrow' : 'other';
 
-  // Calculate the correct count for "Total Design Finished"
-  const totalDesignFinishedCount = useMemo(() => {
-    // When filter is ON, projects already contains only DESIGN_FINISHED
-    // When filter is OFF, count DESIGN_FINISHED from allProjects
-    if (showDesignFinishedFilter) {
-      return projects.length;
-    } else {
-      return allProjects.filter(p => p.designStatus === 'DESIGN_FINISHED').length;
-    }
-  }, [allProjects, projects, showDesignFinishedFilter]);
+  const showDesignFinishedFilter = designStatus === 'DESIGN_FINISHED';
+
+  // "Total Design Finished" always counts from all projects, whatever filter is selected
+  const totalDesignFinishedCount = useMemo(
+    () => allProjects.filter((p) => p.designStatus === 'DESIGN_FINISHED').length,
+    [allProjects]
+  );
+
+  // Design status chip counts follow the search box
+  const searchedAllProjects = useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return allProjects.filter(
+      (project) =>
+        project.invoice?.piNumber?.toLowerCase().includes(searchLower) ||
+        project.customer?.name?.toLowerCase().includes(searchLower)
+    );
+  }, [allProjects, search]);
 
   const renderProjectTable = (projectsList: IProject[]) => {
     const startIndex = (page - 1) * limit;
@@ -127,6 +133,8 @@ function StageProjectListing({
 
     return (
       <StageCardGrid
+        compact
+        showDesignStatus
         data={paginatedData}
         totalItems={projectsList.length}
         columns={projectColumns(reload)}
@@ -136,53 +144,8 @@ function StageProjectListing({
 
   return (
     <div className="space-y-6 p-4">
-      {/* Filter Button and Badge */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">Filter:</span>
-          {showDesignFinishedFilter ? (
-            <Badge variant="default" className="bg-green-500 hover:bg-green-600 flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              DESIGN_FINISHED
-              <span 
-                className="ml-1 cursor-pointer hover:text-white/80"
-                onClick={onToggleFilter}
-              >
-                <X className="h-3 w-3" />
-              </span>
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-muted-foreground">
-              No filter
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground">
-            {showDesignFinishedFilter 
-              ? `Showing ${projects.length} project${projects.length !== 1 ? 's' : ''} with completed design`
-              : `Showing all ${projects.length} project${projects.length !== 1 ? 's' : ''}`
-            }
-          </span>
-        </div>
-        <Button
-          variant={showDesignFinishedFilter ? "default" : "outline"}
-          size="sm"
-          onClick={onToggleFilter}
-          className={showDesignFinishedFilter ? "bg-green-500 hover:bg-green-600" : ""}
-        >
-          {showDesignFinishedFilter ? (
-            <>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Show All
-            </>
-          ) : (
-            <>
-              <Filter className="h-4 w-4 mr-2" />
-              Show DESIGN_FINISHED
-            </>
-          )}
-        </Button>
-      </div>
+      {/* Design Status Filter */}
+      <DesignStatusFilter projects={searchedAllProjects} value={designStatus} onChange={onDesignStatusChange} />
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-4">
@@ -295,11 +258,10 @@ function StageProjectListing({
 }
 
 export default function MyDesignProjectListingPage() {
-  const [projects, setProjects] = useState<IProject[]>([]);
   const [allProjects, setAllProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showDesignFinishedFilter, setShowDesignFinishedFilter] = useState(false);
+  const { designStatus, select, apply } = useDesignStatusFilter();
 
   const fetchProjects = async () => {
     try {
@@ -309,39 +271,12 @@ export default function MyDesignProjectListingPage() {
       });
       
       setAllProjects(result.projects);
-      
-      // Apply filter if active
-      if (showDesignFinishedFilter) {
-        const filteredProjects = result.projects.filter(
-          (project: IProject) => project.designStatus === 'DESIGN_FINISHED'
-        );
-        setProjects(filteredProjects);
-      } else {
-        setProjects(result.projects);
-      }
-      
       setError(null);
     } catch (err) {
       setError('Failed to load my design projects');
       console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleToggleFilter = () => {
-    const newFilterState = !showDesignFinishedFilter;
-    setShowDesignFinishedFilter(newFilterState);
-    
-    if (newFilterState) {
-      // Apply filter
-      const filtered = allProjects.filter(
-        (project: IProject) => project.designStatus === 'DESIGN_FINISHED'
-      );
-      setProjects(filtered);
-    } else {
-      // Show all
-      setProjects(allProjects);
     }
   };
 
@@ -373,13 +308,13 @@ export default function MyDesignProjectListingPage() {
 
   return (
     <StageProjectListing
-      projects={projects}
+      projects={apply(allProjects)}
       allProjects={allProjects}
       projectColumns={projectColumns}
       stageName="My Design"
       reload={fetchProjects}
-      showDesignFinishedFilter={showDesignFinishedFilter}
-      onToggleFilter={handleToggleFilter}
+      designStatus={designStatus}
+      onDesignStatusChange={select}
       emptyStateMessages={{
         today: 'No my design projects due today',
         tomorrow: 'No my design projects due tomorrow',

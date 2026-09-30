@@ -10,7 +10,7 @@ import {
   Row,
   useReactTable
 } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight, ImageOff, Phone, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageOff, Phone, User, X } from 'lucide-react';
 import { parseAsInteger, useQueryState } from 'nuqs';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +21,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { normalizeImagePath } from '@/lib/norm';
+import { DesignStatusBadge } from '@/features/Stages/design/Project/design-status-filter';
 
 // Same props as the DataTable components it replaces, so it is a drop-in swap.
 // Extra props (currentPage, searchValue, filters...) are accepted and ignored, like newdatatable.
@@ -30,6 +31,10 @@ interface StageCardGridProps<TData, TValue> {
   totalItems: number;
   pageSizeOptions?: number[];
   meta?: Record<string, any>;
+  // Show only the project photo, name and customer name (no customer phone, no extra fields)
+  compact?: boolean;
+  // Show the project's design status badge under the title
+  showDesignStatus?: boolean;
   [key: string]: any;
 }
 
@@ -48,7 +53,15 @@ function getItemImages(record: any): { url: string; label: string }[] {
 }
 
 // ─── Card ───────────────────────────────────────────────────────
-function StageCard<TData>({ row }: { row: Row<TData> }) {
+function StageCard<TData>({
+  row,
+  compact = false,
+  showDesignStatus = false
+}: {
+  row: Row<TData>;
+  compact?: boolean;
+  showDesignStatus?: boolean;
+}) {
   const record = row.original as any;
   const images = useMemo(() => getItemImages(record), [record]);
   const hasMultipleImages = images.length > 1;
@@ -191,14 +204,23 @@ function StageCard<TData>({ row }: { row: Row<TData> }) {
             </div>
           )}
 
-          {customerPhone && (
+          {showDesignStatus && <DesignStatusBadge status={record?.designStatus} />}
+
+          {compact && customer?.name && (
+            <p className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+              <User className="h-3.5 w-3.5 shrink-0" />
+              {customer.name}
+            </p>
+          )}
+
+          {!compact && customerPhone && (
             <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <Phone className="h-3 w-3 shrink-0" />
               {customerPhone}
             </p>
           )}
 
-          {fieldCells.map((cell) => {
+          {!compact && fieldCells.map((cell) => {
             const label = headerOf(cell);
             return (
               <div key={cell.id} className="min-w-0 border-t pt-2 text-sm">
@@ -284,7 +306,9 @@ export function StageCardGrid<TData, TValue>({
   data,
   totalItems,
   pageSizeOptions = [10, 20, 30, 40, 50],
-  meta = {}
+  meta = {},
+  compact = false,
+  showDesignStatus = false
 }: StageCardGridProps<TData, TValue>) {
   const [currentPage, setCurrentPage] = useQueryState(
     'page',
@@ -294,7 +318,7 @@ export function StageCardGrid<TData, TValue>({
     'limit',
     parseAsInteger
       .withOptions({ shallow: false, history: 'push' })
-      .withDefault(10)
+      .withDefault(20)
   );
 
   const pageCount = Math.max(Math.ceil(totalItems / pageSize), 1);
@@ -318,7 +342,7 @@ export function StageCardGrid<TData, TValue>({
       {rows.length ? (
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {rows.map((row) => (
-            <StageCard key={row.id} row={row} />
+            <StageCard key={row.id} row={row} compact={compact} showDesignStatus={showDesignStatus} />
           ))}
         </div>
       ) : (

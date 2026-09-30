@@ -59,6 +59,7 @@ export default function FinishedAssemblyProjectListingPage(
 
   return (
     <StageCardGrid
+        compact
       data={projects}
       totalItems={totalCount}
       columns={projectColumns}

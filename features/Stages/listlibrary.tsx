@@ -181,7 +181,7 @@ export function StageProjectListing({
   const searchParams = useSearchParams();
   const page = Number(searchParams.get('page') || 1);
   const search = searchParams.get('q') || '';
-  const limit = Number(searchParams.get('limit') || 10);
+  const limit = Number(searchParams.get('limit') || 20);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { todayProjects, tomorrowProjects, otherProjects } = useMemo(
@@ -222,6 +222,7 @@ export function StageProjectListing({
 
     return (
       <StageCardGrid
+        compact
         data={paginatedData}
         totalItems={projectsList.length}
         columns={projectColumns}

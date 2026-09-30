@@ -15,7 +15,7 @@ type ProjectListingPageProps = object;
 export default function FinisheddeliveryProjectListingPage(
   {}: ProjectListingPageProps
 ) {
-  const { page, search, limit } = useTableQueryParams();
+  const { page, search, limit } = useTableQueryParams(20);
 
   const [projects, setProjects] = useState<IProject[]>([]);
   const [totalCount, setTotalCount] = useState(0);
