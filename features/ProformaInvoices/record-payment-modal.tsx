@@ -171,13 +171,29 @@ export function RecordPaymentModal({
                 value={paymentData.amountPaid ? paymentData.amountPaid.toLocaleString('en-US') : ''}
                 onChange={(e) => {
                   const rawValue = e.target.value.replace(/,/g, '').replace(/[^\d.]/g, '');
-                  setPaymentData({ ...paymentData, amountPaid: parseFloat(rawValue) || 0 });
+                  const amount = parseFloat(rawValue) || 0;
+                  // Never allow more than the remaining balance
+                  if (amount > balance) {
+                    toast.error(`Payment cannot exceed the remaining balance of ${formatCurrency(balance)}`, {
+                      id: 'payment-max-balance',
+                    });
+                  }
+                  setPaymentData({ ...paymentData, amountPaid: Math.min(amount, balance) });
                 }}
                 placeholder="0.00"
               />
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 font-mono">
-                Remaining balance due: <strong>{formatCurrency(balance)}</strong>
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 font-mono">
+                  Remaining balance due: <strong>{formatCurrency(balance)}</strong>
+                </p>
+                <button
+                  type="button"
+                  className="text-[11px] font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                  onClick={() => setPaymentData({ ...paymentData, amountPaid: balance })}
+                >
+                  Pay full balance
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -231,7 +247,13 @@ export function RecordPaymentModal({
 
             <Button
               onClick={handlePaymentRequest}
-              disabled={addingPayment || !paymentData.bankId || !paymentData.paidBy}
+              disabled={
+                addingPayment ||
+                !paymentData.bankId ||
+                !paymentData.paidBy ||
+                paymentData.amountPaid <= 0 ||
+                paymentData.amountPaid > balance
+              }
               className="w-full h-10 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs mt-2"
             >
               Review Payment Entry
