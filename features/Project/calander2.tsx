@@ -188,9 +188,11 @@ const groupRowsByProject = (rows: any[], allocsOf: (r: any) => any[]) => {
     const projAllocs = new Map<string, { label: string; allocs: any[] }>();
     allocs.forEach((a: any) => {
       const pid = a?.projectStage?.project?.id || '_ungrouped';
+      // Show the customer name on the calendar (PI only if there is no customer)
       const label =
-        a?.projectStage?.project?.invoice?.piNumber ||
         a?.projectStage?.project?.customer?.name ||
+        a?.projectStage?.project?.invoice?.customer?.name ||
+        a?.projectStage?.project?.invoice?.piNumber ||
         'Unassigned';
       if (!projAllocs.has(pid)) projAllocs.set(pid, { label, allocs: [] });
       projAllocs.get(pid)!.allocs.push(a);
@@ -543,35 +545,42 @@ const dragDataRef = useRef<any>(null);
   } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   
-  // Filter rows by PI number and/or customer name
+  // Filter rows by PI number and/or customer name (case-insensitive).
+  // Keeps only the matching allocations inside each row, so other projects on the same day are hidden.
   const filterRowsByProject = useCallback((rows: any[], pi: string, customer: string) => {
-    if (!pi && !customer) return rows;
-    
-    return rows.filter(row => {
-      const allocs = row.projectStageCapacityAllocations || row.projectStage_capacityAllocations || [];
-      if (allocs.length === 0) return false;
-      
-      // Check if any allocation matches the filters
-      return allocs.some((alloc: any) => {
-        const project = alloc?.projectStage?.project;
-        if (!project) return false;
-        
-        const piNumber = project?.invoice?.piNumber || '';
-        const customerName = project?.customer?.name || '';
-        
-        let matchesPi = true;
-        let matchesCustomer = true;
-        
-        if (pi) {
-          matchesPi = piNumber.toLowerCase().includes(pi.toLowerCase());
-        }
-        if (customer) {
-          matchesCustomer = customerName.toLowerCase().includes(customer.toLowerCase());
-        }
-        
-        return matchesPi && matchesCustomer;
-      });
-    });
+    // PI: ignore case, spaces and dashes ("pi 0082", "PI-0082", "0082" all match PI-0082)
+    const normalizePi = (v: string) => v.toLowerCase().replace(/[\s\-_/]/g, '');
+    // Customer: ignore case and extra spaces
+    const normalizeText = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+
+    const piQuery = normalizePi(pi || '');
+    const customerQuery = normalizeText(customer || '');
+    if (!piQuery && !customerQuery) return rows;
+
+    const matches = (alloc: any) => {
+      const project = alloc?.projectStage?.project;
+      if (!project) return false;
+
+      const piNumber = normalizePi(project?.invoice?.piNumber || '');
+      const customerName = normalizeText(project?.customer?.name || project?.invoice?.customer?.name || '');
+
+      const matchesPi = !piQuery || piNumber.includes(piQuery);
+      const matchesCustomer = !customerQuery || customerName.includes(customerQuery);
+      return matchesPi && matchesCustomer;
+    };
+
+    return rows
+      .map(row => {
+        const allocs = row.projectStageCapacityAllocations || row.projectStage_capacityAllocations || [];
+        const matched = allocs.filter(matches);
+        if (matched.length === 0) return null;
+        return {
+          ...row,
+          ...(row.projectStageCapacityAllocations ? { projectStageCapacityAllocations: matched } : {}),
+          ...(row.projectStage_capacityAllocations ? { projectStage_capacityAllocations: matched } : {}),
+        };
+      })
+      .filter(Boolean);
   }, []);
 
 const handleDragStart = useCallback((event: DragStartEvent) => {
