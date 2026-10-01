@@ -245,16 +245,7 @@ export const projectColumns: ColumnDef<IProject>[] = [
   cell: ({ row, table }) => {
     // Get the refresh function from table meta
     const meta = table.options.meta as { onRefresh?: () => void };
-    
-    // You can't limit rows here, but you can conditionally render
-    // based on row index if needed
-    const rowIndex = row.index;
-    
-    // This doesn't limit the data, just shows/hides the action button
-    if (rowIndex >= 3) {
-      return null; // Hide actions for rows beyond index 2
-    }
-    
+
     return <ProjectCellAction data={row.original} onRefresh={meta?.onRefresh} />;
   }
 }
