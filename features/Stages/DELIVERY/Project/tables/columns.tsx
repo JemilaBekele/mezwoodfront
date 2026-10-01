@@ -58,6 +58,34 @@ function calculateProgress(project: IProject): number {
   return Math.min(Math.round((actual / planned) * 100), 100);
 }
 
+// Total / Paid / Balance (from the PI for projects, from the sell itself for sells)
+function formatAmount(amount: unknown): string {
+  const n = Number(amount ?? 0);
+  return (isNaN(n) ? 0 : n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function PaymentAmounts({ total, paid, balance }: { total: unknown; paid: unknown; balance: unknown }) {
+  const hasBalance = Number(balance ?? 0) > 0;
+  return (
+    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+      <div>
+        <p className="text-muted-foreground">Total</p>
+        <p className="text-sm font-semibold tabular-nums">{formatAmount(total)}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground">Paid</p>
+        <p className="text-sm font-medium tabular-nums text-emerald-600 dark:text-emerald-400">{formatAmount(paid)}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground">Balance</p>
+        <p className={`text-sm font-medium tabular-nums ${hasBalance ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+          {formatAmount(balance)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Helper to check if project payment is fully paid (for projects only)
 function isProjectFullyPaid(project: any): boolean {
   // Only check payment for projects (type is 'project')
@@ -243,17 +271,20 @@ export const projectColumns: ColumnDef<any>[] = [
         }
 
         return (
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <Badge variant={variant as any}>
-              {label}
-            </Badge>
-            {!isPaid && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <AlertCircle className="h-3 w-3 text-yellow-500" />
-                <span>Payment required</span>
-              </div>
-            )}
+          <div>
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <Badge variant={variant as any}>
+                {label}
+              </Badge>
+              {!isPaid && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3 w-3 text-yellow-500" />
+                  <span>Payment required</span>
+                </div>
+              )}
+            </div>
+            <PaymentAmounts total={project.invoice?.total} paid={project.invoice?.amountPaid} balance={project.invoice?.balance} />
           </div>
         );
       }
@@ -277,11 +308,14 @@ export const projectColumns: ColumnDef<any>[] = [
       }
 
       return (
-        <div className="flex items-center gap-2">
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-          <Badge variant={variant as any}>
-            {label}
-          </Badge>
+        <div>
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <Badge variant={variant as any}>
+              {label}
+            </Badge>
+          </div>
+          <PaymentAmounts total={project.grandTotal} paid={project.totalPaid} balance={project.balance} />
         </div>
       );
     }
