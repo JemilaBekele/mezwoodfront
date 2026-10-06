@@ -1351,6 +1351,9 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
                         <span className="cc-cell__ed" title={`${ethLabel(cell.date)} E.C.`}>
                           {gregorianToEthiopian(cell.date).date}
                         </span>
+                        {cell.key === todayKey && (
+                          <span className="cc-cell__todaytag">Today</span>
+                        )}
                       </span>
                       {active && (() => {
                         const maxOverPct = Math.round(Math.max(...dayRows.map((r: any) => {
@@ -1823,6 +1826,8 @@ const CC_STYLES = `
   --cc-violation:#7f1d1d;
   --cc-line: hsl(var(--border));
   --cc-ink: hsl(var(--foreground));
+  /* Today's date: a colour of its own so it never reads as a load level. */
+  --cc-today:#2563eb;
   --cc-dim: hsl(var(--muted-foreground));
   --cc-surface: hsl(var(--card));
   --cc-inset: hsl(var(--muted)/.4);
@@ -1952,7 +1957,9 @@ const CC_STYLES = `
   border-color:color-mix(in srgb,var(--heat) 55%,var(--cc-line));z-index:2;}
 .capcal .cc-cell--out{opacity:.4;}
 .capcal .cc-cell--off{background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--cc-inset) 6px,var(--cc-inset) 7px);}
-.capcal .cc-cell--today{border-color:var(--cc-ink);box-shadow:inset 0 0 0 1px var(--cc-ink);}
+.capcal .cc-cell--today{border:2px solid var(--cc-today);box-shadow:0 0 0 3px color-mix(in srgb,var(--cc-today) 25%,transparent);}
+.capcal .cc-cell--today .cc-cell__d{background:var(--cc-today);color:#fff;border-radius:999px;padding:0 7px;}
+.capcal .cc-cell__todaytag{align-self:center;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--cc-today);border-radius:4px;padding:1px 5px;line-height:1.4;}
 .capcal .cc-cell--sel{border-color:var(--heat);box-shadow:0 0 0 2px color-mix(in srgb,var(--heat) 45%,transparent);z-index:3;}
 .capcal .cc-cell__top{display:flex;justify-content:space-between;align-items:center;gap:4px;}
 .capcal .cc-cell__dates{display:inline-flex;align-items:baseline;gap:5px;min-width:0;}
@@ -2147,7 +2154,9 @@ const CC_STYLES = `
   background:rgba(255,255,255,.72);backdrop-filter:blur(3px);border-radius:14px;font-size:14px;font-weight:600;color:var(--cc-ink);pointer-events:none;}
 
 /* Dark-mode nudges */
-.dark .capcal .cc-cell--today{box-shadow:inset 0 0 0 1px hsl(var(--foreground)/.7);}
+.dark .capcal{--cc-today:#60a5fa;}
+.dark .capcal .cc-cell--today{box-shadow:0 0 0 3px color-mix(in srgb,var(--cc-today) 30%,transparent);}
+.dark .capcal .cc-cell--today .cc-cell__d,.dark .capcal .cc-cell__todaytag{color:#0b1220;}
 .dark .capcal .cc-modal__scrim{background:rgba(0,0,0,.72);}
 .dark .capcal .cc-modal__card{background:#0c0e14;}
 .dark .capcal .cc-modal__head{background:linear-gradient(145deg,#13161d,#0c0e14);}
