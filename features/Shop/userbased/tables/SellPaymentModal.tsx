@@ -38,6 +38,23 @@ import { normalizeImagePath } from '@/lib/norm';
 
 import Image from 'next/image';
 
+/** Today's date in the browser's timezone, as YYYY-MM-DD (for <input type="date">). */
+const todayInput = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/**
+ * The instant to store for a picked date: right now when it's today, otherwise
+ * midday local time on that day (so no timezone shift can move it a day).
+ */
+const paidDateToIso = (ymd: string) => {
+  if (ymd === todayInput()) return new Date().toISOString();
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d, 12).toISOString();
+};
+
 interface SellPaymentModalProps {
   open: boolean;
   onClose: () => void;
@@ -62,6 +79,7 @@ export const SellPaymentModal: React.FC<SellPaymentModalProps> = ({
   const [paymentAmount, setPaymentAmount] = useState('');
   const [selectedBankId, setSelectedBankId] = useState('');
   const [paidBy, setPaidBy] = useState('');
+  const [paidDate, setPaidDate] = useState(todayInput());
 
   const [banks, setBanks] = useState<IBank[]>([]);
   const [summary, setSummary] = useState<any>(null);
@@ -258,6 +276,16 @@ export const SellPaymentModal: React.FC<SellPaymentModalProps> = ({
       return;
     }
 
+    if (!paidDate) {
+      toast.error('Please select the payment date');
+      return;
+    }
+
+    if (paidDate > todayInput()) {
+      toast.error('Payment date cannot be in the future');
+      return;
+    }
+
     const currentBalance = summary?.balance || 0;
 
     if (Number(paymentAmount) > currentBalance) {
@@ -274,6 +302,7 @@ export const SellPaymentModal: React.FC<SellPaymentModalProps> = ({
         amount: Number(paymentAmount),
         bankId: selectedBankId,
         paidBy: paidBy.trim(),
+        paidDate: paidDateToIso(paidDate),
       });
 
       toast.success('Payment added successfully');
@@ -293,6 +322,7 @@ export const SellPaymentModal: React.FC<SellPaymentModalProps> = ({
 
       setPaymentAmount('');
       setPaidBy('');
+      setPaidDate(todayInput());
       setSelectedBankId('');
 
       await fetchSummary();
@@ -322,6 +352,8 @@ export const SellPaymentModal: React.FC<SellPaymentModalProps> = ({
     if (!selectedBankId) return true;
 
     if (!paidBy || paidBy.trim() === '') return true;
+
+    if (!paidDate || paidDate > todayInput()) return true;
 
     const currentBalance = summary?.balance || 0;
 
@@ -412,6 +444,36 @@ export const SellPaymentModal: React.FC<SellPaymentModalProps> = ({
           </div>
         </div>
 
+        {/* Payments made (with the date each was paid) */}
+
+        {Array.isArray(summary?.payments) && summary.payments.length > 0 && (
+          <div className="mt-4">
+            <Label className="text-sm font-semibold">Payments</Label>
+
+            <div className="mt-2 divide-y rounded border text-sm">
+              {summary.payments.map((p: any) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-2 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {new Date(p.paidDate || p.createdAt).toLocaleDateString()}
+                    </p>
+                    <p className="truncate text-xs text-gray-500">
+                      {[p.bank?.bankName, p.paidBy].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+
+                  <span className="font-semibold">
+                    {Number(p.amount || 0).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Payment Form */}
 
         {!isFullyPaid && (
@@ -471,6 +533,23 @@ export const SellPaymentModal: React.FC<SellPaymentModalProps> = ({
                 value={paidBy}
                 onChange={(e) =>
                   setPaidBy(e.target.value)
+                }
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="paidDate">
+                Payment Date *
+              </Label>
+
+              <Input
+                id="paidDate"
+                type="date"
+                value={paidDate}
+                max={todayInput()}
+                onChange={(e) =>
+                  setPaidDate(e.target.value)
                 }
                 className="mt-1"
               />

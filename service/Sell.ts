@@ -253,8 +253,10 @@ export const addSellPayment = async (
     amount: number;
     bankId: string;
     paidBy: string;
+    /** When the customer paid (ISO string). Defaults to now on the server. */
+    paidDate?: string;
   },
-  
+
 ) => {
   try {
     
@@ -279,8 +281,11 @@ export const getSellPaymentHistory = async (
       `/sells/${sellId}/payments`,
     );
 
-    return response.data.data.sell
-;
+    // Sale totals plus its payment rows (each with its paid date).
+    return {
+      ...response.data.data.sell,
+      payments: response.data.data.payments || [],
+    };
   } catch (error) {
     throw error;
   }
