@@ -57,6 +57,7 @@ import {
   getStageLoadRail as fetchStageLoadRail,
 } from "@/service/Category";
 import { getAllCapacitySlots } from "@/service/CapacityLot";
+import { hideFinishedStages } from "./hideFinishedStages";
 import { rescheduleProjectFromCalendar } from "@/service/Project";
 import { ProjectStatus } from "@/models/Projects";
 import { useRouter } from "next/navigation";
@@ -488,7 +489,7 @@ const [draggedAllocation, setDraggedAllocation] = useState<{
         };
       });
       setSlots(map);
-      setRows(Array.isArray(caps) ? caps : []);
+      setRows(Array.isArray(caps) ? hideFinishedStages(caps) : []);
     } catch (err) {
       console.error(err);
       setError("Failed to load capacity data.");

@@ -59,6 +59,7 @@ import {
 } from "@/service/Category";
 import { getAllCapacitySlots } from "@/service/CapacityLot";
 import { rescheduleProjectFromCalendar } from "@/service/Project";
+import { hideFinishedStages } from "./hideFinishedStages";
 import { ProjectStatus } from "@/models/Projects";
 import { useRouter } from "next/navigation";
 // Ethiopian calendar rendering lives in lib/format.ts — the single copy shared
@@ -839,10 +840,13 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
   const allocsOf = (r: any) =>
     r.projectStageCapacityAllocations || r.projectStage_capacityAllocations || [];
 
+  // Completed / cancelled stages are hidden from the board (see hideFinishedStages).
+  const visibleRows = useMemo(() => hideFinishedStages(rows), [rows]);
+
   const filtered = useMemo(() => {
-    const stageFiltered = rows.filter((r) => stage === "ALL" || r.stage === stage);
+    const stageFiltered = visibleRows.filter((r) => stage === "ALL" || r.stage === stage);
     return filterRowsByProject(stageFiltered, piFilter, customerFilter);
-  }, [rows, stage, piFilter, customerFilter, filterRowsByProject]);
+  }, [visibleRows, stage, piFilter, customerFilter, filterRowsByProject]);
 
   // Index rows by calendar day for the board.
   const byDay = useMemo(() => {
@@ -1412,12 +1416,15 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
                                   const allocUnits = allocs.reduce((s: number, a: any) => s + (a.allocatedUnits || 0), 0);
                                   const f = eff > 0 ? allocUnits / eff : 0;
                                   const projectId = allocs[0]?.projectStage?.project?.id;
+                                  const ps = allocs[0]?.projectStage;
+                                  // Finished work already happened — it can't be moved.
+                                  const isLocked = !!ps && (ps.finished || ps.status === 'COMPLETED' || ps.status === 'CANCELLED');
                                   const dragId = `${group.key}::${r.stage}::${cell.key}`;
                                   const stageBar = (
                                     <div
-                                      className="cc-cell__row cc-cell__row--draggable"
+                                      className={`cc-cell__row ${isLocked ? 'cc-cell__row--locked' : 'cc-cell__row--draggable'}`}
                                       style={{ "--stage-color": meta?.color } as React.CSSProperties}
-                                      title={`${stageName(r.stage)} - ${allocUnits} / ${Math.round(eff)} units (${clampPct(f * 100)} of capacity) — drag to reschedule`}
+                                      title={`${stageName(r.stage)} - ${allocUnits} / ${Math.round(eff)} units (${clampPct(f * 100)} of capacity) — ${isLocked ? `${String(ps.status).toLowerCase()}, can't be rescheduled` : 'drag to reschedule'}`}
                                     >
                                       <span
                                         className="cc-cell__rowfill"
@@ -1429,8 +1436,8 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
                                       <span className="cc-cell__rowpct">{clampPct(f * 100)}</span>
                                     </div>
                                   );
-                                  // Only make draggable if we have a project ID
-                                  if (!projectId) {
+                                  // Only make draggable if we have a project ID and the stage isn't finished
+                                  if (!projectId || isLocked) {
                                     return <div key={`${r.id}-${group.key}`}>{stageBar}</div>;
                                   }
                                   return (
@@ -2128,6 +2135,8 @@ const CC_STYLES = `
 .capcal .cc-cell__row--draggable:hover{box-shadow:0 2px 8px -2px rgba(0,0,0,.15);transform:translateY(-1px);}
 .capcal .cc-cell__grip{position:relative;color:var(--cc-dim);flex:none;opacity:.35;transition:opacity .15s;}
 .capcal .cc-cell__row--draggable:hover .cc-cell__grip{opacity:.8;}
+.capcal .cc-cell__row--locked{cursor:not-allowed;opacity:.6;}
+.capcal .cc-cell__row--locked .cc-cell__grip{visibility:hidden;}
 .capcal .cc-drag-overlay{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:10px;
   background:#ffffff;border:1px solid var(--cc-line);box-shadow:0 12px 32px -8px rgba(0,0,0,.28);
   font-size:12px;font-weight:600;color:var(--cc-ink);white-space:nowrap;pointer-events:none;z-index:999;}
