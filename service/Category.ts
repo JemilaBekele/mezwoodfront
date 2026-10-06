@@ -154,8 +154,12 @@ export const rebuildCapacity = async (
 ) => {
   try {
 
+    // Compact week re-plans many projects in one go and can take well over the
+    // default 15s request timeout; match the server's 3-minute limit.
     const response = await axiosInstance.post(
       '/daily-stage-capacities/rebuild',
+      undefined,
+      { timeout: 180000 },
     );
 
     return response.data;

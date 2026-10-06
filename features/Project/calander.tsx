@@ -683,7 +683,7 @@ const handleDragStart = useCallback((event: DragStartEvent) => {
   }, []);
 
   const handleRebuild = async () => {
-    if (!window.confirm("Compact the current week? This pulls this week's stages earlier into any empty space (filling gaps). Nothing outside this week is moved, and if there's no empty space nothing changes.")) return;
+    if (!window.confirm("Compact the current week? Overdue work and this week's stages are packed into the rest of this week, starting now and filling each day in order (within working hours, up to 130% of each stage's daily capacity). If overdue work doesn't fit, the rest goes onto earlier days of this week. Nothing booked next week is touched, and a stage that still can't fit stays where it is. Completed stages and locked projects are not touched.")) return;
     try {
       setResetting(true);
       await rebuildCapacity();
@@ -691,7 +691,8 @@ const handleDragStart = useCallback((event: DragStartEvent) => {
       setSelectedKey(null);
     } catch (err) {
       console.error(err);
-      window.alert("Failed to rebuild capacity.");
+      const reason = (err as any)?.response?.data?.message || (err as any)?.message;
+      window.alert(`Failed to compact the current week.${reason ? `\n\n${reason}` : ""}`);
     } finally {
       setResetting(false);
     }

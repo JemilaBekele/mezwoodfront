@@ -928,7 +928,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
   // Compact this week: pull current-week stages into empty space only. Nothing
   // outside the current week moves; no downstream cascade; no-op if no gaps.
   const handleRebuild = async () => {
-    if (!window.confirm("Compact the current week? This pulls this week's stages earlier into any empty space (filling gaps). Nothing outside this week is moved, and if there's no empty space nothing changes.")) return;
+    if (!window.confirm("Compact the current week? Overdue work and this week's stages are packed into the rest of this week, starting now and filling each day in order (within working hours, up to 130% of each stage's daily capacity). If overdue work doesn't fit, the rest goes onto earlier days of this week. Nothing booked next week is touched, and a stage that still can't fit stays where it is. Completed stages and locked projects are not touched.")) return;
     try {
       setResetting(true);
       await rebuildCapacity();
@@ -936,7 +936,8 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
       setSelectedKey(null);
     } catch (err) {
       console.error(err);
-      window.alert("Failed to compact the current week.");
+      const reason = (err as any)?.response?.data?.message || (err as any)?.message;
+      window.alert(`Failed to compact the current week.${reason ? `\n\n${reason}` : ""}`);
     } finally {
       setResetting(false);
     }
@@ -978,7 +979,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
               <Button onClick={fetchData} variant="outline" size="sm" className="cc-btn">
                 <RotateCcw size={14} /> Refresh
               </Button>
-              <Button onClick={handleRebuild} disabled={resetting} variant="outline" size="sm" className="cc-btn" title="Compact this week: pull current-week stages into empty space (fill gaps). Nothing else moves.">
+              <Button onClick={handleRebuild} disabled={resetting} variant="outline" size="sm" className="cc-btn" title="Compact this week: pack overdue and this week's work from now, within working hours, up to 130% capacity. Next week is not touched.">
                 <Zap size={14} className={resetting ? "cc-spin" : ""} />
                 {resetting ? "Compacting…" : "Compact week"}
               </Button>
