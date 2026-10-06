@@ -8,6 +8,8 @@ import {
   ArrowLeft,
   Boxes,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Gauge,
 } from "lucide-react";
@@ -159,6 +161,8 @@ export default function DayDetailPage() {
   const [slots, setSlots] = useState<Record<string, { parallelSlots: number; workingHours: number; capacity: number }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The PI-based project list is collapsed by default; the stage grid is the main view.
+  const [showProjects, setShowProjects] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -330,7 +334,20 @@ export default function DayDetailPage() {
               <div className="day-detail-body">
                 {projects.length > 0 && (
                   <section className="day-detail-section">
-                    <h4 className="day-detail-section-title"><Boxes size={16} /> Projects scheduled</h4>
+                    <h4 className="day-detail-section-title day-detail-section-title--toggle">
+                      <span className="day-detail-section-title-text"><Boxes size={16} /> Projects scheduled ({projects.length})</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => setShowProjects((v) => !v)}
+                        aria-expanded={showProjects}
+                      >
+                        {showProjects ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        {showProjects ? "Hide" : "Show"}
+                      </Button>
+                    </h4>
+                    {showProjects && (
                     <div className="day-detail-projlist">
                       {projects.map((p) => {
                         const delivery = operativeDelivery(p);
@@ -361,6 +378,7 @@ export default function DayDetailPage() {
                         );
                       })}
                     </div>
+                    )}
                   </section>
                 )}
 
@@ -638,10 +656,27 @@ const PAGE_STYLES = `
   margin-top: 8px;
 }
 
-.day-detail-stage-list {
+.day-detail-section-title--toggle {
+  justify-content: space-between;
+}
+
+.day-detail-section-title-text {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.day-detail-stage-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .day-detail-stage-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .day-detail-stage {
@@ -817,6 +852,10 @@ const PAGE_STYLES = `
   
   .day-detail-stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .day-detail-stage-list {
+    grid-template-columns: 1fr;
   }
 }
 `;
