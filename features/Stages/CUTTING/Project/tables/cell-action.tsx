@@ -24,6 +24,7 @@ import {
 
 import { IProject, IProjectStage, ProjectStatus } from '@/models/Projects';
 import { createProjectStageWorkLog } from '@/service/projectStageWorkLogService';
+import { getStageHandoff } from '@/lib/stage-handoff';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -84,6 +85,12 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
   const remainingUnits = Math.max(0, plannedUnits - actualUnits);
   const remainingPercentage = plannedUnits > 0 ? (remainingUnits / plannedUnits) * 100 : 0;
   const isCompleted = remainingUnits <= 0.000001;
+  // What the earlier stages have passed on to this one
+  const handoff = getStageHandoff(stage?.stage ?? '', data.stages || []);
+  const maxLogUnits = Math.min(remainingUnits, handoff.availableUnits);
+  const waitingLabel = handoff.waitingOn
+    .map((w) => `${w.label} ${w.donePercent}%`)
+    .join(', ');
 
   const resetForm = () => {
     setInputType('units');
@@ -146,6 +153,12 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
         toast.error(`Cannot add ${doneUnitsValue.toFixed(4)} units. Only ${remainingUnits.toFixed(4)} units remaining.`);
         return;
       }
+    }
+
+    // Only what the earlier stages have passed on can be logged
+    if (doneUnitsValue > handoff.availableUnits + 0.000001) {
+      toast.error(handoff.reason || `Only ${handoff.availableUnits} units are ready.`);
+      return;
     }
 
     setIsSubmitting(true);
@@ -259,13 +272,28 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
                 Add Work Log
               </DropdownMenuItem>
 
-              <DropdownMenuItem
-                onClick={() => setShowCompleteDialog(true)}
-                className="text-green-600 focus:text-green-600"
-              >
-                <IconCheck className="mr-2 h-4 w-4" />
-                Complete All Units ({remainingUnits.toFixed(2)} remaining)
-              </DropdownMenuItem>
+              {handoff.canCompleteAll ? (
+                <DropdownMenuItem
+                  onClick={() => setShowCompleteDialog(true)}
+                  className="text-green-600 focus:text-green-600"
+                >
+                  <IconCheck className="mr-2 h-4 w-4" />
+                  Complete All Units ({remainingUnits.toFixed(2)} remaining)
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  disabled
+                  className="flex-col items-start text-muted-foreground"
+                >
+                  <span className="flex items-center">
+                    <IconCheck className="mr-2 h-4 w-4" />
+                    Can&apos;t complete all yet
+                  </span>
+                  <span className="pl-6 text-xs">
+                    Waiting on {waitingLabel} · {handoff.availableUnits} units ready
+                  </span>
+                </DropdownMenuItem>
+              )}
             </>
           )}
 
@@ -317,7 +345,22 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
                   {remainingUnits.toFixed(4)} units ({remainingPercentage.toFixed(2)}%)
                 </span>
               </div>
+              {!handoff.canCompleteAll && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ready now:</span>
+                  <span className="font-medium text-blue-600">
+                    {maxLogUnits.toFixed(4)} units
+                  </span>
+                </div>
+              )}
             </div>
+
+            {/* Why not everything can be logged yet */}
+            {!handoff.canCompleteAll && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                {handoff.reason}
+              </p>
+            )}
 
             {/* Input Type Toggle */}
             <div>
@@ -361,8 +404,12 @@ export const ProjectCellAction: React.FC<ProjectCellActionProps> = ({
                     const value = e.target.value;
                     if (value) {
                       const numValue = Number(value);
-                      if (numValue > remainingUnits + 0.000001) {
-                        toast.error(`Maximum ${remainingUnits.toFixed(4)} units remaining.`);
+                      if (numValue > maxLogUnits + 0.000001) {
+                        toast.error(
+                          maxLogUnits < remainingUnits - 0.000001
+                            ? `Maximum ${maxLogUnits.toFixed(4)} units ready now.`
+                            : `Maximum ${remainingUnits.toFixed(4)} units remaining.`
+                        );
                         return;
                       }
                     }

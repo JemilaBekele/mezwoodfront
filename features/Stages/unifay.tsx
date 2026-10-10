@@ -66,6 +66,7 @@ import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { createProjectStageWorkLog, deleteProjectStageWorkLog } from '@/service/projectStageWorkLogService';
+import { getStageHandoff } from '@/lib/stage-handoff';
 import Image from 'next/image';
 import { normalizeImagePath } from '@/lib/norm';
 import { SellPaymentStatus } from '@/models/Sell';
@@ -646,6 +647,16 @@ console.log('🚫 Final isPaymentRestricted:', isPaymentRestricted);  // Handle 
       }
     }
 
+    // Only what the earlier stages have passed on can be logged
+    const handoff = getStageHandoff(stage.stage, project?.stages || []);
+    if (doneUnits > handoff.availableUnits + 0.000001) {
+      toast.error(
+        handoff.reason ||
+          `Only ${handoff.availableUnits} units are ready for this stage.`
+      );
+      return;
+    }
+
     setAddingWorkLog(stageId);
     try {
       // Store the entered percentage in the note
@@ -986,6 +997,10 @@ const formatDescription = (text: string, limit = 80) => {
                 const remainingUnits = Math.max(0, plannedUnits - actualUnits);
                 const remainingPercentage = plannedUnits > 0 ? (remainingUnits / plannedUnits) * 100 : 0;
                 const statusDisplay = getStageStatusDisplay(stage);
+                // What the earlier stages have passed on to this one
+                const handoff = getStageHandoff(stage.stage, project?.stages || []);
+                const maxLogUnits = Math.min(remainingUnits, handoff.availableUnits);
+                const maxLogPercentage = plannedUnits > 0 ? (maxLogUnits / plannedUnits) * 100 : 0;
                 
                 return (
                   <div key={stage.id} className="space-y-6">
@@ -1253,15 +1268,48 @@ const formatDescription = (text: string, limit = 80) => {
     )}
     
     <div className="space-y-3">
-      {/* Complete All Units Button - Disabled if payment restricted */}
+      {/* Why "Complete All" is not possible yet: earlier stages still working */}
+      {!handoff.canCompleteAll && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/30 dark:border-amber-900">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                Can&apos;t complete all yet
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400">{handoff.reason}</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Ready to log now: <span className="font-semibold">{handoff.availableUnits} units</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete All Units Button - Disabled if payment restricted or work not passed on yet */}
       <Button
         onClick={() => handleCompleteAll(stage)}
         className="w-full bg-green-600 hover:bg-green-700 text-white"
-        disabled={addingWorkLog === stage.id || isPaymentRestricted}
+        disabled={addingWorkLog === stage.id || isPaymentRestricted || !handoff.canCompleteAll}
       >
         <CheckCircle className="mr-2 h-4 w-4" />
         Complete All Remaining Units ({remainingUnits.toFixed(4)} units / {remainingPercentage.toFixed(2)}%)
       </Button>
+
+      {/* Shortcut: log everything that has been passed on so far */}
+      {!handoff.canCompleteAll && handoff.availableUnits > 0.000001 && (
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={addingWorkLog === stage.id || isPaymentRestricted}
+          onClick={() => {
+            handleWorkLogInputChange(stage.id, 'inputType', 'units');
+            handleWorkLogInputChange(stage.id, 'doneUnits', String(handoff.availableUnits));
+          }}
+        >
+          Fill in the {handoff.availableUnits} ready units
+        </Button>
+      )}
 
       <Separator className="my-2" />
 
@@ -1309,8 +1357,12 @@ const formatDescription = (text: string, limit = 80) => {
               // Validate max value doesn't exceed remaining units
               if (value) {
                 const numValue = Number(value);
-                if (numValue > remainingUnits + 0.000001) {
-                  toast.error(`Maximum ${remainingUnits.toFixed(4)} units remaining.`);
+                if (numValue > maxLogUnits + 0.000001) {
+                  toast.error(
+                    maxLogUnits < remainingUnits - 0.000001
+                      ? `Maximum ${maxLogUnits.toFixed(4)} units ready now. ${handoff.reason ?? ''}`
+                      : `Maximum ${remainingUnits.toFixed(4)} units remaining.`
+                  );
                   return;
                 }
               }
@@ -1321,6 +1373,7 @@ const formatDescription = (text: string, limit = 80) => {
           />
           <p className="text-xs text-muted-foreground mt-1">
             Remaining: {remainingUnits.toFixed(4)} units ({remainingPercentage.toFixed(2)}%)
+            {!handoff.canCompleteAll && ` · Ready now: ${maxLogUnits.toFixed(4)} units`}
           </p>
         </div>
       )}
@@ -1342,8 +1395,12 @@ const formatDescription = (text: string, limit = 80) => {
               const value = e.target.value;
               if (value) {
                 const numValue = Number(value);
-                if (numValue > remainingPercentage + 0.01) {
-                  toast.error(`Maximum ${remainingPercentage.toFixed(2)}% remaining.`);
+                if (numValue > maxLogPercentage + 0.01) {
+                  toast.error(
+                    maxLogUnits < remainingUnits - 0.000001
+                      ? `Maximum ${maxLogPercentage.toFixed(2)}% ready now. ${handoff.reason ?? ''}`
+                      : `Maximum ${remainingPercentage.toFixed(2)}% remaining.`
+                  );
                   return;
                 }
               }
@@ -1358,6 +1415,7 @@ const formatDescription = (text: string, limit = 80) => {
           </p>
           <p className={`text-xs ${stageConfig.remainingTextColor} mt-1`}>
             Remaining: {remainingPercentage.toFixed(2)}%
+            {!handoff.canCompleteAll && ` · Ready now: ${maxLogPercentage.toFixed(2)}%`}
           </p>
         </div>
       )}
