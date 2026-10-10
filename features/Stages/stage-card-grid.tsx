@@ -48,6 +48,13 @@ function getItemImages(record: any): { url: string; label: string }[] {
       const url = normalizeImagePath(img?.imageUrl);
       if (url) list.push({ url, label });
     });
+    // Sells: the sold product's own photo(s)
+    const product = piItem?.item;
+    [product?.imageUrl, ...(product?.itemImages || []).map((img: any) => img?.imageUrl)]
+      .map((raw) => normalizeImagePath(raw))
+      .forEach((url) => {
+        if (url && !list.some((l) => l.url === url)) list.push({ url, label });
+      });
   });
   return list;
 }
