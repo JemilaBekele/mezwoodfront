@@ -232,7 +232,7 @@ const dayCapacityAllocationFrac = (rows: any[]) => {
 /** Dialog shown on drag: choose how many of the cell's units to reschedule.
  *  Default = all (whole-phase move); reducing it does a stage-specific partial move. */
 const RescheduleQuantityDialog: React.FC<{
-  pending: { projectLabel: string; stage: string; sourceDate: string; targetDate: string; cellUnits: number };
+  pending: { projectLabel: string; stage: string; sourceDate: string; targetDate: string; cellUnits: number; pastCellMove?: boolean };
   busy?: boolean;
   onConfirm: (units: number) => void;
   onCancel: () => void;
@@ -255,7 +255,9 @@ const RescheduleQuantityDialog: React.FC<{
           <DialogTitle>Reschedule {stageDisplay} — {projectDisplay}</DialogTitle>
           <DialogDescription>
             {pending?.sourceDate || "Unknown"} → {pending?.targetDate || "Unknown"}. Choose how many of this day&apos;s {max} unit(s) to move.
-            Moving all also shifts the parallel stage; a partial move shifts only this stage. Downstream adjusts either way.
+            {pending?.pastCellMove
+              ? "Moving back: moving all also moves the parallel stage's cell; a partial move moves only this stage. Downstream is untouched."
+              : "Moving all also shifts the parallel stage; a partial move shifts only this stage. Downstream adjusts either way."}
           </DialogDescription>
         </DialogHeader>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "4px 2px" }}>
@@ -543,6 +545,7 @@ const dragDataRef = useRef<any>(null);
     sourceDate: string;
     targetDate: string;
     cellUnits: number;
+    pastCellMove?: boolean;
   } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   
@@ -759,14 +762,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
     return;
   }
 
-  // Backward drag
-  if (targetDate < sourceDate) {
-    void performReschedule(projectId, stage, sourceDate, targetDate, projectLabel, undefined, true);
-    dragDataRef.current = null;
-    return;
-  }
-
-  // Forward drag - open dialog
+  // Always ask how many units to move (forward and backward drags alike)
   setPendingReschedule({
     projectId,
     projectLabel,
@@ -774,10 +770,11 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
     sourceDate,
     targetDate,
     cellUnits: Number(cellUnits) || 0,
+    pastCellMove: targetDate < sourceDate,
   });
   
   dragDataRef.current = null;
-}, [performReschedule]);
+}, []);
 
   const confirmReschedule = useCallback(async (unitsToMove: number) => {
     const p = pendingReschedule;
@@ -788,6 +785,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
     await performReschedule(
       p.projectId, p.stage, p.sourceDate, p.targetDate, p.projectLabel,
       partial ? unitsToMove : undefined,
+      p.pastCellMove,
     );
   }, [pendingReschedule, performReschedule]);
 
