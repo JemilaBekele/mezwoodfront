@@ -47,8 +47,11 @@ export const StockCorrectionCellAction: React.FC<
       setOpen(false);
       router.refresh();
       toast.success('Stock correction deleted successfully');
-    } catch  {
-      toast.error('Error deleting stock correction. Please try again.');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          'Error deleting stock correction. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

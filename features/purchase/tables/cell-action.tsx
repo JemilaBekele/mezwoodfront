@@ -42,8 +42,11 @@ export const PurchaseCellAction: React.FC<CellActionProps> = ({ data }) => {
       setOpen(false);
       router.refresh();
       toast.success('Purchase deleted successfully');
-    } catch  {
-      toast.error('Error deleting purchase. Please try again.');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          'Error deleting purchase. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

@@ -164,8 +164,10 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
       if (pendingStatus === PaymentStatus.APPROVED) {
         setRefreshTrigger((prev) => prev + 1);
       }
-    } catch (error) {
-      toast.error('Failed to update payment status');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || 'Failed to update payment status'
+      );
       if (purchase) {
         setSelectedStatus(purchase.paymentStatus);
       }
@@ -193,8 +195,10 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
       if (id) {
         await fetchStockCorrections(id);
       }
-    } catch (error) {
-      toast.error('Failed to delete stock correction');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || 'Failed to delete stock correction'
+      );
     } finally {
       setDeletingId(null);
     }
@@ -627,8 +631,14 @@ const PurchasedetailPage: React.FC<PurchaseViewProps> = ({ id }) => {
                 <div className='flex items-center gap-2'>
                   <Package className='text-muted-foreground h-4 w-4' />
                   <p>
-                    <span className='font-medium'>Total Products:</span>{' '}
-                    {purchase.totalProducts || 0}
+                    <span className='font-medium'>Materials:</span>{' '}
+                    {purchase.items?.length ?? purchase.totalProducts ?? 0}
+                    <span className='font-medium'> · Total Quantity:</span>{' '}
+                    {(purchase.items || []).reduce(
+                      (sum: number, item: PurchaseItem) =>
+                        sum + (Number(item.quantity) || 0),
+                      0
+                    )}
                   </p>
                 </div>
               </div>

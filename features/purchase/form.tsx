@@ -187,14 +187,19 @@ export default function PurchaseForm({
       });
   };
 
-  const updateItemTotal = (index: number) => {
-    const items = form.getValues('items');
-    const item = items[index];
-    const totalPrice = item.quantity * item.unitPrice;
-
-    const updatedItems = [...items];
-    updatedItems[index] = { ...item, totalPrice };
-    form.setValue('items', updatedItems);
+  // Replace one row with an updated copy (never mutate the form's objects in
+  // place) and keep its total in step, in a single form update.
+  const updateItem = (
+    index: number,
+    changes: Partial<FormValues['items'][number]>
+  ) => {
+    const current = form.getValues('items');
+    const next = current.map((row, i) => {
+      if (i !== index) return row;
+      const updated = { ...row, ...changes };
+      return { ...updated, totalPrice: updated.quantity * updated.unitPrice };
+    });
+    form.setValue('items', next, { shouldDirty: true });
   };
 
   const validateForm = (data: FormValues): boolean => {
@@ -546,12 +551,11 @@ export default function PurchaseForm({
                                     label: getMaterialDisplayName(material),
                                     imageUrl: material.imageUrl
                                   }))}
-                                  onChange={(newValue) => {
-                                    const newItems = [...field.value];
-                                    newItems[index].materialId =
-                                      newValue?.value || '';
-                                    field.onChange(newItems);
-                                  }}
+                                  onChange={(newValue) =>
+                                    updateItem(index, {
+                                      materialId: newValue?.value || ''
+                                    })
+                                  }
                                   value={
                                     item.materialId && selectedMaterial
                                       ? {
@@ -582,18 +586,17 @@ export default function PurchaseForm({
                                 <Input
                                   type='number'
                                   placeholder='Qty'
-                                  value={item.quantity}
+                                  min={1}
+                                  step={1}
+                                  value={item.quantity || ''}
+                                  // Scrolling the page over a focused number
+                                  // field silently changes its value.
+                                  onWheel={(e) => e.currentTarget.blur()}
                                   onChange={(e) => {
-                                    const newItems = [...field.value];
                                     const quantity = Number(e.target.value);
-                                    newItems[index].quantity = isNaN(quantity)
-                                      ? 0
-                                      : quantity;
-                                    newItems[index].totalPrice =
-                                      newItems[index].quantity *
-                                      newItems[index].unitPrice;
-                                    field.onChange(newItems);
-                                    updateItemTotal(index);
+                                    updateItem(index, {
+                                      quantity: isNaN(quantity) ? 0 : quantity
+                                    });
                                   }}
                                 />
                               </div>
@@ -604,17 +607,12 @@ export default function PurchaseForm({
                                   type='number'
                                   placeholder='Price'
                                   value={item.unitPrice}
+                                  onWheel={(e) => e.currentTarget.blur()}
                                   onChange={(e) => {
-                                    const newItems = [...field.value];
                                     const unitPrice = Number(e.target.value);
-                                    newItems[index].unitPrice = isNaN(unitPrice)
-                                      ? 0
-                                      : unitPrice;
-                                    newItems[index].totalPrice =
-                                      newItems[index].quantity *
-                                      newItems[index].unitPrice;
-                                    field.onChange(newItems);
-                                    updateItemTotal(index);
+                                    updateItem(index, {
+                                      unitPrice: isNaN(unitPrice) ? 0 : unitPrice
+                                    });
                                   }}
                                 />
                               </div>
@@ -699,7 +697,7 @@ export default function PurchaseForm({
                                   ...field.value,
                                   {
                                     materialId: '',
-                                    quantity: 1,
+                                    quantity: 0,
                                     unitPrice: 0,
                                     totalPrice: 0
                                   }
@@ -714,7 +712,11 @@ export default function PurchaseForm({
 
                         <div className='flex justify-between items-center'>
                           <div className='text-sm'>
-                            Total Products: {totalProducts}
+                            Materials: {totalProducts} · Total Quantity:{' '}
+                            {items.reduce(
+                              (sum, item) => sum + (Number(item.quantity) || 0),
+                              0
+                            )}
                           </div>
                           {allAvailableMaterials.length === 0 && field.value.length > 0 && (
                             <p className='text-sm text-yellow-600'>

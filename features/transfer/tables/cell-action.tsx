@@ -43,8 +43,11 @@ export const TransferCellAction: React.FC<TransferCellActionProps> = ({
       setOpen(false);
       router.refresh();
       toast.success('Transfer deleted successfully');
-    } catch {
-      toast.error('Error deleting transfer. Please try again.');
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ||
+          'Error deleting transfer. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
