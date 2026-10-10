@@ -9,6 +9,14 @@ import { useTableQueryParams } from "@/hooks/use-table-query-params";
 import { getdeliveryProjects } from "@/service/Stages";
 import { projectColumns } from "../Project/tables/columns";
 import { IProject } from "@/models/Projects";
+import { SellPaymentStatus } from "@/models/Sell";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ProjectListingPageProps = object;
 
@@ -21,6 +29,7 @@ export default function FinisheddeliveryProjectListingPage(
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<SellPaymentStatus | "all">("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -69,10 +78,14 @@ export default function FinisheddeliveryProjectListingPage(
   const filteredData = projects.filter((project) => {
     const searchLower = search.toLowerCase();
 
-    return (
+    const matchesSearch =
       project.invoice?.piNumber?.toLowerCase().includes(searchLower) ||
-      project.customer?.name?.toLowerCase().includes(searchLower)
-    );
+      project.customer?.name?.toLowerCase().includes(searchLower);
+
+    const matchesPaymentStatus =
+      paymentStatus === "all" || project.invoice?.paymentStatus === paymentStatus;
+
+    return matchesSearch && matchesPaymentStatus;
   });
 
   const startIndex = (page - 1) * limit;
@@ -81,10 +94,29 @@ export default function FinisheddeliveryProjectListingPage(
   const paginatedData = filteredData.slice(startIndex, endIndex);
 
   return (
-    <StageCardGrid
-      data={paginatedData}
-      totalItems={filteredData.length}
-      columns={projectColumns}
-    />
+    <div className="space-y-4">
+      <Select
+        value={paymentStatus}
+        onValueChange={(value) => setPaymentStatus(value as SellPaymentStatus | "all")}
+      >
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Payment Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Payment Status</SelectItem>
+          {Object.values(SellPaymentStatus).map((status) => (
+            <SelectItem key={status} value={status}>
+              {status}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <StageCardGrid
+        data={paginatedData}
+        totalItems={filteredData.length}
+        columns={projectColumns}
+      />
+    </div>
   );
 }

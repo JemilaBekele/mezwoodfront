@@ -65,8 +65,8 @@ export default function DeliveryProjectListingPage() {
 
   return (
     <div className="space-y-4">
-      <Tabs 
-        defaultValue="not-finished" 
+      <Tabs
+        value={activeStatus}
         onValueChange={(value) => handleStatusChange(value as DeliveryStatus)}
       >
         <TabsList>

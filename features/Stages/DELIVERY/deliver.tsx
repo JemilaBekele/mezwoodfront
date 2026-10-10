@@ -4,10 +4,30 @@
 import { useSearchParams } from 'next/navigation';
 import { StageCardGrid } from '@/features/Stages/stage-card-grid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, CalendarDays, CalendarClock, RefreshCw } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarClock, RefreshCw, CircleX, CircleDollarSign, CircleCheck } from 'lucide-react';
 import { IProject } from '@/models/Projects';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { SellPaymentStatus } from '@/models/Sell';
+
+type PaymentFilter = 'not-paid' | 'partially-paid' | 'fully-paid';
+
+// Get payment status from the project's invoice, or from the sell itself
+function getPaymentStatus(project: any): SellPaymentStatus | undefined {
+  return project.invoice?.paymentStatus ?? project.paymentStatus;
+}
+
+function matchesPaymentFilter(project: any, filter: PaymentFilter): boolean {
+  const status = getPaymentStatus(project);
+  switch (filter) {
+    case 'not-paid':
+      return status === SellPaymentStatus.PENDING || status === SellPaymentStatus.NONE;
+    case 'partially-paid':
+      return status === SellPaymentStatus.PARTIAL;
+    case 'fully-paid':
+      return status === SellPaymentStatus.PAID;
+  }
+}
 
 interface StageProjectListingProps {
   projects: IProject[];
@@ -136,11 +156,59 @@ export function StageProjectListing({
   const search = searchParams.get('q') || '';
   const limit = Number(searchParams.get('limit') || 20);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter | null>(null);
+
+  const paymentCounts = useMemo(
+    () => ({
+      'not-paid': projects.filter(p => matchesPaymentFilter(p, 'not-paid')).length,
+      'partially-paid': projects.filter(p => matchesPaymentFilter(p, 'partially-paid')).length,
+      'fully-paid': projects.filter(p => matchesPaymentFilter(p, 'fully-paid')).length
+    }),
+    [projects]
+  );
 
   const { todayProjects, tomorrowProjects, otherProjects } = useMemo(
-    () => categorizeProjects(projects, search),
-    [projects, search]
+    () =>
+      categorizeProjects(
+        paymentFilter ? projects.filter(p => matchesPaymentFilter(p, paymentFilter)) : projects,
+        search
+      ),
+    [projects, search, paymentFilter]
   );
+
+  const paymentBoxes: {
+    value: PaymentFilter;
+    label: string;
+    description: string;
+    icon: typeof CircleX;
+    iconClass: string;
+    activeClass: string;
+  }[] = [
+    {
+      value: 'not-paid',
+      label: 'Not Paid',
+      description: 'No payment received',
+      icon: CircleX,
+      iconClass: 'text-red-500',
+      activeClass: 'border-red-500 ring-2 ring-red-500/30'
+    },
+    {
+      value: 'partially-paid',
+      label: 'Partially Paid',
+      description: 'Partial payment received',
+      icon: CircleDollarSign,
+      iconClass: 'text-orange-500',
+      activeClass: 'border-orange-500 ring-2 ring-orange-500/30'
+    },
+    {
+      value: 'fully-paid',
+      label: 'Fully Paid',
+      description: 'Payment completed',
+      icon: CircleCheck,
+      iconClass: 'text-green-500',
+      activeClass: 'border-green-500 ring-2 ring-green-500/30'
+    }
+  ];
 
   const defaultTab = todayProjects.length > 0 ? 'today' : tomorrowProjects.length > 0 ? 'tomorrow' : 'other';
 
@@ -197,36 +265,25 @@ export function StageProjectListing({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-blue-500" />
-            <h3 className="font-medium">Today&apos;s Deliveries</h3>
-          </div>
-          <p className="mt-2 text-2xl font-bold">{todayProjects.length}</p>
-          <p className="text-xs text-muted-foreground">
-            {displayStageName} due today
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-orange-500" />
-            <h3 className="font-medium">Tomorrow&apos;s Deliveries</h3>
-          </div>
-          <p className="mt-2 text-2xl font-bold">{tomorrowProjects.length}</p>
-          <p className="text-xs text-muted-foreground">
-            {displayStageName} due tomorrow
-          </p>
-        </div>
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="h-5 w-5 text-purple-500" />
-            <h3 className="font-medium">Other Deliveries</h3>
-          </div>
-          <p className="mt-2 text-2xl font-bold">{otherProjects.length}</p>
-          <p className="text-xs text-muted-foreground">
-            {displayStageName} scheduled later
-          </p>
-        </div>
+        {paymentBoxes.map(({ value, label, description, icon: Icon, iconClass, activeClass }) => {
+          const isActive = paymentFilter === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPaymentFilter(isActive ? null : value)}
+              aria-pressed={isActive}
+              className={`rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/50 ${isActive ? activeClass : ''}`}
+            >
+              <div className="flex items-center gap-2">
+                <Icon className={`h-5 w-5 ${iconClass}`} />
+                <h3 className="font-medium">{label}</h3>
+              </div>
+              <p className="mt-2 text-2xl font-bold">{paymentCounts[value]}</p>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </button>
+          );
+        })}
       </div>
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
