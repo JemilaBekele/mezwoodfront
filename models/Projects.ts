@@ -99,6 +99,8 @@ export interface IProject {
 
   projectLogs?: IProjectLog[];
   stages?: IProjectStage[];
+  // List endpoint returns only the stage count, not the stages themselves
+  _count?: { stages: number };
 
   createdAt: string;
   updatedAt: string;

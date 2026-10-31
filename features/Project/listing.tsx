@@ -37,11 +37,12 @@ import {
   GanttChart,
   Trash2,
   Phone,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
-import { addNewRequestedDeliveryDate, deleteProject, getProjects } from "@/service/Project";
+import { addNewRequestedDeliveryDate, deleteProject, getProjects, type ProjectCounts } from "@/service/Project";
 import { AlertModal } from "@/components/modal/alert-modal";
 import {
   Dialog,
@@ -68,7 +69,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { IProject, ProjectStatus, DesignStatus, DifficultyLevel } from "@/models/Projects";
-import { IEmployee } from "@/models/employee";
 import * as XLSX from 'xlsx';
 
 type ProjectListingPageProps = object;
@@ -353,7 +353,7 @@ function ProjectCard({
   const items = project.invoice?.items || [];
   const viewUrl = `/dashboard/Project/view?id=${project.id}`;
   const canView = hasPermission(PERMISSIONS.PROJECT.VIEW.name);
-  const hasStages = !!project.stages && project.stages.length > 0;
+  const hasStages = (project._count?.stages ?? project.stages?.length ?? 0) > 0;
 
   return (
     <>
@@ -724,7 +724,10 @@ function ProjectCard({
 }
 
 // ─── Main Listing ───────────────────────────────────────────────
+// Every filter, the paging and the button counts are computed by the backend
+// (GET /projects). The page only renders what comes back.
 export default function ProjectListingPage({}: ProjectListingPageProps) {
+  const router = useRouter();
   const { page, search } = useTableQueryParams();
   const searchParams = useSearchParams();
   // Always show 20 projects per page (ignores ?limit=10 left in the URL by other tables/filters)
@@ -733,20 +736,55 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
   const designStatusFilter = searchParams.get("designStatus") || "all";
   const difficultyFilter = searchParams.get("difficulty") || "all";
   const designerFilter = searchParams.get("designer") || "all";
-  
+
   // ── Date filters ──────────────────────────────────────────────
   const startDateParam = searchParams.get("startDate");
   const endDateParam = searchParams.get("endDate");
   const startDate = startDateParam ? new Date(startDateParam) : null;
   const endDate = endDateParam ? new Date(endDateParam) : null;
 
+  // ── Debounced search: wait until typing pauses before calling the API ──
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const [projects, setProjects] = useState<IProject[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [counts, setCounts] = useState<ProjectCounts | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState<"status" | "design" | "difficulty">("status");
   const [exporting, setExporting] = useState(false);
-  const [designers, setDesigners] = useState<IEmployee[]>([]);
+  const [designers, setDesigners] = useState<{ id: string; name: string }[]>([]);
+
+  // ── Filters as API query params ───────────────────────────────
+  // Dates cover whole days in the user's timezone: From = 00:00, To = 23:59:59.
+  const filterParams = useMemo(() => {
+    const toIso = (value: string | null, endOfDay: boolean) => {
+      if (!value) return undefined;
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return undefined;
+      if (endOfDay) date.setHours(23, 59, 59, 999);
+      else date.setHours(0, 0, 0, 0);
+      return date.toISOString();
+    };
+    return {
+      search: debouncedSearch.trim() || undefined,
+      status: statusFilter !== "all" ? (statusFilter as ProjectStatus) : undefined,
+      designStatus: designStatusFilter !== "all" ? (designStatusFilter as DesignStatus) : undefined,
+      difficulty: difficultyFilter !== "all" ? (difficultyFilter as DifficultyLevel) : undefined,
+      designById: designerFilter !== "all" ? designerFilter : undefined,
+      startDate: toIso(startDateParam, false),
+      endDate: toIso(endDateParam, true),
+      sortBy: "requestedDelivery",
+      sortOrder: "asc" as const,
+    };
+  }, [debouncedSearch, statusFilter, designStatusFilter, difficultyFilter, designerFilter, startDateParam, endDateParam]);
 
   // ── Load Projects ──
   useEffect(() => {
@@ -757,27 +795,25 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
         setLoading(true);
         setError(null);
 
-        // Don't send search to API - we'll handle it client-side
-        const response = await getProjects();
+        const response = await getProjects({ ...filterParams, page, limit });
 
         if (cancelled) return;
 
-        setProjects(response.projects || []);
-        setTotalCount(response.totalCount || 0);
-        
-        // Extract unique designers from projects
-        const uniqueDesigners = response.projects
-          ?.filter((p: IProject) => p.designBy)
-          .map((p: IProject) => p.designBy as IEmployee)
-          .filter((designer: IEmployee, index: number, self: IEmployee[]) => 
-            self.findIndex((d: IEmployee) => d.id === designer.id) === index
-          ) || [];
-        setDesigners(uniqueDesigners);
-      } catch (err) {
+        setProjects(response.projects);
+        setTotalCount(response.total);
+        setTotalPages(response.totalPages);
+        setCounts(response.counts ?? null);
+        setDesigners(response.designers);
+        setHasLoaded(true);
+      } catch (err: any) {
         console.error("Error loading projects:", err);
 
         if (!cancelled) {
-          setError("Error loading projects. Please try again later.");
+          setError(
+            err?.code === "ECONNABORTED"
+              ? "The server took too long to respond while loading projects."
+              : "Could not load projects. Please check your connection and try again."
+          );
         }
       } finally {
         if (!cancelled) {
@@ -791,78 +827,34 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [page, limit]);
+  }, [filterParams, page, limit, reloadKey]);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  // ── Helpers ──────────────────────────────────────────────────
+  const getStatusDisplayText = useCallback((status: string): string => {
+    return PROJECT_STATUS_CONFIG[status as ProjectStatus]?.label || status || "Unknown";
+  }, []);
+
+  const getDesignStatusDisplayText = useCallback((status: string): string => {
+    return DESIGN_STATUS_CONFIG[status as DesignStatus]?.label || status || "None";
+  }, []);
+
+  const getDifficultyDisplayText = useCallback((level: string): string => {
+    return DIFFICULTY_CONFIG[level as DifficultyLevel]?.label || level || "None";
+  }, []);
 
   // ── Export Projects ──────────────────────────────────────────
+  // Fetches every project matching the current filters from the backend —
+  // not just the page on screen.
   const handleExport = async () => {
     try {
       setExporting(true);
-      
-      // Get filtered data based on current filters
-      const filteredProjects = projects.filter((project) => {
-        // Status filter
-        if (statusFilter !== "all" && project.status !== statusFilter) return false;
-        
-        // Design status filter
-        if (designStatusFilter !== "all" && project.designStatus !== designStatusFilter) return false;
-        
-        // Difficulty filter
-        if (difficultyFilter !== "all" && project.difficulty !== difficultyFilter) return false;
-        
-        // Designer filter
-        if (designerFilter !== "all" && project.designById !== designerFilter) return false;
-        
-        // Date range filter - filter by createdAt
-        if (startDate || endDate) {
-          const projectDate = project.createdAt ? new Date(project.createdAt) : null;
-          if (!projectDate) return false;
-          
-          // Set time to start of day for proper comparison
-          if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            if (projectDate < start) return false;
-          }
-          
-          if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            if (projectDate > end) return false;
-          }
-        }
-        
-        // Search filter
-        if (search) {
-          const s = search.toLowerCase().trim();
-          if (s === '') return true;
-          
-                   const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
-          const customerName = project.customer?.name || '';
-          const customerPhone1 = project.customer?.phone1 || '';
-          const customerPhone2 = project.customer?.phone2 || '';
-          const statusText = getStatusDisplayText(project.status);
-          const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
-          const difficultyText = getDifficultyDisplayText(project.difficulty);
-          const designerName = project.designBy?.name || '';
-          
-          const match =
-            String(invoiceNumber).toLowerCase().includes(s) ||
-            String(customerName).toLowerCase().includes(s) ||
-            String(customerPhone1).toLowerCase().includes(s) ||
-            String(customerPhone2).toLowerCase().includes(s) ||
-            statusText.toLowerCase().includes(s) ||
-            designStatusText.toLowerCase().includes(s) ||
-            difficultyText.toLowerCase().includes(s) ||
-            designerName.toLowerCase().includes(s);
-          
-          if (!match) return false;
-        }
-        
-        return true;
-      });
+
+      const { projects: filteredProjects } = await getProjects({ ...filterParams, all: true });
 
       if (filteredProjects.length === 0) {
-        setError("No projects to export. Please adjust your filters.");
+        toast.error("No projects to export. Please adjust your filters.");
         return;
       }
 
@@ -886,14 +878,14 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       // Create workbook
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
-      
+
       // Auto-size columns (optional)
       const maxWidth = 20;
       const wscols = Object.keys(exportData[0] || {}).map(() => ({ wch: maxWidth }));
       worksheet['!cols'] = wscols;
 
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Projects');
-      
+
       // Generate file and download
       const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -905,27 +897,14 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
     } catch (err) {
       console.error("Error exporting projects:", err);
-      setError("Failed to export projects. Please try again.");
+      toast.error("Failed to export projects. Please try again.");
     } finally {
       setExporting(false);
     }
   };
-
-  // ── Helpers ──────────────────────────────────────────────────
-  const getStatusDisplayText = useCallback((status: string): string => {
-    return PROJECT_STATUS_CONFIG[status as ProjectStatus]?.label || status || "Unknown";
-  }, []);
-
-  const getDesignStatusDisplayText = useCallback((status: string): string => {
-    return DESIGN_STATUS_CONFIG[status as DesignStatus]?.label || status || "None";
-  }, []);
-
-  const getDifficultyDisplayText = useCallback((level: string): string => {
-    return DIFFICULTY_CONFIG[level as DifficultyLevel]?.label || level || "None";
-  }, []);
 
   const buildQueryStringLocal = useCallback(
     (params: { status?: string; designStatus?: string; difficulty?: string; designer?: string; page?: string }) => {
@@ -937,11 +916,11 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       urlParams.set("designStatus", params.designStatus || designStatusFilter);
       urlParams.set("difficulty", params.difficulty || difficultyFilter);
       urlParams.set("designer", params.designer || designerFilter);
-      
+
       // Preserve date filters
       if (startDateParam) urlParams.set("startDate", startDateParam);
       if (endDateParam) urlParams.set("endDate", endDateParam);
-      
+
       return `?${urlParams.toString()}`;
     },
     [search, limit, statusFilter, designStatusFilter, difficultyFilter, designerFilter, startDateParam, endDateParam]
@@ -956,117 +935,25 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     [buildQueryStringLocal]
   );
 
-  // ── Loading & Error ──────────────────────────────────────────
-  if (loading) {
+  // ── Error box with Retry ─────────────────────────────────────
+  const errorBox = error && (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 py-10 text-center dark:border-red-800/40 dark:bg-red-950/20">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
+      <Button variant="outline" size="sm" onClick={retry} disabled={loading} className="gap-2">
+        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        Retry
+      </Button>
+    </div>
+  );
+
+  // ── Loading & Error (first load) ─────────────────────────────
+  if (!hasLoaded) {
+    if (error) return errorBox;
     return <DataTableSkeleton columnCount={8} rowCount={8} filterCount={3} />;
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/40 dark:bg-red-950/20">
-        <AlertCircle className="h-4 w-4 text-red-500" />
-        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-      </div>
-    );
-  }
-
-  // ── Client-side filtering ──────────────────────────────────
-  const filteredData = projects.filter((project) => {
-    // Search filter - client side
-    if (search) {
-      const s = search.toLowerCase().trim();
-      if (s === '') return true;
-      
-      const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
-      const customerName = project.customer?.name || '';
-      const customerPhone1 = project.customer?.phone1 || project.invoice?.customer?.phone1 || '';
-      const customerPhone2 = project.customer?.phone2 || project.invoice?.customer?.phone2 || '';
-      const statusText = getStatusDisplayText(project.status);
-      const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
-      const difficultyText = getDifficultyDisplayText(project.difficulty);
-      const designerName = project.designBy?.name || ''; 
-      const match =
-        String(invoiceNumber).toLowerCase().includes(s) ||
-        String(customerName).toLowerCase().includes(s) ||
-        String(customerPhone1).toLowerCase().includes(s) ||
-        String(customerPhone2).toLowerCase().includes(s) ||
-        statusText.toLowerCase().includes(s) ||
-        designStatusText.toLowerCase().includes(s) ||
-        difficultyText.toLowerCase().includes(s) ||
-        designerName.toLowerCase().includes(s);
-
-      if (!match) return false;
-    }
-
-    // Status filter
-    if (statusFilter !== "all" && project.status !== statusFilter) return false;
-
-    // Design status filter
-    if (designStatusFilter !== "all" && project.designStatus !== designStatusFilter) return false;
-
-    // Difficulty filter
-    if (difficultyFilter !== "all" && project.difficulty !== difficultyFilter) return false;
-
-    // Designer filter
-    if (designerFilter !== "all" && project.designById !== designerFilter) return false;
-
-    // ── Date range filter ──────────────────────────────────────
-    if (startDate || endDate) {
-      const projectDate = project.createdAt ? new Date(project.createdAt) : null;
-      if (!projectDate) return false;
-      
-      // Set time to start of day for proper comparison
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        if (projectDate < start) return false;
-      }
-      
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        if (projectDate > end) return false;
-      }
-    }
-
-    return true;
-  });
-
-  // ── Counts ──────────────────────────────────────────────────
-  const statusCounts = Object.keys(PROJECT_STATUS_CONFIG).reduce(
-    (acc, statusKey) => {
-      acc[statusKey as ProjectStatus] = projects.filter(
-        (p) => p.status === statusKey
-      ).length;
-      return acc;
-    },
-    {} as Record<ProjectStatus, number>
-  );
-
-  const designStatusCounts = Object.keys(DESIGN_STATUS_CONFIG).reduce(
-    (acc, statusKey) => {
-      acc[statusKey as DesignStatus] = projects.filter(
-        (p) => p.designStatus === statusKey
-      ).length;
-      return acc;
-    },
-    {} as Record<DesignStatus, number>
-  );
-
-  const difficultyCounts = Object.keys(DIFFICULTY_CONFIG).reduce(
-    (acc, levelKey) => {
-      acc[levelKey as DifficultyLevel] = projects.filter(
-        (p) => p.difficulty === levelKey
-      ).length;
-      return acc;
-    },
-    {} as Record<DifficultyLevel, number>
-  );
-
-  const total = projects.length;
-  const filteredCount = filteredData.length;
-  const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
-  const totalPages = Math.ceil(filteredCount / limit);
+  const total = counts?.all ?? 0;
   const hasFilter = statusFilter !== "all" || designStatusFilter !== "all" || difficultyFilter !== "all" || designerFilter !== "all" || !!startDate || !!endDate;
 
   // ── Get counts for tab badges ──────────────────────────────
@@ -1076,7 +963,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       design: designStatusFilter,
       difficulty: difficultyFilter,
     }[tabKey];
-    
+
     if (filterValue !== "all") {
       const label = {
         status: getStatusDisplayText(filterValue),
@@ -1091,10 +978,10 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
   // ── Format date for display ──────────────────────────────────
   const formatDateDisplay = (date: Date | null): string => {
     if (!date) return '';
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -1109,8 +996,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
             <Select
               value={designerFilter}
               onValueChange={(value) => {
-                const url = buildFilterUrl("designer", value);
-                window.location.href = url;
+                router.push(buildFilterUrl("designer", value));
               }}
             >
               <SelectTrigger className="w-45">
@@ -1118,23 +1004,22 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Designers</SelectItem>
-                {designers.map((designer) => {
-                  const designerId = designer.id ?? designer.name ?? "unknown-designer";
-
-                  return (
-                    <SelectItem key={designerId} value={designerId}>
-                      {designer.name}
-                    </SelectItem>
-                  );
-                })}
+                {designers.map((designer) => (
+                  <SelectItem key={designer.id} value={designer.id}>
+                    {designer.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
+          {loading && (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Loading" />
+          )}
         </div>
-        
+
         <Button
           onClick={handleExport}
-          disabled={exporting || projects.length === 0}
+          disabled={exporting || totalCount === 0}
           variant="outline"
           size="sm"
           className="flex items-center gap-2"
@@ -1149,9 +1034,9 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────── */}
-      <Tabs 
-        defaultValue="status" 
-        value={activeTab} 
+      <Tabs
+        defaultValue="status"
+        value={activeTab}
         onValueChange={(value) => setActiveTab(value as "status" | "design" | "difficulty")}
         className="w-full"
       >
@@ -1188,7 +1073,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
               <StatusPill
                 key={statusKey}
                 label={config.label}
-                count={statusCounts[statusKey as ProjectStatus] || 0}
+                count={counts?.status[statusKey as ProjectStatus] ?? 0}
                 icon={config.icon}
                 color={config.color}
                 selected={statusFilter === statusKey}
@@ -1213,7 +1098,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
               <StatusPill
                 key={statusKey}
                 label={config.label}
-                count={designStatusCounts[statusKey as DesignStatus] || 0}
+                count={counts?.designStatus[statusKey as DesignStatus] ?? 0}
                 icon={config.icon}
                 color={config.color}
                 selected={designStatusFilter === statusKey}
@@ -1238,7 +1123,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
               <StatusPill
                 key={levelKey}
                 label={config.label}
-                count={difficultyCounts[levelKey as DifficultyLevel] || 0}
+                count={counts?.difficulty[levelKey as DifficultyLevel] ?? 0}
                 icon={config.icon}
                 color={config.color}
                 selected={difficultyFilter === levelKey}
@@ -1271,7 +1156,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
             )}
             {designerFilter !== "all" && (
               <Badge variant="secondary" className="flex items-center gap-1 text-xs">
-                Designer: {projects.find(p => p.designById === designerFilter)?.designBy?.name || designerFilter}
+                Designer: {designers.find((d) => d.id === designerFilter)?.name || designerFilter}
               </Badge>
             )}
             {startDate && (
@@ -1285,7 +1170,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">
-              ({filteredCount} results)
+              ({totalCount} results)
             </span>
           </div>
           <Link
@@ -1298,8 +1183,10 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
         </div>
       )}
 
-      {/* ── Empty States ──────────────────────────────────────── */}
-      {filteredData.length === 0 && !search && !hasFilter ? (
+      {/* ── Error / Empty States ──────────────────────────────── */}
+      {error ? (
+        errorBox
+      ) : totalCount === 0 && !search && !hasFilter ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
             <FolderOpen className="h-8 w-8 text-muted-foreground/60" />
@@ -1309,7 +1196,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
             Projects will appear here once created from approved proforma invoices.
           </p>
         </div>
-      ) : filteredData.length === 0 && (search || hasFilter) ? (
+      ) : totalCount === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
           <AlertCircle className="h-8 w-8 text-muted-foreground/40" />
           <p className="mt-3 text-sm font-medium">No matching projects</p>
@@ -1318,18 +1205,18 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
           </p>
         </div>
       ) : (
-        <>
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredCount > 0 ? (page - 1) * limit + 1 : 0}-
-            {Math.min(page * limit, filteredCount)} of {filteredCount} projects
+        <div className={loading ? "pointer-events-none opacity-60 transition-opacity" : "transition-opacity"}>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Showing {totalCount > 0 ? (page - 1) * limit + 1 : 0}-
+            {Math.min(page * limit, totalCount)} of {totalCount} projects
           </p>
 
           <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {paginatedData.map((project) => (
+            {projects.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
-                onDeleted={(id) => setProjects((prev) => prev.filter((p) => p.id !== id))}
+                onDeleted={retry}
                 onUpdated={(id, changes) =>
                   setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...changes } : p)))
                 }
@@ -1338,7 +1225,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-6">
               {page > 1 ? (
                 <Button variant="outline" asChild>
                   <Link href={buildQueryStringLocal({ page: String(page - 1) })}>Previous</Link>
@@ -1366,7 +1253,7 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
               )}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

@@ -41,54 +41,82 @@ interface ProjectStatisticsResponse {
 
 // ========================= PROJECTS ========================= //
 
-// Get all projects (with filtering & pagination)
-export const getProjects = async (params?: {
+// Per-button totals, computed by the backend over the search/date/designer
+// filters (not the selected button). `none` = projects with no value set.
+export interface ProjectCounts {
+  all: number;
+  status: Record<ProjectStatus | 'none', number>;
+  designStatus: Record<DesignStatus | 'none', number>;
+  difficulty: Record<DifficultyLevel | 'none', number>;
+}
+
+interface ProjectListResponse {
+  success: boolean;
+  projects: IProject[];
+  total: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+  counts?: ProjectCounts;
+  designers?: { id: string; name: string }[];
+}
+
+export interface ProjectListParams {
+  page?: number;
+  limit?: number;
   startDate?: string;
   endDate?: string;
-
   search?: string;
   status?: ProjectStatus;
+  designStatus?: DesignStatus;
+  difficulty?: DifficultyLevel;
   customerId?: string;
-  designById?:string;
+  designById?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-}) => {
-  try {
-    const response = await axiosInstance.get<ProjectsResponse>(`/projects`, {
-      params: {
-     
-        search: params?.search || '',
-        status: params?.status,
-        customerId: params?.customerId,
-        designById: params?.designById,
-        sortBy: params?.sortBy || 'createdAt',
-        sortOrder: params?.sortOrder || 'desc',
-        startDate: params?.startDate,
-        endDate: params?.endDate
-      }
-    });
+  // Every matching project, no paging (Excel export)
+  all?: boolean;
+}
 
-    const projects = response?.data?.projects ?? [];
-    return {
-      projects,
-      totalCount: response?.data?.count ?? projects.length,
+// Get projects — all filtering, paging and counting happens on the backend.
+// Errors are thrown (not turned into an empty list) so the page can tell
+// "request failed" apart from "no projects".
+export const getProjects = async (params: ProjectListParams = {}) => {
+  const response = await axiosInstance.get<ProjectListResponse>(`/projects`, {
+    params: {
+      page: params.page,
+      limit: params.limit,
+      search: params.search || undefined,
+      status: params.status,
+      designStatus: params.designStatus,
+      difficulty: params.difficulty,
+      customerId: params.customerId,
+      designById: params.designById,
+      sortBy: params.sortBy || 'createdAt',
+      sortOrder: params.sortOrder || 'desc',
+      startDate: params.startDate,
+      endDate: params.endDate,
+      all: params.all ? 'true' : undefined
+    }
+  });
 
-      success: response?.data?.success ?? false
-    };
-  } catch (error) {
-    console.error('Error fetching projects:', error);
-    return {
-      projects: [] as IProject[],
-      totalCount: 0,
-      success: false
-    };
-  }
+  const data = response.data;
+  return {
+    projects: data.projects ?? [],
+    total: data.total ?? 0,
+    page: data.page ?? 1,
+    totalPages: data.totalPages ?? 1,
+    counts: data.counts,
+    designers: data.designers ?? []
+  };
 };
 
-// Get projects (server-side / SSR)
+// All projects with their stages (all-projects Gantt chart)
 export const getProjectsSSR = async () => {
   try {
-    const response = await axiosInstance.get<ProjectsResponse>(`/projects`);
+    const response = await axiosInstance.get<ProjectsResponse>(
+      `/projects/all/gantt`
+    );
     return response.data.projects;
   } catch (error) {
     throw error;
