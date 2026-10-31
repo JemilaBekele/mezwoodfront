@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,7 +37,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
-import { deleteProformaInvoice, getAllProformaInvoices } from "@/service/ProformaInvoice";
+import {
+  deleteProformaInvoice,
+  listProformaInvoices,
+  ProformaInvoiceListResponse,
+} from "@/service/ProformaInvoice";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,7 +53,10 @@ import { normalizeImagePath } from "@/lib/norm";
 import { IProformaInvoice, IProformaInvoiceBank, PIStatus } from "@/models/ProformaInvoice";
 import { RecordPaymentModal } from "./record-payment-modal";
 
-type ProformaInvoiceListingPageProps = object;
+type ProformaInvoiceListingPageProps = {
+  // My PI page: only invoices prepared by the current user
+  mine?: boolean;
+};
 
 // ─── Compact Status Pill ────────────────────────────────────────
 function StatusPill({
@@ -197,8 +203,14 @@ export function ProformaInvoiceCard({
     }
   };
 
-  // All PI item images (IProformaInvoiceItemImage), captioned with the item description
+  // All PI item images (IProformaInvoiceItemImage), captioned with the item description.
+  // The paginated list sends them ready-made in `invoice.images`.
   const images = useMemo(() => {
+    if (invoice.images) {
+      return invoice.images
+        .map((img) => ({ url: normalizeImagePath(img.url), label: img.label }))
+        .filter((img): img is { url: string; label: string } => Boolean(img.url));
+    }
     const list: { url: string; label: string }[] = [];
     (invoice.items || []).forEach((piItem) => {
       const label = piItem.itemname || piItem.item?.name || piItem.description || "";
@@ -208,9 +220,10 @@ export function ProformaInvoiceCard({
       });
     });
     return list;
-  }, [invoice.items]);
+  }, [invoice.images, invoice.items]);
 
   const hasMultipleImages = images.length > 1;
+  const imageCount = invoice.imageCount ?? images.length;
 
   useEffect(() => {
     if (!isHovering || !hasMultipleImages) return;
@@ -256,6 +269,7 @@ export function ProformaInvoiceCard({
     cls: "bg-muted text-muted-foreground",
   };
   const items = invoice.items || [];
+  const itemsCount = invoice.itemsCount ?? items.length;
   const balance = Number(invoice.balance ?? 0);
   const viewUrl = `/dashboard/ProformaInvoice/view?id=${invoice.id}`;
   const canView = hasPermission(PERMISSIONS.PROFORMA_INVOICE.VIEW.name);
@@ -316,9 +330,9 @@ export function ProformaInvoiceCard({
                       }`}
                     />
                   ))}
-                  {images.length > 10 && (
+                  {imageCount > 10 && (
                     <span className="text-[10px] font-medium leading-none text-white">
-                      +{images.length - 10}
+                      +{imageCount - 10}
                     </span>
                   )}
                 </div>
@@ -429,8 +443,8 @@ export function ProformaInvoiceCard({
                   <span className="shrink-0 tabular-nums">x{piItem.quantity}</span>
                 </div>
               ))}
-              {items.length > 3 && (
-                <p className="text-xs text-muted-foreground">+{items.length - 3} more items</p>
+              {itemsCount > 3 && (
+                <p className="text-xs text-muted-foreground">+{itemsCount - 3} more items</p>
               )}
             </div>
           )}
@@ -570,50 +584,69 @@ export function ProformaInvoiceCard({
 }
 
 // ─── Main Listing ───────────────────────────────────────────────
-export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPageProps) {
+// Filters live in the URL. The API does the filtering, counting and paging;
+// this component only shows one page and the counts it gets back.
+export default function ProformaInvoiceListingPage({ mine = false }: ProformaInvoiceListingPageProps) {
   const { page, search, startDate, endDate } = useTableQueryParams();
   const searchParams = useSearchParams();
   // Always show 20 PIs per page (ignores ?limit=10 left in the URL by other tables/filters)
   const limit = 20;
   const paymentStatusFilter = searchParams.get("paymentStatus") || "all";
   const statusFilter = searchParams.get("status") || "all";
-  const [invoicesData, setInvoicesData] = useState<any[]>([]);
+  const searchTerm = search.trim();
+  const [result, setResult] = useState<ProformaInvoiceListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const lastSearchRef = useRef(searchTerm);
+
+  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
+    // While typing in the search box, wait until the user pauses
+    const delay = searchTerm !== lastSearchRef.current ? 400 : 0;
 
-    const loadInvoices = async () => {
+    const timer = setTimeout(async () => {
+      lastSearchRef.current = searchTerm;
       try {
         setLoading(true);
         setError(null);
 
-        const { proformaInvoices } = await getAllProformaInvoices({
-        
-          search,
-        });
+        const res = await listProformaInvoices(
+          {
+            page,
+            limit,
+            search: searchTerm || undefined,
+            from: startDate,
+            to: endDate,
+            paymentStatus: paymentStatusFilter,
+            status: statusFilter,
+          },
+          mine
+        );
 
-        if (cancelled) return;
-        setInvoicesData(proformaInvoices || []);
+        if (!cancelled) setResult(res);
       } catch {
         if (!cancelled) {
-          setError("Error loading proforma invoices. Please try again later.");
+          setError("Error loading proforma invoices. Please try again.");
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
-    };
+    }, delay);
 
-    loadInvoices();
-    return () => { cancelled = true; };
-  }, [endDate, limit, page, search, startDate]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [endDate, limit, mine, page, paymentStatusFilter, reloadKey, searchTerm, startDate, statusFilter]);
 
   // ── Helpers ──────────────────────────────────────────────────
   const getPaymentStatusDisplayText = useCallback((status: string): string => {
     const map: Record<string, string> = {
       PENDING: "Pending", PARTIAL: "Partial", PAID: "Paid",
-      CANCELLED: "Cancelled", NONE: "None",
+      CANCELLED: "Cancelled", NONE: "Stock",
     };
     return map[status] || "Unknown";
   }, []);
@@ -656,78 +689,28 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
     [buildQueryStringLocal]
   );
 
-  // ── Loading & Error ──────────────────────────────────────────
-  if (loading) {
-    return <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />;
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/40 dark:bg-red-950/20">
+  const errorBox = error && (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/40 dark:bg-red-950/20">
+      <div className="flex items-center gap-2">
         <AlertCircle className="h-4 w-4 text-red-500" />
         <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
       </div>
-    );
+      <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
+        <RefreshCw className={`mr-1 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        Retry
+      </Button>
+    </div>
+  );
+
+  // ── First load & Error ───────────────────────────────────────
+  if (!result) {
+    return errorBox || <DataTableSkeleton columnCount={6} rowCount={8} filterCount={2} />;
   }
 
-  // ── Data ─────────────────────────────────────────────────────
-   const filteredData = invoicesData.filter((item) => {
-    // Search filter
-    if (search) {
-      const s = search.toLowerCase().trim();
-      if (s === '') return true;
-
-      const piNumber = item.piNumber || '';
-      const customerName = item.customer?.name || '';
-      const customerPhone1 = item.customer?.phone1 || '';
-      const customerPhone2 = item.customer?.phone2 || '';
-      const paymentStatusText = getPaymentStatusDisplayText(item.paymentStatus);
-      const statusText = getStatusDisplayText(item.status);
-
-      const match =
-        String(piNumber).toLowerCase().includes(s) ||
-        String(customerName).toLowerCase().includes(s) ||
-        String(customerPhone1).toLowerCase().includes(s) ||
-        String(customerPhone2).toLowerCase().includes(s) ||
-        paymentStatusText.toLowerCase().includes(s) ||
-        statusText.toLowerCase().includes(s);
-
-      if (!match) return false;
-    }
-    
-    // Payment status filter
-    if (paymentStatusFilter !== "all" && item.paymentStatus !== paymentStatusFilter) return false;
-    
-    // Status filter
-    if (statusFilter !== "all" && item.status !== statusFilter) return false;
-    
-    return true;
-  });
-
-  // ── Counts ──────────────────────────────────────────────────
-  const paymentStatusCounts = {
-    PENDING: invoicesData.filter((i) => i.paymentStatus === "PENDING").length,
-    PARTIAL: invoicesData.filter((i) => i.paymentStatus === "PARTIAL").length,
-    PAID: invoicesData.filter((i) => i.paymentStatus === "PAID").length,
-    CANCELLED: invoicesData.filter((i) => i.paymentStatus === "CANCELLED").length,
-    NONE: invoicesData.filter((i) => i.paymentStatus === "NONE").length,
-  };
-
-  const statusCounts = {
-    PENDING_ST: invoicesData.filter((i) => i.status === "PENDING_ST").length,
-    APPROVED_ST: invoicesData.filter((i) => i.status === "APPROVED_ST").length,
-    SENT_TO_CLIENT: invoicesData.filter((i) => i.status === "SENT_TO_CLIENT").length,
-    REVISION: invoicesData.filter((i) => i.status === "REVISION").length,
-    APPROVED_CLIENT: invoicesData.filter((i) => i.status === "APPROVED_CLIENT").length,
-    APPROVED_CREATE_PROJECT: invoicesData.filter((i) => i.status === "APPROVED_CREATE_PROJECT").length,
-    CANCELLED: invoicesData.filter((i) => i.status === "CANCELLED").length,
-  };
-
-  const total = invoicesData.length;
-  const filteredCount = filteredData.length;
-  const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
-  const totalPages = Math.ceil(filteredCount / limit);
+  // ── Data (filtered, counted and paginated by the API) ────────
+  const { data: invoices, total, totalPages, counts } = result;
   const hasFilter = paymentStatusFilter !== "all" || statusFilter !== "all";
+  const hasAnyFilter = hasFilter || Boolean(searchTerm || startDate || endDate);
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -736,53 +719,53 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
       <div className="space-y-2">
         <StatusRowHeader title="Payment Status" icon={CircleDollarSign} />
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill 
-            label="All" 
-            count={total} 
-            icon={Layers} 
+          <StatusPill
+            label="All"
+            count={counts.payment.all}
+            icon={Layers}
             color="slate"
-            selected={paymentStatusFilter === "all" && statusFilter === "all"} 
-            href={buildQueryStringLocal({ paymentStatus: "all", status: "all", page: "1" })} 
+            selected={paymentStatusFilter === "all"}
+            href={buildPaymentStatusFilterUrl("all")}
           />
-          <StatusPill 
-            label="Pending" 
-            count={paymentStatusCounts.PENDING} 
-            icon={Clock} 
+          <StatusPill
+            label="Pending"
+            count={counts.payment.pending}
+            icon={Clock}
             color="amber"
-            selected={paymentStatusFilter === "PENDING"} 
-            href={buildPaymentStatusFilterUrl("PENDING")} 
+            selected={paymentStatusFilter === "PENDING"}
+            href={buildPaymentStatusFilterUrl("PENDING")}
           />
-          <StatusPill 
-            label="Partial" 
-            count={paymentStatusCounts.PARTIAL} 
-            icon={CreditCard} 
+          <StatusPill
+            label="Partial"
+            count={counts.payment.partial}
+            icon={CreditCard}
             color="orange"
-            selected={paymentStatusFilter === "PARTIAL"} 
-            href={buildPaymentStatusFilterUrl("PARTIAL")} 
+            selected={paymentStatusFilter === "PARTIAL"}
+            href={buildPaymentStatusFilterUrl("PARTIAL")}
           />
-          <StatusPill 
-            label="Paid" 
-            count={paymentStatusCounts.PAID} 
-            icon={CircleDollarSign} 
+          <StatusPill
+            label="Paid"
+            count={counts.payment.paid}
+            icon={CircleDollarSign}
             color="emerald"
-            selected={paymentStatusFilter === "PAID"} 
-            href={buildPaymentStatusFilterUrl("PAID")} 
+            selected={paymentStatusFilter === "PAID"}
+            href={buildPaymentStatusFilterUrl("PAID")}
           />
-          <StatusPill 
-            label="Cancelled" 
-            count={paymentStatusCounts.CANCELLED} 
-            icon={Ban} 
+          <StatusPill
+            label="Cancelled"
+            count={counts.payment.cancelled}
+            icon={Ban}
             color="red"
-            selected={paymentStatusFilter === "CANCELLED"} 
-            href={buildPaymentStatusFilterUrl("CANCELLED")} 
+            selected={paymentStatusFilter === "CANCELLED"}
+            href={buildPaymentStatusFilterUrl("CANCELLED")}
           />
-          <StatusPill 
-            label="Stock" 
-            count={paymentStatusCounts.NONE} 
-            icon={AlertCircle} 
+          <StatusPill
+            label="Stock"
+            count={counts.payment.none}
+            icon={AlertCircle}
             color="violet"
-            selected={paymentStatusFilter === "NONE"} 
-            href={buildPaymentStatusFilterUrl("NONE")} 
+            selected={paymentStatusFilter === "NONE"}
+            href={buildPaymentStatusFilterUrl("NONE")}
           />
         </div>
       </div>
@@ -791,69 +774,69 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
       <div className="space-y-2">
         <StatusRowHeader title="Document Status" icon={FileCheck} />
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill 
-            label="All" 
-            count={total} 
-            icon={Layers} 
+          <StatusPill
+            label="All"
+            count={counts.document.all}
+            icon={Layers}
             color="slate"
-            selected={statusFilter === "all" && paymentStatusFilter === "all"} 
-            href={buildQueryStringLocal({ status: "all", paymentStatus: "all", page: "1" })} 
+            selected={statusFilter === "all"}
+            href={buildStatusFilterUrl("all")}
           />
-          <StatusPill 
-            label="Pending" 
-            count={statusCounts.PENDING_ST} 
-            icon={Loader2} 
+          <StatusPill
+            label="Pending"
+            count={counts.document.pending}
+            icon={Loader2}
             color="amber"
-            selected={statusFilter === "PENDING_ST"} 
-            href={buildStatusFilterUrl("PENDING_ST")} 
+            selected={statusFilter === "PENDING_ST"}
+            href={buildStatusFilterUrl("PENDING_ST")}
           />
-          <StatusPill 
-            label="Approved ST" 
-            count={statusCounts.APPROVED_ST} 
-            icon={Check} 
+          <StatusPill
+            label="Approved ST"
+            count={counts.document.approvedSt}
+            icon={Check}
             color="blue"
-            selected={statusFilter === "APPROVED_ST"} 
-            href={buildStatusFilterUrl("APPROVED_ST")} 
+            selected={statusFilter === "APPROVED_ST"}
+            href={buildStatusFilterUrl("APPROVED_ST")}
           />
-          <StatusPill 
-            label="Sent to Client" 
-            count={statusCounts.SENT_TO_CLIENT} 
-            icon={Send} 
+          <StatusPill
+            label="Sent to Client"
+            count={counts.document.sentToClient}
+            icon={Send}
             color="purple"
-            selected={statusFilter === "SENT_TO_CLIENT"} 
-            href={buildStatusFilterUrl("SENT_TO_CLIENT")} 
+            selected={statusFilter === "SENT_TO_CLIENT"}
+            href={buildStatusFilterUrl("SENT_TO_CLIENT")}
           />
-          <StatusPill 
-            label="Revision" 
-            count={statusCounts.REVISION} 
-            icon={RefreshCw} 
+          <StatusPill
+            label="Revision"
+            count={counts.document.revision}
+            icon={RefreshCw}
             color="orange"
-            selected={statusFilter === "REVISION"} 
-            href={buildStatusFilterUrl("REVISION")} 
+            selected={statusFilter === "REVISION"}
+            href={buildStatusFilterUrl("REVISION")}
           />
-          <StatusPill 
-            label="Approved Client" 
-            count={statusCounts.APPROVED_CLIENT} 
-            icon={ThumbsUp} 
+          <StatusPill
+            label="Approved Client"
+            count={counts.document.approvedClient}
+            icon={ThumbsUp}
             color="teal"
-            selected={statusFilter === "APPROVED_CLIENT"} 
-            href={buildStatusFilterUrl("APPROVED_CLIENT")} 
+            selected={statusFilter === "APPROVED_CLIENT"}
+            href={buildStatusFilterUrl("APPROVED_CLIENT")}
           />
-          <StatusPill 
-            label="Approved Project" 
-            count={statusCounts.APPROVED_CREATE_PROJECT} 
-            icon={CheckCircle} 
+          <StatusPill
+            label="Approved Project"
+            count={counts.document.approvedProject}
+            icon={CheckCircle}
             color="emerald"
-            selected={statusFilter === "APPROVED_CREATE_PROJECT"} 
-            href={buildStatusFilterUrl("APPROVED_CREATE_PROJECT")} 
+            selected={statusFilter === "APPROVED_CREATE_PROJECT"}
+            href={buildStatusFilterUrl("APPROVED_CREATE_PROJECT")}
           />
-          <StatusPill 
-            label="Cancelled" 
-            count={statusCounts.CANCELLED} 
-            icon={FileX} 
+          <StatusPill
+            label="Cancelled"
+            count={counts.document.cancelled}
+            icon={FileX}
             color="red"
-            selected={statusFilter === "CANCELLED"} 
-            href={buildStatusFilterUrl("CANCELLED")} 
+            selected={statusFilter === "CANCELLED"}
+            href={buildStatusFilterUrl("CANCELLED")}
           />
         </div>
       </div>
@@ -874,7 +857,7 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">
-              ({filteredCount} results)
+              ({total} results)
             </span>
           </div>
           <Link
@@ -888,7 +871,9 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
       )}
 
       {/* ── Image List ────────────────────────────────────── */}
-      {total === 0 && !hasFilter ? (
+      {errorBox ? (
+        errorBox
+      ) : total === 0 && !hasAnyFilter ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
           <FileText className="h-8 w-8 text-muted-foreground/40" />
           <p className="mt-3 text-sm font-medium">No invoices yet</p>
@@ -898,21 +883,26 @@ export default function ProformaInvoiceListingPage({}: ProformaInvoiceListingPag
         </div>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredCount > 0 ? (page - 1) * limit + 1 : 0}-
-            {Math.min(page * limit, filteredCount)} of {filteredCount} invoices
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            Showing {total > 0 ? (page - 1) * limit + 1 : 0}-
+            {Math.min(page * limit, total)} of {total} invoices
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="Loading" />}
           </p>
 
-          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {paginatedData.length > 0 ? (
-              paginatedData.map((invoice) => (
+          <div
+            className={`grid w-full grid-cols-1 gap-4 transition-opacity sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 ${
+              loading ? "pointer-events-none opacity-50" : ""
+            }`}
+            aria-busy={loading}
+          >
+            {invoices.length > 0 ? (
+              invoices.map((invoice) => (
                 <ProformaInvoiceCard
                   key={invoice.id}
                   invoice={invoice}
-                  onDeleted={(id) => setInvoicesData((prev) => prev.filter((i) => i.id !== id))}
-                  onUpdated={(updated) =>
-                    setInvoicesData((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)))
-                  }
+                  // Deleting or paying changes totals and counts: reload this page from the API
+                  onDeleted={reload}
+                  onUpdated={reload}
                 />
               ))
             ) : (

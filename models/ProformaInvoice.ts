@@ -56,6 +56,12 @@ store?: boolean;
   attachments?: IAttachment[];
   piLogs?: IPiLog[];
 
+  // Sent by the paginated list instead of full items: `items` holds only the
+  // first 3, `itemsCount` the real number, `images` up to 10 of `imageCount`.
+  itemsCount?: number;
+  images?: { url: string; label: string }[];
+  imageCount?: number;
+
   createdAt: Date | string;
   updatedAt: Date | string;
 }

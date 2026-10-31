@@ -7,25 +7,49 @@ import {
 import { axiosInstance } from './axiosIntance';
 
 /* =========================
-   Generic Params
+   Paginated list (Proforma Invoice / My PI pages)
 ========================= */
-export interface GetProformaInvoiceParams {
+export interface ProformaInvoiceListParams {
   page?: number;
   limit?: number;
   search?: string;
-  status?: PIStatus;
-  customerId?: string;
+  from?: string;
+  to?: string;
+  paymentStatus?: string; // SellPaymentStatus or 'all'
+  status?: string; // PIStatus or 'all'
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
 
-/* =========================
-   Responses
-========================= */
-interface ProformaInvoicesResponse {
+export interface ProformaInvoiceListCounts {
+  payment: {
+    all: number;
+    pending: number;
+    partial: number;
+    paid: number;
+    cancelled: number;
+    none: number;
+  };
+  document: {
+    all: number;
+    pending: number;
+    approvedSt: number;
+    sentToClient: number;
+    revision: number;
+    approvedClient: number;
+    approvedProject: number;
+    cancelled: number;
+  };
+}
+
+export interface ProformaInvoiceListResponse {
   success: boolean;
-  invoices: IProformaInvoice[];
-    count: number;
+  data: IProformaInvoice[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  counts: ProformaInvoiceListCounts;
 }
 
 interface ProformaInvoiceResponse {
@@ -33,79 +57,17 @@ interface ProformaInvoiceResponse {
   invoice: IProformaInvoice;
 }
 
-/* =========================
-   GET ALL (Client-side)
-========================= */
-
-// mypiinvoices
-export const getAllProformaInvoicesmy = async ({
-  page = 1,
-  limit = 10,
-  search = '',
-  status,
-  customerId,
-  sortBy = 'createdAt',
-  sortOrder = 'desc'
-}: GetProformaInvoiceParams = {}, ) => {
-  try {
-
-    const response = await axiosInstance.get<ProformaInvoicesResponse>(
-      `/proforma-invoices/mypiinvoices`,
-      {
-        params: {
-          page,
-          limit,
-          search,
-          status,
-          customerId,
-          sortBy,
-          sortOrder
-        }
-      }
-    );
-    const invoices = response.data.invoices ?? [];
-    return {
-      proformaInvoices: invoices,
-      count:invoices.length,
-      success: response.data.success
-    };
-  } catch (error) {
-    console.error('Error fetching proforma invoices:', error);
-    return {
-      proformaInvoices: [],
-      totalCount: 0,
-      success: false
-    };
-  }
-};
-export const getAllProformaInvoices = async ({
-
-  search = '',
-  status,
-  customerId,
-  sortBy = 'createdAt',
-  sortOrder = 'desc'
-}: GetProformaInvoiceParams = {}, ) => {
-  try {
-
-    const response = await axiosInstance.get<ProformaInvoicesResponse>(
-      `/proforma-invoices`,
-     
-    );
-    const invoices = response.data.invoices ?? [];
-    return {
-      proformaInvoices: invoices,
-      count:invoices.length,
-      success: response.data.success
-    };
-  } catch (error) {
-    console.error('Error fetching proforma invoices:', error);
-    return {
-      proformaInvoices: [],
-      totalCount: 0,
-      success: false
-    };
-  }
+// The API filters, counts and paginates. `mine` limits it to the current
+// user's invoices. Errors are thrown so the page can offer a Retry.
+export const listProformaInvoices = async (
+  params: ProformaInvoiceListParams,
+  mine = false
+) => {
+  const response = await axiosInstance.get<ProformaInvoiceListResponse>(
+    mine ? `/proforma-invoices/mypiinvoices` : `/proforma-invoices`,
+    { params: { ...params, page: params.page ?? 1 } }
+  );
+  return response.data;
 };
 
 /* =========================
