@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -24,12 +24,13 @@ import {
   BarChart3,
   CheckCheck,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
 import { StageCardGrid } from "@/features/Stages/stage-card-grid";
 import { DataTableSkeleton } from "@/components/ui/table/data-table-skeleton";
 import { useTableQueryParams } from "@/hooks/use-table-query-params";
-import { getProjects } from "@/service/Project";
-import { projectColumns } from "./tables/columns";
+import type { ProjectCounts } from "@/service/Project";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { IProject, ProjectStatus, DesignStatus, DifficultyLevel } from "@/models/Projects";
@@ -174,20 +175,55 @@ const TAB_CONFIG = {
 } as const;
 
 // ─── Main Listing ───────────────────────────────────────────────
+// Search, filters, sort (by delivery date), paging and the button counts are
+// all computed by the backend (GET stage/design-projects).
 export default function ProjectListingPage({}: ProjectListingPageProps) {
   const { page, search, limit } = useTableQueryParams(20);
   const searchParams = useSearchParams();
   const statusFilter = searchParams.get("status") || "all";
   const designStatusFilter = searchParams.get("designStatus") || "all";
   const difficultyFilter = searchParams.get("difficulty") || "all";
+  const startDateParam = searchParams.get("startDate");
+  const endDateParam = searchParams.get("endDate");
+
+  // ── Debounced search: wait until typing pauses before calling the API ──
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const [projects, setProjects] = useState<IProject[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [counts, setCounts] = useState<ProjectCounts | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState<"status" | "design" | "difficulty">("status");
 
-  // ── Load Projects (without search - we'll filter client-side) ──
+  // ── Filters as API query params ───────────────────────────────
+  // Dates cover whole days in the user's timezone: From = 00:00, To = 23:59:59.
+  const filterParams = useMemo(() => {
+    const toIso = (value: string | null, endOfDay: boolean) => {
+      if (!value) return undefined;
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return undefined;
+      if (endOfDay) date.setHours(23, 59, 59, 999);
+      else date.setHours(0, 0, 0, 0);
+      return date.toISOString();
+    };
+    return {
+      search: debouncedSearch.trim() || undefined,
+      status: statusFilter !== "all" ? (statusFilter as ProjectStatus) : undefined,
+      designStatus: designStatusFilter !== "all" ? (designStatusFilter as DesignStatus) : undefined,
+      difficulty: difficultyFilter !== "all" ? (difficultyFilter as DifficultyLevel) : undefined,
+      startDate: toIso(startDateParam, false),
+      endDate: toIso(endDateParam, true),
+    };
+  }, [debouncedSearch, statusFilter, designStatusFilter, difficultyFilter, startDateParam, endDateParam]);
+
+  // ── Load Projects ──
   useEffect(() => {
     let cancelled = false;
 
@@ -196,19 +232,23 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
         setLoading(true);
         setError(null);
 
-        // Don't send search to API - we'll handle it client-side
-               const response = await getdesignProjects({ status: 'all' });
-       
+        const response = await getdesignProjects({ ...filterParams, page, limit });
 
         if (cancelled) return;
 
-        setProjects(response.projects || []);
-        setTotalCount(response.totalCount || 0);
-      } catch (err) {
+        setProjects(response.projects);
+        setTotalCount(response.total);
+        setCounts(response.counts ?? null);
+        setHasLoaded(true);
+      } catch (err: any) {
         console.error("Error loading projects:", err);
 
         if (!cancelled) {
-          setError("Error loading projects. Please try again later.");
+          setError(
+            err?.code === "ECONNABORTED"
+              ? "The server took too long to respond while loading projects."
+              : "Could not load projects. Please check your connection and try again."
+          );
         }
       } finally {
         if (!cancelled) {
@@ -222,7 +262,9 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [page, limit]); // Remove search from dependencies
+  }, [filterParams, page, limit, reloadKey]);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   // ── Helpers ──────────────────────────────────────────────────
   const getStatusDisplayText = useCallback((status: string): string => {
@@ -246,9 +288,12 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
       urlParams.set("status", params.status || statusFilter);
       urlParams.set("designStatus", params.designStatus || designStatusFilter);
       urlParams.set("difficulty", params.difficulty || difficultyFilter);
+      // Preserve date filters
+      if (startDateParam) urlParams.set("startDate", startDateParam);
+      if (endDateParam) urlParams.set("endDate", endDateParam);
       return `?${urlParams.toString()}`;
     },
-    [search, limit, statusFilter, designStatusFilter, difficultyFilter]
+    [search, limit, statusFilter, designStatusFilter, difficultyFilter, startDateParam, endDateParam]
   );
 
   const buildFilterUrl = useCallback(
@@ -260,119 +305,25 @@ export default function ProjectListingPage({}: ProjectListingPageProps) {
     [buildQueryStringLocal]
   );
 
-  // ── Loading & Error ──────────────────────────────────────────
-  if (loading) {
+  // ── Error box with Retry ─────────────────────────────────────
+  const errorBox = error && (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 py-10 text-center dark:border-red-800/40 dark:bg-red-950/20">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
+      <Button variant="outline" size="sm" onClick={retry} disabled={loading} className="gap-2">
+        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        Retry
+      </Button>
+    </div>
+  );
+
+  // ── Loading & Error (first load) ─────────────────────────────
+  if (!hasLoaded) {
+    if (error) return errorBox;
     return <DataTableSkeleton columnCount={8} rowCount={8} filterCount={3} />;
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/40 dark:bg-red-950/20">
-        <AlertCircle className="h-4 w-4 text-red-500" />
-        <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-      </div>
-    );
-  }
-
-  // ── Client-side filtering ──────────────────────────────────
-const sortedProjects = [...projects].sort((a, b) => {
-  const dateA = a.newRequestedDelivery
-    ? new Date(a.newRequestedDelivery).getTime()
-    : a.requestedDelivery
-      ? new Date(a.requestedDelivery).getTime()
-      : null;
-
-  const dateB = b.newRequestedDelivery
-    ? new Date(b.newRequestedDelivery).getTime()
-    : b.requestedDelivery
-      ? new Date(b.requestedDelivery).getTime()
-      : null;
-
-  // Both have dates
-  if (dateA !== null && dateB !== null) {
-    return dateA - dateB;
-  }
-
-  // A has no date → last
-  if (dateA === null && dateB !== null) return 1;
-
-  // B has no date → last
-  if (dateA !== null && dateB === null) return -1;
-
-  // Both have no date
-  return 0;
-});
-
-// Then apply filters to the sorted array
-const filteredData = sortedProjects.filter((project) => {
-  // Search filter - client side
-  if (search) {
-    const s = search.toLowerCase().trim();
-    if (s === '') return true;
-    
-    const invoiceNumber = project.invoice?.piNumber || project.invoice?.id || '';
-    const customerName = project.customer?.name || '';
-    const statusText = getStatusDisplayText(project.status);
-    const designStatusText = getDesignStatusDisplayText(project.designStatus || '');
-    const difficultyText = getDifficultyDisplayText(project.difficulty);
-    
-    const match =
-      String(invoiceNumber).toLowerCase().includes(s) ||
-      String(customerName).toLowerCase().includes(s) ||
-      statusText.toLowerCase().includes(s) ||
-      designStatusText.toLowerCase().includes(s) ||
-      difficultyText.toLowerCase().includes(s);
-    
-    if (!match) return false;
-  }
-
-  // Status filter
-  if (statusFilter !== "all" && project.status !== statusFilter) return false;
-
-  // Design status filter
-  if (designStatusFilter !== "all" && project.designStatus !== designStatusFilter) return false;
-
-  // Difficulty filter
-  if (difficultyFilter !== "all" && project.difficulty !== difficultyFilter) return false;
-
-  return true;
-});
-
-
-  // ── Counts ──────────────────────────────────────────────────
-  const statusCounts = Object.keys(PROJECT_STATUS_CONFIG).reduce(
-    (acc, statusKey) => {
-      acc[statusKey as ProjectStatus] = projects.filter(
-        (p) => p.status === statusKey
-      ).length;
-      return acc;
-    },
-    {} as Record<ProjectStatus, number>
-  );
-
-  const designStatusCounts = Object.keys(DESIGN_STATUS_CONFIG).reduce(
-    (acc, statusKey) => {
-      acc[statusKey as DesignStatus] = projects.filter(
-        (p) => p.designStatus === statusKey
-      ).length;
-      return acc;
-    },
-    {} as Record<DesignStatus, number>
-  );
-
-  const difficultyCounts = Object.keys(DIFFICULTY_CONFIG).reduce(
-    (acc, levelKey) => {
-      acc[levelKey as DifficultyLevel] = projects.filter(
-        (p) => p.difficulty === levelKey
-      ).length;
-      return acc;
-    },
-    {} as Record<DifficultyLevel, number>
-  );
-
-  const total = projects.length;
-  const filteredCount = filteredData.length;
-  const paginatedData = filteredData.slice((page - 1) * limit, page * limit);
+  const total = counts?.all ?? 0;
   const hasFilter = statusFilter !== "all" || designStatusFilter !== "all" || difficultyFilter !== "all";
 
   // ── Get counts for tab badges ──────────────────────────────
@@ -382,7 +333,7 @@ const filteredData = sortedProjects.filter((project) => {
       design: designStatusFilter,
       difficulty: difficultyFilter,
     }[tabKey];
-    
+
     if (filterValue !== "all") {
       const label = {
         status: getStatusDisplayText(filterValue),
@@ -398,29 +349,34 @@ const filteredData = sortedProjects.filter((project) => {
   return (
     <div className="space-y-4">
       {/* ── Tabs ───────────────────────────────────────────────── */}
-      <Tabs 
-        defaultValue="status" 
-        value={activeTab} 
+      <Tabs
+        defaultValue="status"
+        value={activeTab}
         onValueChange={(value) => setActiveTab(value as "status" | "design" | "difficulty")}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
-          <TabsTrigger value="status" className="flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" />
-            <span>Project Status</span>
-            <span className="ml-1 text-xs text-muted-foreground">{getTabBadge("status")}</span>
-          </TabsTrigger>
-          <TabsTrigger value="design" className="flex items-center gap-2">
-            <PenTool className="h-4 w-4" />
-            <span>Design Status</span>
-            <span className="ml-1 text-xs text-muted-foreground">{getTabBadge("design")}</span>
-          </TabsTrigger>
-          <TabsTrigger value="difficulty" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span>Difficulty</span>
-            <span className="ml-1 text-xs text-muted-foreground">{getTabBadge("difficulty")}</span>
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center gap-3">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+            <TabsTrigger value="status" className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              <span>Project Status</span>
+              <span className="ml-1 text-xs text-muted-foreground">{getTabBadge("status")}</span>
+            </TabsTrigger>
+            <TabsTrigger value="design" className="flex items-center gap-2">
+              <PenTool className="h-4 w-4" />
+              <span>Design Status</span>
+              <span className="ml-1 text-xs text-muted-foreground">{getTabBadge("design")}</span>
+            </TabsTrigger>
+            <TabsTrigger value="difficulty" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span>Difficulty</span>
+              <span className="ml-1 text-xs text-muted-foreground">{getTabBadge("difficulty")}</span>
+            </TabsTrigger>
+          </TabsList>
+          {loading && (
+            <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Loading" />
+          )}
+        </div>
 
         {/* ── Project Status Tab ────────────────────────────── */}
         <TabsContent value="status" className="mt-4 space-y-2">
@@ -437,7 +393,7 @@ const filteredData = sortedProjects.filter((project) => {
               <StatusPill
                 key={statusKey}
                 label={config.label}
-                count={statusCounts[statusKey as ProjectStatus] || 0}
+                count={counts?.status[statusKey as ProjectStatus] ?? 0}
                 icon={config.icon}
                 color={config.color}
                 selected={statusFilter === statusKey}
@@ -462,7 +418,7 @@ const filteredData = sortedProjects.filter((project) => {
               <StatusPill
                 key={statusKey}
                 label={config.label}
-                count={designStatusCounts[statusKey as DesignStatus] || 0}
+                count={counts?.designStatus[statusKey as DesignStatus] ?? 0}
                 icon={config.icon}
                 color={config.color}
                 selected={designStatusFilter === statusKey}
@@ -487,7 +443,7 @@ const filteredData = sortedProjects.filter((project) => {
               <StatusPill
                 key={levelKey}
                 label={config.label}
-                count={difficultyCounts[levelKey as DifficultyLevel] || 0}
+                count={counts?.difficulty[levelKey as DifficultyLevel] ?? 0}
                 icon={config.icon}
                 color={config.color}
                 selected={difficultyFilter === levelKey}
@@ -519,7 +475,7 @@ const filteredData = sortedProjects.filter((project) => {
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">
-              ({filteredCount} results)
+              ({totalCount} results)
             </span>
           </div>
           <Link
@@ -532,8 +488,10 @@ const filteredData = sortedProjects.filter((project) => {
         </div>
       )}
 
-      {/* ── Empty States ──────────────────────────────────────── */}
-      {filteredData.length === 0 && !search && !hasFilter ? (
+      {/* ── Error / Empty States ──────────────────────────────── */}
+      {error ? (
+        errorBox
+      ) : totalCount === 0 && !search && !hasFilter && !startDateParam && !endDateParam ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
             <FolderOpen className="h-8 w-8 text-muted-foreground/60" />
@@ -543,7 +501,7 @@ const filteredData = sortedProjects.filter((project) => {
             Projects will appear here once created from approved proforma invoices.
           </p>
         </div>
-      ) : filteredData.length === 0 && (search || hasFilter) ? (
+      ) : totalCount === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
           <AlertCircle className="h-8 w-8 text-muted-foreground/40" />
           <p className="mt-3 text-sm font-medium">No matching projects</p>
@@ -552,18 +510,20 @@ const filteredData = sortedProjects.filter((project) => {
           </p>
         </div>
       ) : (
-        <StageCardGrid
-        compact
-          data={paginatedData}
-          totalItems={filteredCount}
-          columns={adminprojectColumns}
-          currentPage={page}
-          itemsPerPage={limit}
-          searchValue={search}
-          statusFilter={statusFilter}
-          designStatusFilter={designStatusFilter}
-          difficultyFilter={difficultyFilter}
-        />
+        <div className={loading ? "pointer-events-none opacity-60 transition-opacity" : "transition-opacity"}>
+          <StageCardGrid
+          compact
+            data={projects}
+            totalItems={totalCount}
+            columns={adminprojectColumns}
+            currentPage={page}
+            itemsPerPage={limit}
+            searchValue={search}
+            statusFilter={statusFilter}
+            designStatusFilter={designStatusFilter}
+            difficultyFilter={difficultyFilter}
+          />
+        </div>
       )}
     </div>
   );

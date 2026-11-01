@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {  IProject, ProjectStatus } from '@/models/Projects';
 import { axiosInstance } from './axiosIntance';
+import { fetchProjectList, type ProjectListParams } from './Project';
 
 // ========================= TYPES ========================= //
 interface ProjectsResponse {
@@ -417,40 +418,11 @@ export const getinstalationProjects = async (params?: {
     };
   }
 };
-export const getdesignProjects = async (params?: {
-  status?: 'finished' | 'not-finished' | 'all';
-  sortOrder?: 'asc' | 'desc';
-}) => {
-  try {
-    const response = await axiosInstance.get<MetalWorkProjectsResponse>(
-      `stage/design-projects`,
-      {
-        params: {
-          status: params?.status || 'all',
-        }
-      }
-    );
-
-    const projects = response?.data?.projects ?? [];
-
-    return {
-      projects,
-      totalCount: response?.data?.count ?? projects.length,
-      total: response?.data?.total ?? 0,
-      success: response?.data?.success ?? false
-    };
-
-  } catch (error) {
-    console.error('Error fetching metal work projects:', error);
-
-    return {
-      projects: [] as IProject[],
-      totalCount: 0,
-      total: 0,
-      success: false
-    };
-  }
-};
+// Design stage page: search, filters, paging and button counts all run on the
+// backend (same response shape as GET /projects). Throws on failure.
+export const getdesignProjects = (
+  params: ProjectListParams & { designStage?: 'finished' | 'not-finished' } = {}
+) => fetchProjectList(`stage/design-projects`, params);
 export const mygetdesignProjects = async (params?: {
   status?: 'finished' | 'not-finished' | 'all';
   sortOrder?: 'asc' | 'desc';

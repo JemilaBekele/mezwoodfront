@@ -78,12 +78,16 @@ export interface ProjectListParams {
   all?: boolean;
 }
 
-// Get projects — all filtering, paging and counting happens on the backend.
+// Fetch a server-filtered project list (GET /projects, the Design stage page…).
 // Errors are thrown (not turned into an empty list) so the page can tell
 // "request failed" apart from "no projects".
-export const getProjects = async (params: ProjectListParams = {}) => {
-  const response = await axiosInstance.get<ProjectListResponse>(`/projects`, {
+export const fetchProjectList = async <P extends ProjectListParams>(
+  url: string,
+  params: P
+) => {
+  const response = await axiosInstance.get<ProjectListResponse>(url, {
     params: {
+      ...params,
       page: params.page,
       limit: params.limit,
       search: params.search || undefined,
@@ -110,6 +114,10 @@ export const getProjects = async (params: ProjectListParams = {}) => {
     designers: data.designers ?? []
   };
 };
+
+// Get projects — all filtering, paging and counting happens on the backend.
+export const getProjects = (params: ProjectListParams = {}) =>
+  fetchProjectList(`/projects`, params);
 
 // All projects with their stages (all-projects Gantt chart)
 export const getProjectsSSR = async () => {
