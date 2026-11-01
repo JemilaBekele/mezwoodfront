@@ -23,7 +23,7 @@ export default async function SupplierPage({
 
   return (
     <PageContainer scrollable={true}>
-      <div className='flex flex-1 flex-col space-y-4 pb-6'>
+      <div className='flex min-w-0 flex-1 flex-col space-y-4 pb-6'>
         <Suspense
           fallback={
             <DataTableSkeleton
@@ -33,7 +33,7 @@ export default async function SupplierPage({
             />
           }
         >
-          <div className='w-full'>
+          <div className='w-full min-w-0'>
             <CapacityCalendar />
           </div>
         </Suspense>

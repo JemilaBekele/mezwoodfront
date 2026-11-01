@@ -52,21 +52,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CapacityStage } from "@/models/CapacityLot";
 import {
-  getAllDailyStageCapacities,
   rebuildCapacity,
-  getCapacityTelemetry,
-  getStageLoadRail as fetchStageLoadRail,
+  getCapacityCalendar,
+  getCalendarRowAllocations,
+  type CapacityCalendarResponse,
+  type CapacityLedgerRow,
+  type CapacityLoadLevel,
 } from "@/service/Category";
-import { getAllCapacitySlots } from "@/service/CapacityLot";
 import { rescheduleProjectFromCalendar } from "@/service/Project";
-import { hideFinishedStages } from "./hideFinishedStages";
 import { ProjectStatus } from "@/models/Projects";
 import { useRouter } from "next/navigation";
+import { parseAsString, useQueryStates } from "nuqs";
 // Ethiopian calendar rendering lives in lib/format.ts — the single copy shared
 // by every screen, so a fix to the conversion cannot reach only some of them.
 import { gregorianToEthiopian, formatDateEth as ethLabel } from '@/lib/format';
-// Working-hour fallbacks live in lib/workingTime.ts, mirroring the backend config.
-import { FALLBACK_SHIFT_HOURS, FALLBACK_WORKING_HOURS_PER_DAY } from '@/lib/workingTime';
 
 
 /* ------------------------------------------------------------------ *
@@ -77,12 +76,6 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-// Mirrors backend config.SHIFT_TIMES hours — used to reconstruct the engine's
-// effective daily ceiling (capacity × shiftHours/workingHours × parallelSlots).
-const SHIFT_HOURS: Record<string, number> = {
-  ...FALLBACK_SHIFT_HOURS,
-};
 
 const STAGE_ORDER: CapacityStage[] = [
   CapacityStage.DESIGN,
@@ -108,9 +101,6 @@ const STAGE_META: Record<CapacityStage, { color: string; abbr: string }> = {
   [CapacityStage.DELIVERY]: { color: "#14b8a6", abbr: "DLV" },
 };
 
-const STAGE_SORT = new Map<string, number>(STAGE_ORDER.map((s, i) => [s, i]));
-
-
 // FIX: Add safe stageName function with error handling
 const stageName = (s: string | undefined) => {
   if (!s) return "Unknown Stage";
@@ -123,22 +113,6 @@ const stageName = (s: string | undefined) => {
 const OVERCAPACITY_FACTOR = 1.25;
 const MAX_OC_BAND = OVERCAPACITY_FACTOR - 1.0; // 0.25 — the allowed 100→125% band
 
-const dayHoursOf = (r: any) => r.maxHours || r.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
-const dayFrac = (r: any) => (dayHoursOf(r) > 0 ? (r.usedHours || 0) / dayHoursOf(r) : 0);
-const rowOver = (r: any) =>
-  (r.overCapacityUsed || 0) > 0 ||
-  (r.overHoursCapacityUsed || 0) > 0 ||
-  dayFrac(r) > 1.01 ||
-  (r.usedCapacity || 0) > (r.maxCapacity || Infinity);
-// True ratio of a row against its 100% base (uncapped, can exceed 1.25).
-const rowFrac = (r: any) => {
-  const u = r.usedCapacity || 0;
-  const m = r.maxCapacity || 0;
-  if (m > 0) return u / m;
-  return dayFrac(r);
-};
-// A row that BREACHES the 125% hard ceiling (not just the allowed band).
-const rowViolation = (r: any) => rowFrac(r) > OVERCAPACITY_FACTOR + 0.001;
 // Display cap: a fully-loaded stage reads 100% (sub-unit rounding can't push it
 // to 101/102%). Genuine over-capacity is conveyed by the red flag / "over by" text.
 const clampPct = (v: number) => `${Math.min(Math.round(v), 100)}%`;
@@ -157,74 +131,32 @@ const heatVar = (frac: number, over = false) => {
   return "var(--cc-idle)";
 };
 
-const dateKeyOf = (raw: any): string =>
-  typeof raw === "string" ? raw.slice(0, 10) : new Date(raw).toISOString().slice(0, 10);
+// Colour of each load level the API returns (same bands as heatVar)
+const LEVEL_VAR: Record<CapacityLoadLevel, string> = {
+  VIOLATION: "var(--cc-violation)",
+  OVER: "var(--cc-over)",
+  CRIT: "var(--cc-crit)",
+  HIGH: "var(--cc-high)",
+  MED: "var(--cc-med)",
+  LOW: "var(--cc-low)",
+  IDLE: "var(--cc-idle)",
+};
+
 const dateFromKey = (key: string) => new Date(`${key}T12:00:00`);
 const keyOf = (y: number, m: number, d: number) =>
   `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
-const allocationStartMs = (a: any) =>
-  new Date(a.startDateTime || a.customStartTime || a.allocationDate).getTime();
+// Filters in the URL use the stage chip abbreviations (?stage=CNC)
+const stageFromAbbr = (abbr: string | null): CapacityStage | "ALL" =>
+  (STAGE_ORDER.find((s) => STAGE_META[s].abbr === abbr) as CapacityStage | undefined) || "ALL";
 
-const earliestAllocationStart = (r: any, allocsOf: (r: any) => any[]) => {
-  const starts = allocsOf(r).map(allocationStartMs).filter(Number.isFinite);
-  return starts.length ? Math.min(...starts) : Number.MAX_SAFE_INTEGER;
+const parseMonth = (value: string | null) => {
+  const m = /^(\d{4})-(\d{2})$/.exec(value || "");
+  if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) return { y: Number(m[1]), m: Number(m[2]) - 1 };
+  const n = new Date();
+  return { y: n.getFullYear(), m: n.getMonth() };
 };
-
-const sortDayRows = (rows: any[], allocsOf: (r: any) => any[]) =>
-  [...rows].sort((a, b) => {
-    const byStart = earliestAllocationStart(a, allocsOf) - earliestAllocationStart(b, allocsOf);
-    if (byStart !== 0) return byStart;
-    return (STAGE_SORT.get(a.stage) ?? 999) - (STAGE_SORT.get(b.stage) ?? 999);
-  });
-
-/** Group sorted day-rows by their parent project so cells can render
- *  each project's stages together with a separator border between them. */
-const groupRowsByProject = (rows: any[], allocsOf: (r: any) => any[]) => {
-  const groups: { key: string; label: string; entries: { row: any; allocs: any[] }[] }[] = [];
-  const keyMap = new Map<string, number>();
-  rows.forEach((r) => {
-    const allocs = allocsOf(r);
-    // Group allocations by project
-    const projAllocs = new Map<string, { label: string; allocs: any[] }>();
-    allocs.forEach((a: any) => {
-      const pid = a?.projectStage?.project?.id || '_ungrouped';
-      // Show the customer name on the calendar (PI only if there is no customer)
-      const label =
-        a?.projectStage?.project?.customer?.name ||
-        a?.projectStage?.project?.invoice?.customer?.name ||
-        a?.projectStage?.project?.invoice?.piNumber ||
-        'Unassigned';
-      if (!projAllocs.has(pid)) projAllocs.set(pid, { label, allocs: [] });
-      projAllocs.get(pid)!.allocs.push(a);
-    });
-    // If no allocs, put under ungrouped
-    if (projAllocs.size === 0) {
-      projAllocs.set('_ungrouped', { label: 'Unassigned', allocs: [] });
-    }
-    // Add each project entry to the group
-    projAllocs.forEach(({ label, allocs: pAllocs }, pid) => {
-      if (keyMap.has(pid)) {
-        groups[keyMap.get(pid)!].entries.push({ row: r, allocs: pAllocs });
-      } else {
-        keyMap.set(pid, groups.length);
-        groups.push({ key: pid, label, entries: [{ row: r, allocs: pAllocs }] });
-      }
-    });
-  });
-  return groups;
-};
-
-
-const dayCapacityAllocationFrac = (rows: any[]) => {
-  let totalUsedH = 0;
-  let totalAvailableH = 0;
-  rows.forEach((r) => {
-    totalUsedH += r.usedHours || 0;
-    totalAvailableH += dayHoursOf(r);
-  });
-  return totalAvailableH > 0 ? totalUsedH / totalAvailableH : 0;
-};
+const monthParam = (y: number, m: number) => `${y}-${String(m + 1).padStart(2, "0")}`;
 
 /* ------------------------------------------------------------------ *
  * Small presentational pieces
@@ -436,17 +368,53 @@ const rangeLabel = (from: Date, to: Date) => {
 };
 
 const CapacityCalendar: React.FC = () => {
-  const [rows, setRows] = useState<any[]>([]);
-  const [slots, setSlots] = useState<Record<string, { parallelSlots: number; workingHours: number; capacity: number }>>({});
+  const [data, setData] = useState<CapacityCalendarResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [resetting, setResetting] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
-  const [piFilter, setPiFilter] = useState<string>("");
-  const [customerFilter, setCustomerFilter] = useState<string>("");
-  const [stage, setStage] = useState<CapacityStage | "ALL">("ALL");
   const [view, setView] = useState<"board" | "ledger">("board");
-  const [cursor, setCursor] = useState(() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; });
+
+  // Month and filters live in the URL (?month=2026-10&stage=CNC&pi=&customer=)
+  // so refresh and shared links keep the same view.
+  const [urlState, setUrl] = useQueryStates(
+    {
+      month: parseAsString,
+      stage: parseAsString,
+      pi: parseAsString,
+      customer: parseAsString,
+    },
+    { history: "replace" }
+  );
+  const cursor = useMemo(() => parseMonth(urlState.month), [urlState.month]);
+  const setCursor = useCallback(
+    (c: { y: number; m: number }) => { setUrl({ month: monthParam(c.y, c.m) }); },
+    [setUrl]
+  );
+  const stage = stageFromAbbr(urlState.stage);
+  const setStage = (s: CapacityStage | "ALL") => {
+    setUrl({ stage: s === "ALL" ? null : STAGE_META[s].abbr });
+  };
+  const piQuery = urlState.pi || "";
+  const customerQuery = urlState.customer || "";
+
+  // The text boxes update immediately; the URL (and the API call) follow
+  // once typing pauses for 400 ms.
+  const [piFilter, setPiFilter] = useState<string>(piQuery);
+  const [customerFilter, setCustomerFilter] = useState<string>(customerQuery);
+  useEffect(() => {
+    const pi = piFilter.trim();
+    const customer = customerFilter.trim();
+    if (pi === piQuery && customer === customerQuery) return;
+    const timer = setTimeout(() => {
+      setUrl({ pi: pi || null, customer: customer || null });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [piFilter, customerFilter, piQuery, customerQuery, setUrl]);
+
+  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(false);
   const [railRange, setRailRange] = useState<string>("today");
@@ -500,40 +468,14 @@ const dragDataRef = useRef<any>(null);
     const newDate = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: newDate.getFullYear(), m: newDate.getMonth() });
     setTimeout(() => setIsChangingMonth(false), 300);
-  }, [cursor]);
+  }, [cursor, setCursor]);
 
   const goToToday = useCallback(() => {
     setIsChangingMonth(true);
     const n = new Date();
     setCursor({ y: n.getFullYear(), m: n.getMonth() });
     setTimeout(() => setIsChangingMonth(false), 300);
-  }, []);
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [caps, lotRes] = await Promise.all([
-        getAllDailyStageCapacities(),
-        getAllCapacitySlots().catch(() => ({ capacitySlots: [] })),
-      ]);
-      const map: Record<string, any> = {};
-      (lotRes?.capacitySlots || []).forEach((l: any) => {
-        map[l.stage] = {
-          parallelSlots: l.parallelSlots || 1,
-          workingHours: l.workingHours || FALLBACK_WORKING_HOURS_PER_DAY,
-          capacity: l.capacity || 0,
-        };
-      });
-      setSlots(map);
-      setRows(Array.isArray(caps) ? caps : []);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load capacity data.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  }, [setCursor]);
 
   // Drag state
   const [activeDrag, setActiveDrag] = useState<{ id: string; data: any } | null>(null);
@@ -549,43 +491,6 @@ const dragDataRef = useRef<any>(null);
   } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   
-  // Filter rows by PI number and/or customer name (case-insensitive).
-  // Keeps only the matching allocations inside each row, so other projects on the same day are hidden.
-  const filterRowsByProject = useCallback((rows: any[], pi: string, customer: string) => {
-    // PI: ignore case, spaces and dashes ("pi 0082", "PI-0082", "0082" all match PI-0082)
-    const normalizePi = (v: string) => v.toLowerCase().replace(/[\s\-_/]/g, '');
-    // Customer: ignore case and extra spaces
-    const normalizeText = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
-
-    const piQuery = normalizePi(pi || '');
-    const customerQuery = normalizeText(customer || '');
-    if (!piQuery && !customerQuery) return rows;
-
-    const matches = (alloc: any) => {
-      const project = alloc?.projectStage?.project;
-      if (!project) return false;
-
-      const piNumber = normalizePi(project?.invoice?.piNumber || '');
-      const customerName = normalizeText(project?.customer?.name || project?.invoice?.customer?.name || '');
-
-      const matchesPi = !piQuery || piNumber.includes(piQuery);
-      const matchesCustomer = !customerQuery || customerName.includes(customerQuery);
-      return matchesPi && matchesCustomer;
-    };
-
-    return rows
-      .map(row => {
-        const allocs = row.projectStageCapacityAllocations || row.projectStage_capacityAllocations || [];
-        const matched = allocs.filter(matches);
-        if (matched.length === 0) return null;
-        return {
-          ...row,
-          ...(row.projectStageCapacityAllocations ? { projectStageCapacityAllocations: matched } : {}),
-          ...(row.projectStage_capacityAllocations ? { projectStage_capacityAllocations: matched } : {}),
-        };
-      })
-      .filter(Boolean);
-  }, []);
 
 const handleDragStart = useCallback((event: DragStartEvent) => {
   const data = event.active.data.current;
@@ -718,14 +623,14 @@ const handleDragStart = useCallback((event: DragStartEvent) => {
         { id: 'reschedule', duration: 4000 },
       );
 
-      // Refresh calendar data
-      await fetchData();
+      // Refresh the visible range and the KPIs (one request)
+      reload();
     } catch (err: any) {
       toast.error(err?.message || 'Reschedule failed', { id: 'reschedule' });
     } finally {
       setRescheduling(false);
     }
-  }, [fetchData]);
+  }, [reload]);
 
 const handleDragEnd = useCallback((event: DragEndEvent) => {
   setActiveDrag(null);
@@ -789,15 +694,6 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
     );
   }, [pendingReschedule, performReschedule]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  // Ensure the calendar always opens to the current month (guards against
-  // stale SSR / long-lived tabs where the initialiser ran on a previous day).
-  useEffect(() => {
-    const n = new Date();
-    setCursor({ y: n.getFullYear(), m: n.getMonth() });
-  }, []);
-
   // Clean up auto-scroll interval on unmount
   useEffect(() => {
     return () => {
@@ -807,97 +703,6 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
       }
     };
   }, []);
-
-  // Effective daily ceiling (the 100% denominator). The backend stores the true
-  // slots-inclusive ceiling in maxCapacity (capacity × shift ÷ working-hours ×
-  // parallel-slots), so we trust it directly. We must NOT key off `usedCapacity`
-  // here: with reschedule overcapacity a day legitimately runs `used > maxCapacity`
-  // (up to 125%) — treating that as a "legacy under-counted" row and recomputing
-  // both re-applied parallelSlots (double-count) AND hid the overcapacity, e.g.
-  // DESIGN's real 6/day ballooned to ~11. Only a genuine pre-slots legacy row
-  // (stored well below the lot ceiling) is scaled up to the lot ceiling.
-  const effMax = useCallback((r: any) => {
-    const lot = slots[r.stage] || { parallelSlots: 1, workingHours: FALLBACK_WORKING_HOURS_PER_DAY, capacity: 0 };
-    const stored = r.maxCapacity || 0;
-    const slotsN = lot.parallelSlots || 1;
-    const whpd = r.workingHours || lot.workingHours || FALLBACK_WORKING_HOURS_PER_DAY;
-    // CUSTOM stages run the whole working day, so their shift length IS whpd
-    // (matches the engine's stageShiftHours); fixed shifts use their fixed length.
-    const shift = r.shift || "CUSTOM";
-    const sh = shift === "CUSTOM" ? whpd : (SHIFT_HOURS[shift] || whpd);
-    // Authoritative ceiling from the (dynamic) CapacityLot — identical to the
-    // engine's baseDailyMax = capacity × shiftHours/whpd × slots.
-    const lotEff = (lot.capacity || 0) * (sh / whpd) * slotsN;
-    if (stored > 0) {
-      if (slotsN > 1 && lotEff > 0 && stored < lotEff * 0.6) return lotEff; // legacy pre-slots row
-      return stored;
-    }
-    return lotEff > 0 ? lotEff : stored;
-  }, [slots]);
-
-  const allocsOf = (r: any) =>
-    r.projectStageCapacityAllocations || r.projectStage_capacityAllocations || [];
-
-  // Completed / cancelled stages are hidden from the board (see hideFinishedStages).
-  const visibleRows = useMemo(() => hideFinishedStages(rows), [rows]);
-
-  const filtered = useMemo(() => {
-    const stageFiltered = visibleRows.filter((r) => stage === "ALL" || r.stage === stage);
-    return filterRowsByProject(stageFiltered, piFilter, customerFilter);
-  }, [visibleRows, stage, piFilter, customerFilter, filterRowsByProject]);
-
-  // Index rows by calendar day for the board.
-  const byDay = useMemo(() => {
-    const m: Record<string, any[]> = {};
-    filtered.forEach((r) => {
-      const k = dateKeyOf(r.date);
-      (m[k] ||= []).push(r);
-    });
-    return m;
-  }, [filtered]);
-
-  // Telemetry summary — fetched from backend by statsRange.
-  const statsBounds = useMemo(() => computeRangeBounds(statsRange), [statsRange]);
-  const [summary, setSummary] = useState({
-    used: 0, eff: 0, usedH: 0, maxH: 0, over: 0, violation: 0, allocs: 0, activeDays: 0,
-    util: 0, hoursUtil: 0,
-  });
-  useEffect(() => {
-    let cancelled = false;
-    getCapacityTelemetry(statsBounds.startKey, statsBounds.endKey)
-      .then((res) => {
-        if (cancelled) return;
-        setSummary({
-          used: res.used ?? 0, eff: res.eff ?? 0, usedH: res.usedH ?? 0,
-          maxH: res.maxH ?? 0, over: res.over ?? 0, violation: res.violation ?? 0,
-          allocs: res.allocs ?? 0,
-          activeDays: res.activeDays ?? 0, util: res.util ?? 0, hoursUtil: res.hoursUtil ?? 0,
-        });
-      })
-      .catch(() => { /* telemetry fetch failed — keep previous values */ });
-    return () => { cancelled = true; };
-  }, [statsBounds]);
-
-  // Per-stage load rail — fetched from backend by railRange.
-  const railBounds = useMemo(() => computeRangeBounds(railRange), [railRange]);
-  const [stageRail, setStageRail] = useState<{ stage: CapacityStage; used: number; eff: number; over: boolean; violation: boolean }[]>(
-    STAGE_ORDER.map((s) => ({ stage: s as CapacityStage, used: 0, eff: 0, over: false, violation: false }))
-  );
-  useEffect(() => {
-    let cancelled = false;
-    fetchStageLoadRail(railBounds.startKey, railBounds.endKey)
-      .then((res) => {
-        if (cancelled) return;
-        setStageRail(
-          (res.stages || []).map((s: any) => ({
-            stage: s.stage, used: s.used ?? 0, eff: s.eff ?? 0, over: s.over ?? false,
-            violation: s.violation ?? false,
-          }))
-        );
-      })
-      .catch(() => { /* stage load fetch failed — keep previous values */ });
-    return () => { cancelled = true; };
-  }, [railBounds]);
 
   // Build a 6-week grid for the cursor month.
   const weeks = useMemo(() => {
@@ -923,6 +728,63 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
     return keyOf(n.getFullYear(), n.getMonth(), n.getDate());
   }, []);
 
+  const statsBounds = useMemo(() => computeRangeBounds(statsRange), [statsRange]);
+  const railBounds = useMemo(() => computeRangeBounds(railRange), [railRange]);
+  // First and last day shown, including the leading / trailing days
+  const gridFrom = weeks[0][0].key;
+  const gridTo = weeks[weeks.length - 1][6].key;
+
+  // One request per change of month, filter, view or KPI / stage-load range.
+  // The API filters and aggregates; nothing is counted in the browser.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getCapacityCalendar({
+      from: gridFrom,
+      to: gridTo,
+      stage,
+      pi: piQuery || undefined,
+      customer: customerQuery || undefined,
+      kpiFrom: statsBounds.startKey,
+      kpiTo: statsBounds.endKey,
+      loadFrom: railBounds.startKey,
+      loadTo: railBounds.endKey,
+      view,
+    })
+      .then((res) => {
+        if (!cancelled) setData(res);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        setError("Failed to load capacity data.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [gridFrom, gridTo, stage, piQuery, customerQuery, statsBounds, railBounds, view, reloadKey]);
+
+  const kpis = data?.kpis;
+  const daysByKey = useMemo(
+    () => Object.fromEntries((data?.days || []).map((d) => [d.date, d])),
+    [data]
+  );
+  const stageRail = useMemo(
+    () =>
+      (data?.stageLoad.stages || STAGE_ORDER.map((s) => ({ stage: s, units: 0, capacity: 0, over: false, violation: false })))
+        .map((s) => ({
+          stage: s.stage as CapacityStage,
+          used: s.units,
+          eff: s.capacity,
+          over: s.over,
+          violation: s.violation,
+        })),
+    [data]
+  );
+  const isEmpty = view === "board" ? !data?.days.length : !data?.rows.length;
+
   // Compact this week: pull current-week stages into empty space only. Nothing
   // outside the current week moves; no downstream cascade; no-op if no gaps.
   const handleRebuild = async () => {
@@ -930,7 +792,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
     try {
       setResetting(true);
       await rebuildCapacity();
-      await fetchData();
+      reload();
       setSelectedKey(null);
     } catch (err) {
       console.error(err);
@@ -974,7 +836,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
           <Gauge size={14} />
           Calander based on Project status 
         </Button>
-              <Button onClick={fetchData} variant="outline" size="sm" className="cc-btn">
+              <Button onClick={reload} variant="outline" size="sm" className="cc-btn">
                 <RotateCcw size={14} /> Refresh
               </Button>
               <Button onClick={handleRebuild} disabled={resetting} variant="outline" size="sm" className="cc-btn" title="Compact this week: pack overdue and this week's work from now, within working hours, up to 130% capacity. Next week is not touched.">
@@ -989,7 +851,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
       {error && (
         <div className="cc-error">
           <AlertTriangle size={18} /> <span>{error}</span>
-          <Button onClick={fetchData} variant="outline" size="sm" className="cc-btn ml-auto">Retry</Button>
+          <Button onClick={reload} variant="outline" size="sm" className="cc-btn ml-auto">Retry</Button>
         </div>
       )}
 
@@ -1019,21 +881,24 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
         </div>
       </div>
       <section className="cc-telemetry">
+        {/* All KPI numbers are calculated by the API for the selected range and filters */}
         <TelemetryTile
           icon={<Activity size={14} />} label="Effective utilization"
-          value={loading ? "—" : (summary.util > 100 ? truePct(summary.util) : clampPct(summary.util))} meter={summary.util / 100}
-          over={summary.util > 100}
-          foot={`${Math.round(summary.used)} / ${Math.round(summary.eff)} units`}
+          value={!kpis ? "—" : (kpis.utilizationPct > 100 ? truePct(kpis.utilizationPct) : clampPct(kpis.utilizationPct))}
+          meter={(kpis?.utilizationPct ?? 0) / 100}
+          over={(kpis?.utilizationPct ?? 0) > 100}
+          foot={`${Math.round(kpis?.scheduledUnits ?? 0)} / ${Math.round(kpis?.capacityUnits ?? 0)} units`}
         />
         <TelemetryTile
           icon={<Boxes size={14} />} label="Scheduled units"
-          value={loading ? "—" : `${Math.round(summary.used)}`}
-          foot={`${summary.allocs} allocation lines`}
+          value={!kpis ? "—" : `${Math.round(kpis.scheduledUnits)}`}
+          foot={`${kpis?.allocationLines ?? 0} allocation lines`}
         />
         <TelemetryTile
           icon={<Clock size={14} />} label="Hours loaded"
-          value={loading ? "—" : summary.usedH.toFixed(1)} meter={summary.hoursUtil / 100}
-          foot={`${summary.hoursUtil > 100 ? truePct(summary.hoursUtil) : clampPct(summary.hoursUtil)} of available`}
+          value={!kpis ? "—" : kpis.hoursLoaded.toFixed(1)}
+          meter={(kpis?.hoursAvailablePct ?? 0) / 100}
+          foot={`${(kpis?.hoursAvailablePct ?? 0) > 100 ? truePct(kpis?.hoursAvailablePct ?? 0) : clampPct(kpis?.hoursAvailablePct ?? 0)} of available`}
         />
       
       </section>
@@ -1178,18 +1043,19 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
         )}
       </div>
 
-      {loading ? (
+      {loading && !data ? (
         <div className="cc-skeleton">
           <div className="cc-spinner" />
           <p className="cc-mono">Reading capacity ledger…</p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : view === "ledger" && isEmpty ? (
         <div className="cc-empty">
           <CalendarDays size={28} />
           <h3>No reserved capacity in window</h3>
           <p>The board shows days with active allocations. Try another stage or refresh.</p>
         </div>
       ) : view === "board" ? (
+        // The board always renders so the month navigation stays usable on empty months
         <DndContext 
           sensors={sensors} 
           onDragStart={handleDragStart} 
@@ -1201,10 +1067,10 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
             style={{ position: 'relative', maxHeight: '80vh', overflowY: 'auto' }}
             ref={boardRef}
           >
-            {rescheduling && (
+            {(rescheduling || loading) && (
               <div className="cc-reschedule-overlay">
                 <Loader2 className="animate-spin" size={24} />
-                <span>Rescheduling…</span>
+                <span>{rescheduling ? "Rescheduling…" : "Loading…"}</span>
               </div>
             )}
             <div className="cc-board__head">
@@ -1309,17 +1175,11 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
 
             <div className={`cc-grid ${isChangingMonth ? 'cc-grid--changing' : ''}`}>
               {weeks.flat().map((cell, i) => {
-                const dayRows = byDay[cell.key] || [];
-                const displayRows = sortDayRows(dayRows, allocsOf);
+                // Load %, colour level and bars for the day come from the API
+                const day = daysByKey[cell.key];
                 const isSunday = cell.date.getDay() === 0;
-                const dayLoadFrac = dayCapacityAllocationFrac(dayRows);
-                let anyOver = false;
-                dayRows.forEach((r) => {
-                  if (rowOver(r)) anyOver = true;
-                });
-              
-                const heat = heatVar(dayLoadFrac, anyOver);
-                const active = dayRows.length > 0;
+                const heat = day ? LEVEL_VAR[day.level] : LEVEL_VAR.IDLE;
+                const active = !!day;
                 return (
                   <DroppableDayCell
                     key={cell.key}
@@ -1338,6 +1198,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
                       "--heat": heat,
                     } as React.CSSProperties}
                     onClick={() => {
+                      // The day page loads that day's full allocation list
                       if (active) {
                         router.push(`/dashboard/capacityday/${cell.key}`);
                       }
@@ -1353,120 +1214,85 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
                           <span className="cc-cell__todaytag">Today</span>
                         )}
                       </span>
-                      {active && (() => {
-                        const maxOverPct = Math.round(Math.max(...dayRows.map((r: any) => {
-                          if ((r.maxCapacity || 0) <= 0) return 0;
-                          const overFromField = (r.overCapacityUsed || 0) / r.maxCapacity;
-                          const overFromUsage = Math.max(0, (r.usedCapacity || 0) - r.maxCapacity) / r.maxCapacity;
-                          return Math.max(overFromField, overFromUsage);
-                        })) * 100);
-                        // >25% over base == >125% == breach of the hard ceiling.
-                        const anyViolation = dayRows.some(rowViolation);
-                        return (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            {anyOver && maxOverPct > 0 && (
-                              <span
-                                title={anyViolation
-                                  ? "Exceeds the 125% hard ceiling"
-                                  : "Within the allowed 100–125% overcapacity band"}
-                                style={{
-                                  background: anyViolation
-                                    ? "repeating-linear-gradient(45deg, var(--cc-violation), var(--cc-violation) 3px, #b91c1c 3px, #b91c1c 6px)"
-                                    : "var(--cc-over)",
-                                  color: "#fff",
-                                  fontSize: "8px",
-                                  fontWeight: 800,
-                                  padding: "2px 4px",
-                                  borderRadius: "4px",
-                                  textTransform: "uppercase",
-                                  lineHeight: 1.1,
-                                  flexShrink: 0
-                                }}
-                              >
-                                {anyViolation ? `+${maxOverPct}% !` : `+${maxOverPct}% OC`}
-                              </span>
-                            )}
-                            <span className="cc-cell__peak" style={{ background: heat, flexShrink: 0 }}>
-                              {clampPct(dayLoadFrac * 100)}
+                      {day && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          {day.over && day.maxOverPct > 0 && (
+                            <span
+                              title={day.violation
+                                ? "Exceeds the 125% hard ceiling"
+                                : "Within the allowed 100–125% overcapacity band"}
+                              style={{
+                                background: day.violation
+                                  ? "repeating-linear-gradient(45deg, var(--cc-violation), var(--cc-violation) 3px, #b91c1c 3px, #b91c1c 6px)"
+                                  : "var(--cc-over)",
+                                color: "#fff",
+                                fontSize: "8px",
+                                fontWeight: 800,
+                                padding: "2px 4px",
+                                borderRadius: "4px",
+                                textTransform: "uppercase",
+                                lineHeight: 1.1,
+                                flexShrink: 0
+                              }}
+                            >
+                              {day.violation ? `+${day.maxOverPct}% !` : `+${day.maxOverPct}% OC`}
                             </span>
-                          </div>
-                        );
-                      })()}
+                          )}
+                          <span className="cc-cell__peak" style={{ background: heat, flexShrink: 0 }}>
+                            {clampPct(day.loadPct)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {active && (
+                    {day && (
                       <div className="cc-cell__bars">
-                        {(() => {
-                          const groups = groupRowsByProject(displayRows, allocsOf);
-                          let totalShown = 0;
-                          const maxBars = 4;
-                          return groups.map((group) => {
-                            if (totalShown >= maxBars) return null;
-                            const remaining = maxBars - totalShown;
-                            const barsToShow = group.entries.slice(0, remaining);
-                            totalShown += barsToShow.length;
-                            return (
-                              <div
-                                key={group.key}
-                                className="cc-cell__pgroup"
-                              >
-                                <span className="cc-cell__pdiv" title={group.label}>
-                                  <span>{group.label}</span>
-                                </span>
-                                {barsToShow.map(({ row: r, allocs }) => {
-                                  const meta = STAGE_META[r.stage as CapacityStage];
-                                  const eff = effMax(r);
-                                  const allocUnits = allocs.reduce((s: number, a: any) => s + (a.allocatedUnits || 0), 0);
-                                  const f = eff > 0 ? allocUnits / eff : 0;
-                                  const projectId = allocs[0]?.projectStage?.project?.id;
-                                  const ps = allocs[0]?.projectStage;
-                                  // Finished work already happened — it can't be moved.
-                                  const isLocked = !!ps && (ps.finished || ps.status === 'COMPLETED' || ps.status === 'CANCELLED');
-                                  const dragId = `${group.key}::${r.stage}::${cell.key}`;
-                                  const stageBar = (
-                                    <div
-                                      className={`cc-cell__row ${isLocked ? 'cc-cell__row--locked' : 'cc-cell__row--draggable'}`}
-                                      style={{ "--stage-color": meta?.color } as React.CSSProperties}
-                                      title={`${stageName(r.stage)} - ${allocUnits} / ${Math.round(eff)} units (${clampPct(f * 100)} of capacity) — ${isLocked ? `${String(ps.status).toLowerCase()}, can't be rescheduled` : 'drag to reschedule'}`}
-                                    >
-                                      <span
-                                        className="cc-cell__rowfill"
-                                        style={{ width: `${Math.min(f * 100, 100)}%`, background: meta?.color }}
-                                      />
-                                      <GripVertical size={10} className="cc-cell__grip" />
-                                      <span className="cc-cell__rowdot" style={{ background: meta?.color }} />
-                                      <span className="cc-cell__rowabbr">{stageName(r.stage)}</span>
-                                      <span className="cc-cell__rowpct">{clampPct(f * 100)}</span>
-                                    </div>
-                                  );
-                                  // Only make draggable if we have a project ID and the stage isn't finished
-                                  if (!projectId || isLocked) {
-                                    return <div key={`${r.id}-${group.key}`}>{stageBar}</div>;
-                                  }
-                                  return (
-                                    <DraggableStageBar
-                                      key={`${r.id}-${group.key}`}
-                                      id={dragId}
-                                      data={{
-                                        projectId,
-                                        projectLabel: group.label,
-                                        stage: r.stage,
-                                        sourceDate: cell.key,
-                                        cellUnits: allocUnits,
-                                      }}
-                                    >
-                                      {stageBar}
-                                    </DraggableStageBar>
-                                  );
-                                })}
-                                {group.entries.length > barsToShow.length && (
-                                  <span className="cc-cell__more">+{group.entries.length - barsToShow.length} more</span>
-                                )}
-                              </div>
-                            );
-                          });
-                        })()}
-                        {dayRows.length > 4 && (
-                          <span className="cc-cell__more">+{dayRows.length - 4} stage{dayRows.length - 4 > 1 ? "s" : ""}</span>
+                        {day.groups.map((group) => (
+                          <div
+                            key={group.projectId}
+                            className="cc-cell__pgroup"
+                          >
+                            <span className="cc-cell__pdiv" title={group.label}>
+                              <span>{group.label}</span>
+                            </span>
+                            {group.bars.map((bar) => {
+                              const meta = STAGE_META[bar.stage as CapacityStage];
+                              const dragId = `${group.projectId}::${bar.stage}::${cell.key}`;
+                              return (
+                                <DraggableStageBar
+                                  key={dragId}
+                                  id={dragId}
+                                  data={{
+                                    projectId: group.projectId,
+                                    projectLabel: group.label,
+                                    stage: bar.stage,
+                                    sourceDate: cell.key,
+                                    cellUnits: bar.units,
+                                  }}
+                                >
+                                  <div
+                                    className="cc-cell__row cc-cell__row--draggable"
+                                    style={{ "--stage-color": meta?.color } as React.CSSProperties}
+                                    title={`${stageName(bar.stage)} - ${bar.units} / ${Math.round(bar.eff)} units (${clampPct(bar.pct)} of capacity) — drag to reschedule`}
+                                  >
+                                    <span
+                                      className="cc-cell__rowfill"
+                                      style={{ width: `${Math.min(bar.pct, 100)}%`, background: meta?.color }}
+                                    />
+                                    <GripVertical size={10} className="cc-cell__grip" />
+                                    <span className="cc-cell__rowdot" style={{ background: meta?.color }} />
+                                    <span className="cc-cell__rowabbr">{stageName(bar.stage)}</span>
+                                    <span className="cc-cell__rowpct">{clampPct(bar.pct)}</span>
+                                  </div>
+                                </DraggableStageBar>
+                              );
+                            })}
+                            {group.more > 0 && (
+                              <span className="cc-cell__more">+{group.more} more</span>
+                            )}
+                          </div>
+                        ))}
+                        {day.moreStages > 0 && (
+                          <span className="cc-cell__more">+{day.moreStages} stage{day.moreStages > 1 ? "s" : ""}</span>
                         )}
                       </div>
                     )}
@@ -1492,7 +1318,7 @@ const handleDragEnd = useCallback((event: DragEndEvent) => {
           </section>
         </DndContext>
       ) : (
-        <Ledger rows={filtered} effMax={effMax} allocsOf={allocsOf} slots={slots} />
+        <Ledger rows={data?.rows || []} pi={piQuery} customer={customerQuery} />
       )}
 
       {/* Reschedule quantity dialog — choose how many of the cell's units to move */}
@@ -1634,34 +1460,57 @@ const StageRail: React.FC<{
 /* ------------------------------------------------------------------ *
  * Ledger (table) view
  * ------------------------------------------------------------------ */
+type LedgerLine = Awaited<ReturnType<typeof getCalendarRowAllocations>>[number];
+type LedgerViewRow = CapacityLedgerRow & { isZeroRow?: boolean };
+
 const Ledger: React.FC<{
-  rows: any[]; effMax: (r: any) => number; allocsOf: (r: any) => any[];
-  slots: Record<string, any>;
-}> = ({ rows, effMax, allocsOf, slots }) => {
+  rows: CapacityLedgerRow[];
+  pi: string;
+  customer: string;
+}> = ({ rows, pi, customer }) => {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showAllStagesForDate, setShowAllStagesForDate] = useState(false);
+  // Allocation lines are loaded per row the first time it is opened. The cache
+  // belongs to one `rows` response, so new data starts with an empty cache.
+  type LineState = LedgerLine[] | "loading" | "error";
+  const [lineCache, setLineCache] = useState<{ rows: CapacityLedgerRow[]; byId: Record<string, LineState> }>({ rows, byId: {} });
+  const lines = lineCache.rows === rows ? lineCache.byId : {};
+  const setLine = (id: string, value: LineState) =>
+    setLineCache((c) => ({ rows, byId: { ...(c.rows === rows ? c.byId : {}), [id]: value } }));
 
-  const sorted = [...rows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const allPossibleStages = Object.values(ProjectStatus);
+  const toggleRow = (id: string) => {
+    const opening = !open[id];
+    setOpen((o) => ({ ...o, [id]: !o[id] }));
+    if (!opening || Array.isArray(lines[id]) || lines[id] === "loading") return;
+    setLine(id, "loading");
+    getCalendarRowAllocations({ rowId: id, pi: pi || undefined, customer: customer || undefined })
+      .then((res) => setLine(id, res))
+      .catch(() => setLine(id, "error"));
+  };
 
-  const getProcessedRows = () => {
-    if (!selectedDate) return sorted;
-    const dateFiltered = sorted.filter(r => dateKeyOf(r.date) === selectedDate);
+  const allPossibleStages = Object.values(ProjectStatus) as string[];
+
+  const getProcessedRows = (): LedgerViewRow[] => {
+    if (!selectedDate) return rows;
+    const dateFiltered = rows.filter((r) => r.date === selectedDate);
     if (!showAllStagesForDate) return dateFiltered;
-    const existingStages = new Set(dateFiltered.map(r => r.stage));
-    const result = [...dateFiltered];
+    const existingStages = new Set(dateFiltered.map((r) => r.stage));
+    const result: LedgerViewRow[] = [...dateFiltered];
     for (const stage of allPossibleStages) {
       if (!existingStages.has(stage)) {
-        const templateRow = rows.find(r => r.stage === stage) || rows[0];
+        const templateRow = rows.find((r) => r.stage === stage) || rows[0];
         if (templateRow) {
           result.push({
             ...templateRow,
             id: `${selectedDate}-${stage}-zero`,
-            stage: stage,
+            stage,
             date: selectedDate,
-            usedCapacity: 0,
+            used: 0,
             usedHours: 0,
+            frac: 0,
+            over: false,
+            lines: 0,
             isZeroRow: true,
           });
         }
@@ -1674,10 +1523,10 @@ const Ledger: React.FC<{
 
   return (
     <div className="cc-ledger">
-      <div className="cc-ledger__filters" style={{ 
-        marginBottom: '1rem', 
-        padding: '0.75rem', 
-        background: 'var(--cc-inset)', 
+      <div className="cc-ledger__filters" style={{
+        marginBottom: '1rem',
+        padding: '0.75rem',
+        background: 'var(--cc-inset)',
         borderRadius: '6px',
         display: 'flex',
         gap: '1rem',
@@ -1685,15 +1534,15 @@ const Ledger: React.FC<{
       }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontWeight: 500 }}>Filter by date:</span>
-          <select 
-            value={selectedDate || ''} 
+          <select
+            value={selectedDate || ''}
             onChange={(e) => {
               const newDate = e.target.value || null;
               setSelectedDate(newDate);
               setShowAllStagesForDate(!!newDate);
               setOpen({});
             }}
-            style={{ 
+            style={{
               padding: '0.25rem 0.5rem',
               borderRadius: '4px',
               border: '1px solid var(--cc-line)',
@@ -1701,15 +1550,15 @@ const Ledger: React.FC<{
             }}
           >
             <option value="">All dates</option>
-            {Array.from(new Set(rows.map(r => dateKeyOf(r.date)))).sort().map(date => (
+            {Array.from(new Set(rows.map((r) => r.date))).sort().map((date) => (
               <option key={date} value={date}>{date}</option>
             ))}
           </select>
         </label>
         {selectedDate && (
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               checked={showAllStagesForDate}
               onChange={(e) => {
                 setShowAllStagesForDate(e.target.checked);
@@ -1726,27 +1575,23 @@ const Ledger: React.FC<{
       </div>
       <div className="cc-ledger__body">
         {finalRows.map((r, i) => {
-          const eff = effMax(r);
-          const frac = r.isZeroRow ? 0 : dayFrac(r);
-          const over = r.isZeroRow ? false : rowOver(r);
-          const allocs = r.isZeroRow ? [] : allocsOf(r);
-          const lot = slots[r.stage] || {};
-          const d = dateFromKey(dateKeyOf(r.date));
+          const d = dateFromKey(r.date);
           const isOpen = !!open[r.id];
-          const isZeroRow = r.isZeroRow;
+          const isZeroRow = !!r.isZeroRow;
           const isDesign = r.stage === CapacityStage.DESIGN;
+          const rowLines = lines[r.id];
 
           return (
             <React.Fragment key={r.id}>
               <div
                 className={`cc-lrow ${isZeroRow ? 'cc-lrow--zero' : ''}`}
-                style={{ 
+                style={{
                   animationDelay: `${i * 6}ms`,
                   opacity: isZeroRow ? 0.6 : 1,
                   backgroundColor: isZeroRow ? 'var(--cc-inset)' : 'transparent',
                   cursor: isZeroRow ? 'default' : 'pointer',
                 }}
-                onClick={() => !isZeroRow && setOpen((o) => ({ ...o, [r.id]: !o[r.id] }))}
+                onClick={() => !isZeroRow && toggleRow(r.id)}
               >
                 <span className="cc-lrow__date">
                   <span>{d.toLocaleDateString()}</span>
@@ -1758,36 +1603,37 @@ const Ledger: React.FC<{
                   {isZeroRow && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--cc-dim)' }}>(zero)</span>}
                 </span>
                 <span className="cc-lrow__load">
-                  <Meter frac={frac} over={over} thin />
-                  <b className="cc-mono" style={{ color: isZeroRow ? 'var(--cc-dim)' : heatVar(frac, over) }}>
-                    {isZeroRow ? '0%' : clampPct(frac * 100)}
+                  <Meter frac={r.frac} over={r.over} thin />
+                  <b className="cc-mono" style={{ color: isZeroRow ? 'var(--cc-dim)' : heatVar(r.frac, r.over) }}>
+                    {isZeroRow ? '0%' : clampPct(r.frac * 100)}
                   </b>
                 </span>
                 <span className="cc-mono cc-lrow__eff">
-                  {Math.round(r.usedCapacity || 0)}/{Math.round(eff)}
-                  {(lot.parallelSlots || 1) > 1 && <i className="cc-x2">×{lot.parallelSlots}</i>}
+                  {Math.round(r.used)}/{Math.round(r.eff)}
+                  {r.parallelSlots > 1 && <i className="cc-x2">×{r.parallelSlots}</i>}
                 </span>
                 <span className="cc-mono">
-                  {(r.usedHours || 0).toFixed(1)}/{dayHoursOf(r).toFixed(1)}
+                  {r.usedHours.toFixed(1)}/{r.dayHours.toFixed(1)}
                 </span>
                 <span className="cc-mono cc-lrow__lines">
-                  {allocs.length}
-                  {over && isDesign && <span className="cc-lrow__flag">OVER</span>}
+                  {r.lines}
+                  {r.over && isDesign && <span className="cc-lrow__flag">OVER</span>}
                 </span>
               </div>
               {isOpen && !isZeroRow && (
                 <div className="cc-lexpand">
-                  {allocs.length === 0 ? (
+                  {rowLines === "loading" || rowLines === undefined ? (
+                    <p className="cc-allocs__empty cc-mono">Loading allocation lines…</p>
+                  ) : rowLines === "error" ? (
+                    <p className="cc-allocs__empty cc-mono">Could not load allocation lines.</p>
+                  ) : rowLines.length === 0 ? (
                     <p className="cc-allocs__empty cc-mono">No allocation lines.</p>
                   ) : (
-                    allocs.map((a: any) => (
+                    rowLines.map((a) => (
                       <div key={a.id} className="cc-alloc cc-alloc--wide">
-                        <span className="cc-alloc__proj">
-                          {a.projectStage?.project?.invoice?.piNumber || 
-                           a.projectStage?.project?.customer?.name || "—"}
-                        </span>
+                        <span className="cc-alloc__proj">{a.label}</span>
                         <span className="cc-alloc__u cc-mono">
-                          {a.allocatedUnits} units · {a.allocatedHours} h
+                          {a.units} units · {a.hours} h
                         </span>
                         <span className="cc-mono cc-alloc__date">
                           {new Date(a.allocationDate).toLocaleDateString()}
@@ -1832,6 +1678,9 @@ const CC_STYLES = `
   font-family:var(--cc-display);
   color:var(--cc-ink);
   display:flex; flex-direction:column; gap:16px;
+  /* Size to the page, never to the content: the dashboard ScrollArea grows to
+     its widest child, which pushed the 7th column and buttons off-screen. */
+  width:100%; min-width:0; contain:inline-size;
 }
 .capcal .cc-mono{font-family:var(--cc-mono);font-feature-settings:"tnum" 1;letter-spacing:-.02em;}
 
@@ -1852,7 +1701,8 @@ const CC_STYLES = `
 .capcal .cc-stamp__k{font-family:var(--cc-mono);font-size:10px;letter-spacing:.2em;color:var(--cc-dim);}
 .capcal .cc-stamp__v{font-size:18px;font-weight:600;}
 .capcal .cc-stamp__e{font-size:11px;color:var(--cc-dim);}
-.capcal .cc-actions{display:flex;gap:8px;}
+.capcal .cc-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.capcal .cc-mast__meta{max-width:100%;}
 .capcal .cc-btn{font-family:var(--cc-display);gap:6px;border-radius:9px;}
 .capcal .cc-btn--danger{background:transparent;border:1px solid color-mix(in srgb,var(--cc-over) 50%,transparent);color:var(--cc-over);}
 .capcal .cc-btn--danger:hover{background:color-mix(in srgb,var(--cc-over) 12%,transparent);}
@@ -1864,7 +1714,7 @@ const CC_STYLES = `
 
 /* Telemetry */
 /* Telemetry header */
-.capcal .cc-telemetry-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:4px;}
+.capcal .cc-telemetry-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;}
 .capcal .cc-telemetry-header__left{display:flex;align-items:center;gap:8px;}
 .capcal .cc-range-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--cc-mono);
   font-size:11.5px;font-weight:600;color:var(--cc-low);padding:5px 12px;border-radius:8px;
@@ -1915,7 +1765,7 @@ const CC_STYLES = `
 .capcal .cc-chip.is-on .cc-dot{box-shadow:0 0 0 2px hsl(var(--background));}
 .capcal .cc-dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none;}
 .capcal .cc-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.capcal .cc-legend{display:flex;gap:10px;}
+.capcal .cc-legend{display:flex;gap:10px;flex-wrap:wrap;}
 .capcal .cc-legend__i{display:inline-flex;align-items:center;gap:5px;font-family:var(--cc-mono);font-size:10px;color:var(--cc-dim);letter-spacing:.06em;}
 .capcal .cc-legend__i i{width:10px;height:10px;border-radius:3px;}
 .capcal .cc-seg{display:inline-flex;border:1px solid var(--cc-line);border-radius:9px;overflow:hidden;background:var(--cc-surface);}
@@ -1928,7 +1778,7 @@ const CC_STYLES = `
 
 
 /* Board */
-.capcal .cc-board{border:1px solid var(--cc-line);border-radius:14px;background:var(--cc-surface);padding:14px;}
+.capcal .cc-board{border:1px solid var(--cc-line);border-radius:14px;background:var(--cc-surface);padding:14px;overflow-x:auto;}
 .capcal .cc-board__head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .capcal .cc-monthnav{display:flex;align-items:center;gap:10px;}
 .capcal .cc-monthnav button{width:30px;height:30px;border-radius:8px;border:1px solid var(--cc-line);background:transparent;
@@ -1943,10 +1793,10 @@ const CC_STYLES = `
 .capcal .cc-today--dated span:first-child{font-size:12px;font-weight:700;color:var(--cc-ink);letter-spacing:.04em;}
 .capcal .cc-today__ec{font-size:10px;font-weight:600;opacity:.75;}
 .capcal .cc-today:hover{color:var(--cc-ink);border-color:var(--cc-dim);}
-.capcal .cc-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;}
+.capcal .cc-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-bottom:6px;min-width:560px;}
 .capcal .cc-dow span{font-family:var(--cc-mono);font-size:10px;letter-spacing:.12em;color:var(--cc-dim);text-align:center;padding:2px 0;}
 .capcal .cc-dow .cc-dow--off{color:color-mix(in srgb,var(--cc-dim) 55%,transparent);}
-.capcal .cc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.capcal .cc-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;min-width:560px;}
 .capcal .cc-cell{min-height:128px;border:1px solid var(--cc-line);border-radius:10px;background:var(--cc-surface);
   padding:7px;display:flex;flex-direction:column;gap:4px;text-align:left;cursor:default;position:relative;overflow:hidden;
   transition:transform .18s,box-shadow .18s,border-color .18s;animation:cc-rise .4s both;}
@@ -1989,6 +1839,8 @@ const CC_STYLES = `
 .capcal .cc-cell__more{font-size:9px;color:var(--cc-dim);align-self:flex-start;padding:1px 5px;border-radius:5px;
   border:1px dashed var(--cc-line);background:var(--cc-surface);}
 @media(max-width:760px){
+  /* Compact cells (no bars) fit any width without scrolling */
+  .capcal .cc-grid,.capcal .cc-dow{min-width:0;}
   .capcal .cc-cell{min-height:60px;}
   .capcal .cc-cell__bars{display:none;}
   .capcal .cc-cell__peak{font-size:11px;}
@@ -2013,7 +1865,8 @@ const CC_STYLES = `
 
 
 /* Ledger */
-.capcal .cc-ledger{border:1px solid var(--cc-line);border-radius:14px;background:var(--cc-surface);overflow:hidden;}
+.capcal .cc-ledger{border:1px solid var(--cc-line);border-radius:14px;background:var(--cc-surface);overflow-x:auto;}
+.capcal .cc-ledger__head,.capcal .cc-ledger__body{min-width:640px;}
 .capcal .cc-ledger__head,.capcal .cc-lrow{display:grid;grid-template-columns:1.3fr 1fr 1.4fr .9fr .9fr .7fr;gap:12px;align-items:center;padding:11px 16px;}
 .capcal .cc-ledger__head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cc-dim);border-bottom:1px solid var(--cc-line);background:var(--cc-inset);}
 .capcal .cc-lrow{border-bottom:1px solid var(--cc-line);cursor:pointer;transition:background .15s;animation:cc-rise .4s both;font-size:13px;}

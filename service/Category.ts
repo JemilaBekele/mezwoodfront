@@ -48,9 +48,10 @@ export const getCategories = async () => {
     throw error;
   }
 };
-export const getAllDailyStageCapacities = async () => {
+// Optional range (YYYY-MM-DD) limits the days returned, e.g. one day for the day page
+export const getAllDailyStageCapacities = async (range?: { from?: string; to?: string }) => {
   try {
-    const response = await axiosInstance.get(`/daily/all/capacity`);
+    const response = await axiosInstance.get(`/daily/all/capacity`, { params: range });
     
     // Extract the array from the nested structure
     // The array is at response.data.category.dailyStageCapacities
@@ -318,4 +319,124 @@ export const deleteColour = async (id: string, req?: IncomingMessage) => {
   } catch (error) {
     throw error;
   }
+};
+
+/* =========================
+   Capacity Calendar page (one request: grid + KPIs + stage load)
+========================= */
+export type CapacityLoadLevel = 'IDLE' | 'LOW' | 'MED' | 'HIGH' | 'CRIT' | 'OVER' | 'VIOLATION';
+
+export interface CapacityCalendarParams {
+  from: string; // first day of the visible grid (YYYY-MM-DD)
+  to: string; // last day of the visible grid
+  stage?: string; // CapacityStage or 'ALL'
+  pi?: string;
+  customer?: string;
+  kpiFrom?: string;
+  kpiTo?: string;
+  loadFrom?: string;
+  loadTo?: string;
+  view?: 'board' | 'ledger';
+}
+
+export interface CapacityCalendarBar {
+  stage: string;
+  units: number;
+  eff: number;
+  pct: number;
+}
+
+export interface CapacityCalendarDay {
+  date: string;
+  loadPct: number;
+  level: CapacityLoadLevel;
+  over: boolean;
+  violation: boolean;
+  maxOverPct: number;
+  stageCount: number;
+  groups: { projectId: string; label: string; bars: CapacityCalendarBar[]; more: number }[];
+  moreStages: number;
+}
+
+export interface CapacityLedgerRow {
+  id: string;
+  date: string;
+  stage: string;
+  used: number;
+  eff: number;
+  usedHours: number;
+  dayHours: number;
+  frac: number;
+  over: boolean;
+  lines: number;
+  parallelSlots: number;
+}
+
+export interface CapacityCalendarResponse {
+  success: boolean;
+  range: { from: string; to: string };
+  kpis: {
+    range: { from: string; to: string };
+    workingDays: number;
+    utilizationPct: number;
+    scheduledUnits: number;
+    capacityUnits: number;
+    allocationLines: number;
+    hoursLoaded: number;
+    hoursAvailable: number;
+    hoursAvailablePct: number;
+    overDays: number;
+    violationDays: number;
+  };
+  stageLoad: {
+    range: { from: string; to: string };
+    workingDays: number;
+    stages: {
+      stage: string;
+      units: number;
+      capacity: number;
+      pct: number;
+      over: boolean;
+      violation: boolean;
+      parallelSlots: number;
+    }[];
+  };
+  days: CapacityCalendarDay[];
+  rows: CapacityLedgerRow[];
+}
+
+// React StrictMode (dev) runs effects twice; identical requests still in
+// flight share one HTTP call instead of firing twice.
+const inflightCalendar = new Map<string, Promise<CapacityCalendarResponse>>();
+
+/** Filtered, aggregated Capacity Calendar data. Throws so the page can offer Retry. */
+export const getCapacityCalendar = (params: CapacityCalendarParams) => {
+  const key = JSON.stringify(params);
+  const pending = inflightCalendar.get(key);
+  if (pending) return pending;
+  const request = axiosInstance
+    .get<CapacityCalendarResponse>('/capacity/calendar', { params })
+    .then((response) => response.data)
+    .finally(() => inflightCalendar.delete(key));
+  inflightCalendar.set(key, request);
+  return request;
+};
+
+/** Allocation lines of one ledger row, loaded when the row is opened. */
+export const getCalendarRowAllocations = async (params: {
+  rowId: string;
+  pi?: string;
+  customer?: string;
+}) => {
+  const response = await axiosInstance.get<{
+    lines: {
+      id: string;
+      label: string;
+      units: number;
+      hours: number;
+      allocationDate: string;
+      isOverCapacity: boolean;
+    }[];
+  }>('/capacity/calendar/allocations', { params });
+  return response.data.lines;
 };

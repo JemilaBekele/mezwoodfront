@@ -168,8 +168,9 @@ export default function DayDetailPage() {
     try {
       setLoading(true);
       setError(null);
+      // Only this day's rows are needed (the page used to load every day)
       const [caps, lotRes] = await Promise.all([
-        getAllDailyStageCapacities(),
+        getAllDailyStageCapacities(dateParam ? { from: dateParam, to: dateParam } : undefined),
         getAllCapacitySlots().catch(() => ({ capacitySlots: [] })),
       ]);
       const map: Record<string, any> = {};
@@ -188,7 +189,7 @@ export default function DayDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateParam]);
 
   useEffect(() => {
     fetchData();
